@@ -243,6 +243,33 @@
     stock[p.id] = { ...p, count: c + n };
   }
 
+  function getSmeltGainSummary(beforeStock, afterStock) {
+    const before = cloneSmeltStock(beforeStock);
+    const after = cloneSmeltStock(afterStock);
+    const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+    const gains = [];
+    keys.forEach((k) => {
+      const b = before[k] && typeof before[k].count === 'number' ? before[k].count : 0;
+      const a = after[k] && typeof after[k].count === 'number' ? after[k].count : 0;
+      const d = a - b;
+      if (d <= 0) return;
+      const ref = after[k] || before[k] || { id: k, name: k, emoji: '◆' };
+      gains.push({
+        id: String(ref.id || k),
+        name: String(ref.name || k),
+        emoji: String(ref.emoji || '◆'),
+        count: d,
+      });
+    });
+    gains.sort((x, y) => y.count - x.count || x.name.localeCompare(y.name, 'ko'));
+    return gains;
+  }
+
+  function formatSmeltGainSummary(gains) {
+    if (!Array.isArray(gains) || gains.length === 0) return '';
+    return gains.map((g) => `${g.emoji} ${g.name} +${g.count}`).join(', ');
+  }
+
   /** 로그인 시 서버 재고를 불러오고, 서버가 비어 있으면 로컬 산출물을 한 번 이관 */
   async function syncSmeltFromServer() {
     if (!alpToken || !platformApi) {
@@ -413,7 +440,8 @@
     if (btnSmelt) btnSmelt.disabled = true;
 
     try {
-      let stock = cloneSmeltStock(loadSmeltStock());
+      const beforeStock = cloneSmeltStock(loadSmeltStock());
+      let stock = cloneSmeltStock(beforeStock);
 
       if (needsServer) {
         const catchIds = serverCatches.map((m) => String(m.serverId).trim());
@@ -457,7 +485,11 @@
       refreshMaterials();
       syncFurnaceUi();
       syncForgeUi();
-      setFurnaceMsg(`${toMelt.length}개를 녹였습니다.`);
+      const gains = getSmeltGainSummary(beforeStock, stock);
+      const gainText = formatSmeltGainSummary(gains);
+      setFurnaceMsg(
+        gainText ? `${toMelt.length}개를 녹였습니다. 산출: ${gainText}` : `${toMelt.length}개를 녹였습니다.`,
+      );
       window.setTimeout(() => setFurnaceMsg(''), 3200);
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
