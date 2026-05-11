@@ -395,8 +395,14 @@
     } else {
       resultDesc.textContent = `${aiLine}${baseDesc}`;
     }
-    const em = eq.emoji || eq.icon || matEmoji(String(eq.name || ''));
-    resultSpriteHost.textContent = em;
+    resultSpriteHost.innerHTML = '';
+    const eqArt = sanitizeForgePixelArt(eq.pixelArt || eq.pixel_art);
+    if (eqArt) {
+      mountForgePixelArt(resultSpriteHost, eqArt, 88, 88);
+    } else {
+      const em = eq.emoji || eq.icon || matEmoji(String(eq.name || ''));
+      resultSpriteHost.textContent = em;
+    }
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
@@ -488,6 +494,24 @@
     };
   }
 
+  /** 보관함 썸네일과 동일: pixelArt 우선, 없으면 이모지 */
+  function mountCraftedThumb(hostEl, item) {
+    if (!hostEl) return;
+    hostEl.className = 'cr-thumb';
+    hostEl.innerHTML = '';
+    const art = sanitizeForgePixelArt(item.pixelArt || item.pixel_art);
+    if (art) {
+      mountForgePixelArt(hostEl, art, 56, 56);
+      return;
+    }
+    const em = item.emoji || item.icon || matEmoji(String(item.name || item.displayName || ''));
+    const span = document.createElement('span');
+    span.className = 'cr-emoji-fallback';
+    span.setAttribute('aria-hidden', 'true');
+    span.textContent = em;
+    hostEl.appendChild(span);
+  }
+
   async function refreshCraftedList() {
     if (!craftedListEl) return;
     if (!alpToken || !platformApi) {
@@ -550,7 +574,7 @@
           const id = String(item.id).trim();
           const nameStr = item.name || item.displayName || '장비';
           const tier = String(item.tier || item.rarity || 'common').toLowerCase();
-          const pa = sanitizeForgePixelArt(item.pixelArt);
+          const pa = sanitizeForgePixelArt(item.pixelArt || item.pixel_art);
           return {
             uid: `eq-${id}`,
             name: nameStr,
@@ -571,6 +595,10 @@
         const c = normalizeCraftedRow(item);
         const row = document.createElement('div');
         row.className = 'crafted-row';
+        const thumb = document.createElement('div');
+        mountCraftedThumb(thumb, item);
+        row.appendChild(thumb);
+        const body = document.createElement('div');
         const st = c.stats;
         const durPart =
           st && st.durabilityMax != null && Number.isFinite(Number(st.durabilityMax))
@@ -584,15 +612,13 @@
           st && st.avgSourceSize != null
             ? `<div class="cr-stats cr-stats--sub">재료 평균 크기 ${escapeHtml(String(st.avgSourceSize))}${st.maxSourceSize != null ? ` · 최대 ${escapeHtml(String(st.maxSourceSize))}` : ''}</div>`
             : '';
-        row.innerHTML = `
-        <span class="cr-emoji">${c.emoji || '⚒️'}</span>
-        <div>
+        body.innerHTML = `
           <strong>${escapeHtml(c.name)}</strong>
           <div class="cr-desc">${escapeHtml(c.desc || '')}</div>
           ${statsLine}
           ${sizeLine}
-        </div>
-      `;
+        `;
+        row.appendChild(body);
         craftedListEl.appendChild(row);
       });
     } catch {
