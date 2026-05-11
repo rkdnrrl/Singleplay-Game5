@@ -326,6 +326,14 @@ body {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 200, 120, 0.2);
   color: #ffe0b2;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.smelt-pill:disabled {
+  opacity: 0.48;
+  cursor: default;
 }
 
 .smelt-pill--empty {
