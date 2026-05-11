@@ -1156,7 +1156,8 @@
         '서버에 Gemini 키(GEMINI_API_KEY 또는 GOOGLE_AI_API_KEY)가 없어, 재료 규칙으로 이름·스탯을 정했어요.',
       timeout: 'AI 응답이 지연되어(타임아웃) 로컬 규칙으로 이름·스탯을 정했어요.',
       network: 'AI 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.',
-      api_error: 'AI API 오류로 로컬 규칙으로 이름·스탯을 정했어요.',
+      api_error:
+        'AI API 오류(모델명·할당량·Generative Language API 미활성 등)로 로컬 규칙을 썼어요. 서버에 GEMINI_MODEL=gemini-2.0-flash 로 바꿔 보세요.',
       blocked: 'AI 안전 정책으로 이름 생성이 제한되어 로컬 규칙을 썼어요.',
       parse_error: 'AI 응답을 해석하지 못해 로컬 규칙으로 이름·스탯을 정했어요.',
       incomplete_response: 'AI가 완전한 이름·스탯을 주지 않아 로컬 규칙을 썼어요.',
