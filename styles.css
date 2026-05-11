@@ -601,6 +601,16 @@ body {
   }
 }
 
+.result-card .result-size {
+  white-space: pre-line;
+}
+
+.cr-stats {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--muted, #78909c);
+}
+
 .result-card.rarity-common {
   border-color: var(--common);
   box-shadow: 0 0 12px rgba(120, 144, 156, 0.5);

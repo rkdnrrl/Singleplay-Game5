@@ -8,6 +8,12 @@
 
   const RECIPES = window.FORGE_RECIPES || [];
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const alpToken = urlParams.get('token');
+  const platformApi = window.__ALP_PLATFORM_API__ || '';
+
+  let forgeInFlight = false;
+
   const MAT_EMOJI_POOL = [
     '🐟', '🐠', '🐡', '🪸', '🦑', '🪼', '🐙', '✨', '🌌', '💎', '🔮', '🛸',
     '🪨', '⚙️', '🧩', '☄️', '🌠', '💫', '🔱', '🫧', '🌀', '🦈', '🐬',
@@ -415,7 +421,7 @@
     if (resultCard) resultCard.classList.add('hidden');
   }
 
-  function showResultCard(rec) {
+  function showResultCard(rec, stats) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
     const tier = rec.out.tier || 'rare';
@@ -423,13 +429,20 @@
     resultRarity.className = `result-rarity rarity-${rarityClass(tier)}`;
     resultRarity.textContent = tierLabel(tier);
     resultName.textContent = rec.out.name;
-    resultDesc.textContent = rec.out.desc || '';
+    const baseDesc = rec.out.desc || '';
+    if (stats && typeof stats.attackBonus === 'number') {
+      const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
+      resultDesc.textContent = `${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%`;
+    } else {
+      resultDesc.textContent = baseDesc;
+    }
     resultSpriteHost.textContent = rec.out.emoji || '⚒️';
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
 
-  function forge() {
+  async function forge() {
+    if (forgeInFlight) return;
     if (selected.length === 0) return;
     const hit = findRecipeFor(selected);
     if (!hit) {
@@ -439,6 +452,57 @@
       return;
     }
     const { rec, used } = hit;
+
+    const catchIds = used
+      .map((m) => m.serverId)
+      .filter((id) => id != null && String(id).length > 0);
+    const canServerCraft =
+      Boolean(alpToken && platformApi) && catchIds.length === used.length;
+
+    let serverStats = null;
+    let serverEquipment = null;
+    if (canServerCraft) {
+      forgeInFlight = true;
+      if (btnForge) {
+        btnForge.disabled = true;
+        btnForge.textContent = '제련 중…';
+      }
+      try {
+        const res = await fetch(`${platformApi}/api/craft/equipment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${alpToken}`,
+          },
+          body: JSON.stringify({ recipeId: rec.id, catchIds }),
+        });
+        const text = await res.text();
+        let data = null;
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch {
+            data = null;
+          }
+        }
+        if (!res.ok || !data || !data.equipment) {
+          const msg = (data && data.error && data.error.message) || `서버 저장 실패 (${res.status})`;
+          if (statusMsgEl) statusMsgEl.textContent = msg;
+          return;
+        }
+        serverEquipment = data.equipment;
+        serverStats = data.equipment.stats || null;
+      } catch {
+        if (statusMsgEl) {
+          statusMsgEl.textContent = '네트워크 오류로 서버에 저장하지 못했어요.';
+        }
+        return;
+      } finally {
+        forgeInFlight = false;
+        if (btnForge) btnForge.textContent = '⚒️ 제련하기';
+        syncForgeUi();
+      }
+    }
 
     const uids = used.map((s) => s.uid);
     appendSpent(uids);
@@ -452,6 +516,8 @@
       desc: rec.out.desc,
       tier: rec.out.tier,
       at: Date.now(),
+      stats: serverStats,
+      serverSaved: Boolean(serverEquipment && serverEquipment.id),
     });
     saveCrafted(crafted.slice(0, 80));
 
@@ -464,7 +530,7 @@
     refreshMaterials();
     syncForgeUi();
     renderCrafted();
-    showResultCard(rec);
+    showResultCard(rec, serverStats);
   }
 
   function renderCrafted() {
@@ -478,11 +544,17 @@
     list.forEach((c) => {
       const row = document.createElement('div');
       row.className = 'crafted-row';
+      const st = c.stats;
+      const statsLine =
+        st && typeof st.attackBonus === 'number'
+          ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%</div>`
+          : '';
       row.innerHTML = `
         <span class="cr-emoji">${c.emoji || '⚒️'}</span>
         <div>
           <strong>${escapeHtml(c.name)}</strong>
           <div class="cr-desc">${escapeHtml(c.desc || '')}</div>
+          ${statsLine}
         </div>
       `;
       craftedListEl.appendChild(row);
@@ -502,7 +574,7 @@
       syncForgeUi();
     });
   }
-  if (btnForge) btnForge.addEventListener('click', forge);
+  if (btnForge) btnForge.addEventListener('click', () => void forge());
   window.addEventListener('storage', onStorage);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hideResultCard();
