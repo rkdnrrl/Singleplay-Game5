@@ -366,7 +366,7 @@
     if (resultCard) resultCard.classList.add('hidden');
   }
 
-  function showResultFromServer(eq, stats) {
+  function showResultFromServer(eq, stats, nameSource) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
     const tier = String(eq.tier || eq.rarity || 'rare').toLowerCase();
@@ -375,15 +375,21 @@
     resultRarity.textContent = tierLabel(tier);
     resultName.textContent = eq.name || eq.displayName || '장비';
     const baseDesc = eq.description || eq.desc || '';
+    const aiLine =
+      nameSource === 'ai'
+        ? '이름 · Gemini 생성\n'
+        : nameSource === 'client_fallback'
+          ? '이름 · 로컬 규칙(AI 응답 없음)\n'
+          : '';
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
       const sz =
         stats.avgSourceSize != null
           ? `\n재료 평균 크기 ${stats.avgSourceSize}${stats.maxSourceSize != null ? ` · 최대 ${stats.maxSourceSize}` : ''}`
           : '';
-      resultDesc.textContent = `${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${sz}`;
+      resultDesc.textContent = `${aiLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${sz}`;
     } else {
-      resultDesc.textContent = baseDesc;
+      resultDesc.textContent = `${aiLine}${baseDesc}`;
     }
     const em = eq.emoji || eq.icon || matEmoji(String(eq.name || ''));
     resultSpriteHost.textContent = em;
@@ -426,7 +432,12 @@
           'Content-Type': 'application/json',
           Authorization: `Bearer ${alpToken}`,
         },
-        body: JSON.stringify({ materials: materialsPayload, name, description }),
+        body: JSON.stringify({
+          materials: materialsPayload,
+          name,
+          description,
+          generateNameWithAi: true,
+        }),
       });
       const text = await res.text();
       let data = null;
@@ -454,7 +465,7 @@
       refreshMaterials();
       syncForgeUi();
       await refreshCraftedList();
-      showResultFromServer(serverEquipment, serverStats);
+      showResultFromServer(serverEquipment, serverStats, data.nameSource);
     } catch {
       if (statusMsgEl) statusMsgEl.textContent = '네트워크 오류로 서버에 저장하지 못했어요.';
     } finally {
