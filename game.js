@@ -94,6 +94,44 @@
     hostEl.appendChild(canvas);
   }
 
+  function isForgePixelImageUrl(pa) {
+    return (
+      pa &&
+      typeof pa === 'object' &&
+      typeof pa.imageDataUrl === 'string' &&
+      /^data:image\/(png|jpeg|webp);base64,/i.test(pa.imageDataUrl.trim())
+    );
+  }
+
+  /** 절차적 pixelArt · PixelLab raster · 이모지 폴백 */
+  function mountForgeThumbOrImage(hostEl, pixelArtVal, fallbackEmoji, cssW, cssH) {
+    if (!hostEl) return;
+    hostEl.innerHTML = '';
+    if (isForgePixelImageUrl(pixelArtVal)) {
+      const im = document.createElement('img');
+      im.src = pixelArtVal.imageDataUrl.trim();
+      im.alt = '';
+      im.decoding = 'async';
+      im.loading = 'lazy';
+      im.draggable = false;
+      im.className = 'forge-raster-thumb';
+      if (cssW != null) im.width = cssW;
+      if (cssH != null) im.height = cssH;
+      hostEl.appendChild(im);
+      return;
+    }
+    const art = sanitizeForgePixelArt(pixelArtVal);
+    if (art) {
+      mountForgePixelArt(hostEl, art, cssW, cssH);
+      return;
+    }
+    const span = document.createElement('span');
+    span.className = 'inv-emoji cr-emoji-fallback';
+    span.setAttribute('aria-hidden', 'true');
+    span.textContent = fallbackEmoji || '⚒️';
+    hostEl.appendChild(span);
+  }
+
   const materialListEl = document.getElementById('materialList');
   const materialScrollWrap = document.getElementById('materialScrollWrap');
   const matCountBadge = document.getElementById('matCountBadge');
@@ -107,12 +145,21 @@
   const resultName = document.getElementById('resultName');
   const resultDesc = document.getElementById('resultDesc');
   const resultSpriteHost = document.getElementById('resultSpriteHost');
+  const forgeOverlayEl = document.getElementById('forgeOverlay');
 
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
   let selected = [];
   let resultHideTimer = 0;
+
+  function setForgeOverlay(visible) {
+    if (!forgeOverlayEl) return;
+    forgeOverlayEl.classList.toggle('forge-overlay--hidden', !visible);
+    forgeOverlayEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    document.documentElement.classList.toggle('forge-scroll-lock', !!visible);
+    document.body.classList.toggle('forge-scroll-lock', !!visible);
+  }
 
   function isEquipmentMaterial(m) {
     return Boolean(m && (m.kind === 'equipment' || m.equipmentId != null));
@@ -273,13 +320,7 @@
       if (selected.some((s) => s.uid === m.uid)) row.classList.add('selected');
       const thumb = document.createElement('div');
       thumb.className = 'inv-thumb';
-      const art = sanitizeForgePixelArt(m.pixelArt);
-      if (art) {
-        mountForgePixelArt(thumb, art, 56, 56);
-      } else {
-        const em = matEmoji(m.name);
-        thumb.innerHTML = `<span class="inv-emoji" aria-hidden="true">${em}</span>`;
-      }
+      mountForgeThumbOrImage(thumb, m.pixelArt, matEmoji(m.name), 56, 56);
       row.appendChild(thumb);
       const nameEl = document.createElement('span');
       nameEl.className = 'inv-name';
@@ -395,14 +436,13 @@
     } else {
       resultDesc.textContent = `${aiLine}${baseDesc}`;
     }
-    resultSpriteHost.innerHTML = '';
-    const eqArt = sanitizeForgePixelArt(eq.pixelArt || eq.pixel_art);
-    if (eqArt) {
-      mountForgePixelArt(resultSpriteHost, eqArt, 88, 88);
-    } else {
-      const em = eq.emoji || eq.icon || matEmoji(String(eq.name || ''));
-      resultSpriteHost.textContent = em;
-    }
+    mountForgeThumbOrImage(
+      resultSpriteHost,
+      eq.pixelArt || eq.pixel_art,
+      eq.emoji || eq.icon || matEmoji(String(eq.name || '')),
+      88,
+      88,
+    );
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
@@ -435,6 +475,7 @@
       btnForge.disabled = true;
       btnForge.textContent = '제련 중…';
     }
+    setForgeOverlay(true);
     try {
       const res = await fetch(`${platformApi}/api/craft/equipment`, {
         method: 'POST',
@@ -479,6 +520,7 @@
     } catch {
       if (statusMsgEl) statusMsgEl.textContent = '네트워크 오류로 서버에 저장하지 못했어요.';
     } finally {
+      setForgeOverlay(false);
       forgeInFlight = false;
       if (btnForge) btnForge.textContent = '⚒️ 제련하기';
       syncForgeUi();
@@ -494,22 +536,17 @@
     };
   }
 
-  /** 보관함 썸네일과 동일: pixelArt 우선, 없으면 이모지 */
+  /** 보관함 썸네일과 동일: PixelLab URL · 절차적 pixelArt · 이모지 */
   function mountCraftedThumb(hostEl, item) {
     if (!hostEl) return;
     hostEl.className = 'cr-thumb';
-    hostEl.innerHTML = '';
-    const art = sanitizeForgePixelArt(item.pixelArt || item.pixel_art);
-    if (art) {
-      mountForgePixelArt(hostEl, art, 56, 56);
-      return;
-    }
-    const em = item.emoji || item.icon || matEmoji(String(item.name || item.displayName || ''));
-    const span = document.createElement('span');
-    span.className = 'cr-emoji-fallback';
-    span.setAttribute('aria-hidden', 'true');
-    span.textContent = em;
-    hostEl.appendChild(span);
+    mountForgeThumbOrImage(
+      hostEl,
+      item.pixelArt || item.pixel_art,
+      item.emoji || item.icon || matEmoji(String(item.name || item.displayName || '')),
+      56,
+      56,
+    );
   }
 
   async function refreshCraftedList() {
@@ -574,12 +611,12 @@
           const id = String(item.id).trim();
           const nameStr = item.name || item.displayName || '장비';
           const tier = String(item.tier || item.rarity || 'common').toLowerCase();
-          const pa = sanitizeForgePixelArt(item.pixelArt || item.pixel_art);
+          const rawPa = item.pixelArt || item.pixel_art || null;
           return {
             uid: `eq-${id}`,
             name: nameStr,
             rarity: tier,
-            pixelArt: pa,
+            pixelArt: rawPa,
             kind: 'equipment',
             equipmentId: id,
             serverId: null,
