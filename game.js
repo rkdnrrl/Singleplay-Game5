@@ -360,7 +360,11 @@
     const baseDesc = eq.description || eq.desc || '';
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
-      resultDesc.textContent = `${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%`;
+      const sz =
+        stats.avgSourceSize != null
+          ? `\n재료 평균 크기 ${stats.avgSourceSize}${stats.maxSourceSize != null ? ` · 최대 ${stats.maxSourceSize}` : ''}`
+          : '';
+      resultDesc.textContent = `${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${sz}`;
     } else {
       resultDesc.textContent = baseDesc;
     }
@@ -497,12 +501,17 @@
           st && typeof st.attackBonus === 'number'
             ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%</div>`
             : '';
+        const sizeLine =
+          st && st.avgSourceSize != null
+            ? `<div class="cr-stats cr-stats--sub">재료 평균 크기 ${escapeHtml(String(st.avgSourceSize))}${st.maxSourceSize != null ? ` · 최대 ${escapeHtml(String(st.maxSourceSize))}` : ''}</div>`
+            : '';
         row.innerHTML = `
         <span class="cr-emoji">${c.emoji || '⚒️'}</span>
         <div>
           <strong>${escapeHtml(c.name)}</strong>
           <div class="cr-desc">${escapeHtml(c.desc || '')}</div>
           ${statsLine}
+          ${sizeLine}
         </div>
       `;
         craftedListEl.appendChild(row);

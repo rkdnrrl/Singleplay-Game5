@@ -611,6 +611,12 @@ body {
   color: var(--muted, #78909c);
 }
 
+.cr-stats.cr-stats--sub {
+  margin-top: 0.1rem;
+  font-size: 0.68rem;
+  opacity: 0.9;
+}
+
 .result-card.rarity-common {
   border-color: var(--common);
   box-shadow: 0 0 12px rgba(120, 144, 156, 0.5);
