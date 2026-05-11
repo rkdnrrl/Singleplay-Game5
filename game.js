@@ -251,50 +251,58 @@
 
   const MAX_EQUIP_NAME = 30;
 
-  function endsWithBatchimKo(str) {
-    const s = String(str);
-    if (!s) return false;
-    const c = s.charCodeAt(s.length - 1);
-    if (Number.isNaN(c) || c < 0xac00 || c > 0xd7a3) return false;
-    return (c - 0xac00) % 28 !== 0;
+  function hangulOnlyUi(s) {
+    return String(s || '').replace(/[^가-힣]/g, '');
   }
 
-  function clampPart(s, maxChars) {
-    const t = String(s != null ? s : '').trim();
-    if (!t) return '재료';
-    if (t.length <= maxChars) return t;
-    return `${t.slice(0, Math.max(1, maxChars - 1))}…`;
+  const BLEND_SUFFIX_UI = ['날', '심', '릭', '드', '텍', '온', '프', '즈', '빛', '심'];
+
+  function pickSuffixUi(seed) {
+    const n = String(seed || '').length;
+    return BLEND_SUFFIX_UI[Math.abs(n * 17) % BLEND_SUFFIX_UI.length];
   }
 
-  /** 재료 이름만으로 짧고 읽기 자연스러운 장비 이름 */
+  /** 서버 휴리스틱과 동일: 짧은 합성 이름 (유리+…버드 등), 풀재료 나열 금지 */
   function mergeEquipmentName(mats) {
     const names = mats.map((m) => String(m.name != null ? m.name : '').trim()).filter((x) => x.length > 0);
-    if (names.length === 0) return '이름 없는 무기';
-    if (names.length === 2) {
-      const a = clampPart(names[0], 10);
-      const b = clampPart(names[1], 10);
-      const link = endsWithBatchimKo(a) ? '과' : '와';
-      let s = `${a}${link} ${b}의 무기`;
-      if (s.length <= MAX_EQUIP_NAME) return s;
-      s = `${a}·${b}의 무기`;
-      return s.slice(0, MAX_EQUIP_NAME);
+    if (names.length === 0) return '무명합금';
+    const hang = names.map((nm) => hangulOnlyUi(nm)).filter((h) => h.length > 0);
+    if (hang.length === 0) return '무명합금';
+    if (hang.length === 1) {
+      const h = hang[0];
+      const core = h.length <= 4 ? h : `${h.slice(0, 2)}${h.slice(-2)}`;
+      return `${core}${pickSuffixUi(h)}`.slice(0, MAX_EQUIP_NAME);
     }
-    if (names.length === 3) {
-      const p = names.map((x) => clampPart(x, 7)).join('·');
-      return `${p}의 무기`.slice(0, MAX_EQUIP_NAME);
+    if (hang.length === 2) {
+      const a = hang[0];
+      const b = hang[1];
+      const head = a.slice(0, 2) || a.slice(0, 1) || '무';
+      const tail = b.length >= 2 ? b.slice(-2) : b.slice(0, Math.min(2, b.length)) || '명';
+      return `${head}${tail}`.slice(0, MAX_EQUIP_NAME);
     }
-    const a0 = clampPart(names[0], 8);
-    const a1 = clampPart(names[1], 6);
-    return `${a0}·${a1} 외 ${names.length - 2}가지 재료 무기`.slice(0, MAX_EQUIP_NAME);
+    if (hang.length === 3) {
+      const c0 = hang[0].slice(0, 1) || '·';
+      const c1 = hang[1].slice(0, 1) || '·';
+      const c2 = hang[2].slice(-1) || hang[2].slice(0, 1) || '·';
+      const suf = pickSuffixUi(hang.join(''));
+      return `${c0}${c1}${c2}${suf}`.slice(0, MAX_EQUIP_NAME);
+    }
+    const bits = hang
+      .slice(0, 4)
+      .map((h) => h.slice(0, 1))
+      .join('');
+    const suf = pickSuffixUi(bits + String(hang.length));
+    return `${bits}${suf}`.slice(0, MAX_EQUIP_NAME);
   }
 
   function mergeEquipmentDesc(mats) {
     const n = mats.length;
+    const short = mergeEquipmentName(mats);
     if (n === 2) {
-      const a = clampPart(mats[0].name, 14);
-      const b = clampPart(mats[1].name, 14);
-      const link = endsWithBatchimKo(a) ? '과' : '와';
-      return `${a}${link} ${b}를 섞어 제련했습니다.`.slice(0, 140);
+      return `「${short}」 두 흔적을 한 덩이로 비벼 냈다.`.slice(0, 140);
+    }
+    if (n >= 3) {
+      return `「${short}」 여러 기운을 한 덩이로 녹였다.`.slice(0, 140);
     }
     return `${n}가지 재료를 섞어 제련했습니다.`;
   }
