@@ -1286,3 +1286,108 @@ body.forge-scroll-lock {
   width: 88px;
   height: 88px;
 }
+
+/* ── AI 시그니처 이름 축하 (제련 완료 후) ───────────────── */
+.signature-celebrate {
+  position: fixed;
+  inset: 0;
+  z-index: 3100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.signature-celebrate--hidden {
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.signature-celebrate-backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 120% 80% at 50% 40%, rgba(255, 215, 0, 0.14), transparent 55%),
+    rgba(4, 6, 18, 0.78);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.signature-celebrate-card {
+  position: relative;
+  z-index: 1;
+  max-width: 20rem;
+  width: 100%;
+  text-align: center;
+  padding: 1.25rem 1.35rem 1.15rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(165deg, rgba(36, 28, 12, 0.96), rgba(18, 20, 40, 0.96));
+  border: 1px solid rgba(255, 215, 0, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 180, 80, 0.12), 0 16px 48px rgba(0, 0, 0, 0.55),
+    0 0 36px rgba(255, 215, 0, 0.22);
+  animation: signature-celebrate-pop 0.45s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+@keyframes signature-celebrate-pop {
+  from {
+    transform: scale(0.88) translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.signature-celebrate-stars {
+  font-size: 1.75rem;
+  line-height: 1;
+  margin-bottom: 0.35rem;
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+}
+
+.signature-celebrate-title {
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: #ffe082;
+  margin: 0 0 0.45rem;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.35);
+}
+
+.signature-celebrate-sub {
+  font-size: 0.8rem;
+  color: rgba(232, 234, 246, 0.82);
+  line-height: 1.45;
+  margin: 0 0 0.65rem;
+}
+
+.signature-celebrate-name {
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 1.15rem;
+  color: #fff8e1;
+  margin: 0 0 1rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  overflow-wrap: anywhere;
+}
+
+.signature-celebrate-dismiss {
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 1rem;
+  padding: 0.5rem 1.35rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  color: #1a1204;
+  background: linear-gradient(180deg, #ffe082, #ffb300);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.signature-celebrate-dismiss:active {
+  transform: translateY(1px);
+}

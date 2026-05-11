@@ -149,6 +149,12 @@
   const resultSpriteHost = document.getElementById('resultSpriteHost');
   const forgeOverlayEl = document.getElementById('forgeOverlay');
   const forgeOverlayTimerEl = document.getElementById('forgeOverlayTimer');
+  const signatureCelebrateEl = document.getElementById('signatureCelebrate');
+  const signatureCelebrateNameEl = document.getElementById('signatureCelebrateName');
+  const signatureCelebrateOkBtn = document.getElementById('signatureCelebrateOk');
+  const signatureCelebrateBackdropEl = signatureCelebrateEl
+    ? signatureCelebrateEl.querySelector('.signature-celebrate-backdrop')
+    : null;
   const furnaceSlotsEl = document.getElementById('furnaceSlots');
   const btnSmelt = document.getElementById('btnSmelt');
   const btnClearFurnace = document.getElementById('btnClearFurnace');
@@ -163,6 +169,8 @@
   /** 용광로에 넣은 재료 (낚시 재료·장비) */
   let furnaceSelected = [];
   let resultHideTimer = 0;
+  let signatureCelebrateTimer = 0;
+  let pendingSignatureCelebrateName = null;
   let forgeOverlayCountdownId = 0;
   let smeltCategory = 'all';
 
@@ -723,9 +731,35 @@
     }, 1000);
   }
 
+  function hideSignatureCelebrate() {
+    window.clearTimeout(signatureCelebrateTimer);
+    signatureCelebrateTimer = 0;
+    if (!signatureCelebrateEl) return;
+    signatureCelebrateEl.classList.add('signature-celebrate--hidden');
+    signatureCelebrateEl.setAttribute('aria-hidden', 'true');
+  }
+
+  function showSignatureCelebrate(displayName) {
+    if (!signatureCelebrateEl || !signatureCelebrateNameEl) return;
+    hideSignatureCelebrate();
+    const label = String(displayName || '').trim() || '장비';
+    signatureCelebrateNameEl.textContent = label;
+    signatureCelebrateEl.classList.remove('signature-celebrate--hidden');
+    signatureCelebrateEl.setAttribute('aria-hidden', 'false');
+    signatureCelebrateTimer = window.setTimeout(hideSignatureCelebrate, 5200);
+  }
+
+  if (signatureCelebrateOkBtn) {
+    signatureCelebrateOkBtn.addEventListener('click', () => hideSignatureCelebrate());
+  }
+  if (signatureCelebrateBackdropEl) {
+    signatureCelebrateBackdropEl.addEventListener('click', () => hideSignatureCelebrate());
+  }
+
   function setForgeOverlay(visible) {
     if (!forgeOverlayEl) return;
     if (visible) {
+      hideSignatureCelebrate();
       startForgeOverlayTimer();
     } else {
       stopForgeOverlayTimer();
@@ -1188,6 +1222,7 @@
     const description = mergeEquipmentDesc(used);
 
     forgeInFlight = true;
+    pendingSignatureCelebrateName = null;
     if (btnForge) {
       btnForge.disabled = true;
       btnForge.textContent = '제련 중…';
@@ -1235,13 +1270,20 @@
       syncForgeUi();
       await refreshCraftedList();
       showResultFromServer(serverEquipment, serverStats, data.nameSource);
+      if (data.nameSource === 'ai' && data.nameClass === 'signature') {
+        pendingSignatureCelebrateName = String(serverEquipment.name || '').trim() || '장비';
+      }
     } catch {
+      pendingSignatureCelebrateName = null;
       if (statusMsgEl) statusMsgEl.textContent = '네트워크 오류로 서버에 저장하지 못했어요.';
     } finally {
       setForgeOverlay(false);
       forgeInFlight = false;
       if (btnForge) btnForge.textContent = '⚒️ 제련하기';
       syncForgeUi();
+      const sigName = pendingSignatureCelebrateName;
+      pendingSignatureCelebrateName = null;
+      if (sigName) showSignatureCelebrate(sigName);
     }
   }
 
