@@ -1,0 +1,12 @@
+{
+  "name": "blacksmith-forge",
+  "version": "1.0.0",
+  "description": "왕국의 대장간 - 중세 대장간, 재료 단조·조합 (Singleplay-Game5)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
