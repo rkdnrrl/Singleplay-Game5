@@ -617,6 +617,10 @@ body {
   opacity: 0.9;
 }
 
+.inv-item.inv-item--equipment {
+  outline: 1px solid rgba(255, 193, 7, 0.35);
+}
+
 .result-card.rarity-common {
   border-color: var(--common);
   box-shadow: 0 0 12px rgba(120, 144, 156, 0.5);

@@ -109,8 +109,22 @@
   const resultSpriteHost = document.getElementById('resultSpriteHost');
 
   let materials = [];
+  /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
+  let serverEquipmentForgePool = [];
   let selected = [];
   let resultHideTimer = 0;
+
+  function isEquipmentMaterial(m) {
+    return Boolean(m && (m.kind === 'equipment' || m.equipmentId != null));
+  }
+
+  function materialHasForgeServerRef(m) {
+    if (!m) return false;
+    if (isEquipmentMaterial(m)) {
+      return m.equipmentId != null && String(m.equipmentId).trim() !== '';
+    }
+    return m.serverId != null && String(m.serverId).trim() !== '';
+  }
 
   function getSpentSet() {
     try {
@@ -226,7 +240,10 @@
   }
 
   function refreshMaterials() {
-    materials = loadMaterials();
+    const spent = getSpentSet();
+    const fromLocal = loadMaterials();
+    const fromServer = serverEquipmentForgePool.filter((e) => e && !spent.has(e.uid));
+    materials = fromLocal.concat(fromServer);
   }
 
   function syncScrollOverflow() {
@@ -251,7 +268,7 @@
     materialListEl.innerHTML = '';
     materials.forEach((m) => {
       const row = document.createElement('div');
-      row.className = `inv-item rarity-${rarityClass(m.rarity)}`;
+      row.className = `inv-item rarity-${rarityClass(m.rarity)}${isEquipmentMaterial(m) ? ' inv-item--equipment' : ''}`;
       row.dataset.uid = m.uid;
       if (selected.some((s) => s.uid === m.uid)) row.classList.add('selected');
       const thumb = document.createElement('div');
@@ -315,8 +332,8 @@
     }
     if (btnForge) {
       const hasServer = Boolean(alpToken && platformApi);
-      const allCatch = selected.every((m) => m.serverId != null && String(m.serverId).trim() !== '');
-      btnForge.disabled = selected.length < 2 || !hasServer || !allCatch;
+      const allRef = selected.every((m) => materialHasForgeServerRef(m));
+      btnForge.disabled = selected.length < 2 || !hasServer || !allRef;
     }
     updateStatusMsg();
     renderMaterials();
@@ -336,9 +353,9 @@
       statusMsgEl.textContent = '재료를 하나 더 올리면 조합(제련)할 수 있어요.';
       return;
     }
-    const miss = selected.some((m) => m.serverId == null || String(m.serverId).trim() === '');
+    const miss = selected.some((m) => !materialHasForgeServerRef(m));
     if (miss) {
-      statusMsgEl.textContent = '낚시에서 잡은 기록이 있는 재료만 제련할 수 있어요.';
+      statusMsgEl.textContent = '낚시 재료(serverId) 또는 서버에 저장된 장비만 제련 재료로 쓸 수 있어요.';
       return;
     }
     const preview = mergeEquipmentName(selected);
@@ -383,11 +400,16 @@
     }
 
     const used = selected.slice();
-    const catchIds = used.map((m) => m.serverId).filter((id) => id != null && String(id).trim() !== '');
-    if (catchIds.length !== used.length) {
-      if (statusMsgEl) statusMsgEl.textContent = '모든 재료에 낚시 기록(serverId)이 있어야 제련할 수 있어요.';
+    if (!used.every((m) => materialHasForgeServerRef(m))) {
+      if (statusMsgEl) statusMsgEl.textContent = '모든 재료에 서버 id(낚시 또는 장비)가 있어야 제련할 수 있어요.';
       return;
     }
+
+    const materialsPayload = used.map((m) =>
+      isEquipmentMaterial(m)
+        ? { kind: 'equipment', id: String(m.equipmentId).trim() }
+        : { kind: 'catch', id: String(m.serverId).trim() },
+    );
 
     const name = mergeEquipmentName(used);
     const description = mergeEquipmentDesc(used);
@@ -404,7 +426,7 @@
           'Content-Type': 'application/json',
           Authorization: `Bearer ${alpToken}`,
         },
-        body: JSON.stringify({ catchIds, name, description }),
+        body: JSON.stringify({ materials: materialsPayload, name, description }),
       });
       const text = await res.text();
       let data = null;
@@ -425,7 +447,7 @@
       const serverStats = serverEquipment.stats || null;
 
       const uids = used.map((s) => s.uid);
-      appendSpent(uids);
+      appendSpent(uids.filter((u) => !String(u).startsWith('eq-')));
       removeMaterialsFromStore(uids);
       const usedSet = new Set(uids);
       selected = selected.filter((s) => !usedSet.has(s.uid));
@@ -456,6 +478,10 @@
     if (!alpToken || !platformApi) {
       craftedListEl.innerHTML =
         '<p class="log-empty">게임에 연결되면 서버에 저장된 장비 목록을 불러옵니다.</p>';
+      serverEquipmentForgePool = [];
+      refreshMaterials();
+      renderMaterials();
+      syncForgeUi();
       return;
     }
     craftedListEl.innerHTML = '<p class="log-empty">불러오는 중…</p>';
@@ -466,10 +492,17 @@
       if (res.status === 404 || res.status === 405) {
         craftedListEl.innerHTML =
           '<p class="log-empty">장비 목록을 불러오는 API가 없습니다. 인벤토리에서 확인하세요.</p>';
+        serverEquipmentForgePool = [];
+        refreshMaterials();
+        renderMaterials();
+        syncForgeUi();
         return;
       }
       if (!res.ok) {
         craftedListEl.innerHTML = '<p class="log-empty">목록을 불러오지 못했어요.</p>';
+        serverEquipmentForgePool = [];
+        refreshMaterials();
+        renderMaterials();
         return;
       }
       const text = await res.text();
@@ -489,8 +522,35 @@
 
       if (list.length === 0) {
         craftedListEl.innerHTML = '<p class="log-empty">아직 제작한 장비가 없습니다.</p>';
+        serverEquipmentForgePool = [];
+        refreshMaterials();
+        renderMaterials();
+        selected = selected.filter((s) => materials.some((m) => m.uid === s.uid));
+        syncForgeUi();
         return;
       }
+      serverEquipmentForgePool = list
+        .filter((item) => item && item.id != null && String(item.id).trim() !== '')
+        .map((item) => {
+          const id = String(item.id).trim();
+          const nameStr = item.name || item.displayName || '장비';
+          const tier = String(item.tier || item.rarity || 'common').toLowerCase();
+          const pa = sanitizeForgePixelArt(item.pixelArt);
+          return {
+            uid: `eq-${id}`,
+            name: nameStr,
+            rarity: tier,
+            pixelArt: pa,
+            kind: 'equipment',
+            equipmentId: id,
+            serverId: null,
+          };
+        });
+      refreshMaterials();
+      renderMaterials();
+      selected = selected.filter((s) => materials.some((m) => m.uid === s.uid));
+      syncForgeUi();
+
       craftedListEl.innerHTML = '';
       list.forEach((item) => {
         const c = normalizeCraftedRow(item);
@@ -518,6 +578,10 @@
       });
     } catch {
       craftedListEl.innerHTML = '<p class="log-empty">네트워크 오류로 목록을 불러오지 못했어요.</p>';
+      serverEquipmentForgePool = [];
+      refreshMaterials();
+      renderMaterials();
+      syncForgeUi();
     }
   }
 
