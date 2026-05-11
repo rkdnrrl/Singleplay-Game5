@@ -146,15 +146,47 @@
   const resultDesc = document.getElementById('resultDesc');
   const resultSpriteHost = document.getElementById('resultSpriteHost');
   const forgeOverlayEl = document.getElementById('forgeOverlay');
+  const forgeOverlayTimerEl = document.getElementById('forgeOverlayTimer');
 
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
   let selected = [];
   let resultHideTimer = 0;
+  let forgeOverlayCountdownId = 0;
+
+  function stopForgeOverlayTimer() {
+    if (forgeOverlayCountdownId) {
+      window.clearInterval(forgeOverlayCountdownId);
+      forgeOverlayCountdownId = 0;
+    }
+  }
+
+  /** 20→0초 예상, 이후 예상시간 N초 초과로 증가 */
+  function startForgeOverlayTimer() {
+    stopForgeOverlayTimer();
+    if (!forgeOverlayTimerEl) return;
+    let countdown = 20;
+    let exceed = 0;
+    forgeOverlayTimerEl.textContent = `예상 시간 약 ${countdown}초`;
+    forgeOverlayCountdownId = window.setInterval(() => {
+      countdown -= 1;
+      if (countdown >= 0) {
+        forgeOverlayTimerEl.textContent = `예상 시간 약 ${countdown}초`;
+      } else {
+        exceed += 1;
+        forgeOverlayTimerEl.textContent = `예상시간 ${exceed}초 초과`;
+      }
+    }, 1000);
+  }
 
   function setForgeOverlay(visible) {
     if (!forgeOverlayEl) return;
+    if (visible) {
+      startForgeOverlayTimer();
+    } else {
+      stopForgeOverlayTimer();
+    }
     forgeOverlayEl.classList.toggle('forge-overlay--hidden', !visible);
     forgeOverlayEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
     document.documentElement.classList.toggle('forge-scroll-lock', !!visible);
@@ -536,7 +568,7 @@
     };
   }
 
-  /** 보관함 썸네일과 동일: PixelLab URL · 절차적 pixelArt · 이모지 */
+  /** 보관함 썸네일: 래스터 URL · 절차적 pixelArt · 이모지 */
   function mountCraftedThumb(hostEl, item) {
     if (!hostEl) return;
     hostEl.className = 'cr-thumb';

@@ -896,11 +896,12 @@ body.forge-scroll-lock {
   margin-bottom: 0.35rem;
 }
 
-.forge-overlay-hint {
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  line-height: 1.45;
+.forge-overlay-timer {
+  font-size: 0.95rem;
+  color: rgba(232, 234, 246, 0.88);
+  line-height: 1.4;
   margin-bottom: 0.65rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .forge-progress-dots {
