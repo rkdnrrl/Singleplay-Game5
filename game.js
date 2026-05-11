@@ -1141,15 +1141,32 @@
       statusMsgEl.textContent = '산출물 포함 조합은 서버에 저장됩니다.';
       return;
     }
-    const preview = mergeEquipmentName(selected);
-    statusMsgEl.innerHTML = `제련 시 이름: <strong>${escapeHtml(preview)}</strong> (서버에 저장)`;
+    statusMsgEl.textContent =
+      '「⚒️ 제련하기」를 누르면 서버에서 AI가 이름·능력치·내구도를 정하고 저장해요.';
   }
 
   function hideResultCard() {
     if (resultCard) resultCard.classList.add('hidden');
   }
 
-  function showResultFromServer(eq, stats, nameSource) {
+  function nameAiSkipHintKo(reason) {
+    const r = String(reason || 'unknown');
+    const map = {
+      no_api_key:
+        '서버에 Gemini 키(GEMINI_API_KEY 또는 GOOGLE_AI_API_KEY)가 없어, 재료 규칙으로 이름·스탯을 정했어요.',
+      timeout: 'AI 응답이 지연되어(타임아웃) 로컬 규칙으로 이름·스탯을 정했어요.',
+      network: 'AI 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      api_error: 'AI API 오류로 로컬 규칙으로 이름·스탯을 정했어요.',
+      blocked: 'AI 안전 정책으로 이름 생성이 제한되어 로컬 규칙을 썼어요.',
+      parse_error: 'AI 응답을 해석하지 못해 로컬 규칙으로 이름·스탯을 정했어요.',
+      incomplete_response: 'AI가 완전한 이름·스탯을 주지 않아 로컬 규칙을 썼어요.',
+      exception: 'AI 처리 중 오류가 나 로컬 규칙으로 이름·스탯을 정했어요.',
+      unknown: 'AI 이름을 쓰지 못하고 로컬 규칙으로 이름·스탯을 정했어요.',
+    };
+    return map[r] || map.unknown;
+  }
+
+  function showResultFromServer(eq, stats, nameSource, nameAiMeta) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
     const tier = String(eq.tier || eq.rarity || 'rare').toLowerCase();
@@ -1158,12 +1175,18 @@
     resultRarity.textContent = tierLabel(tier);
     resultName.textContent = eq.name || eq.displayName || '장비';
     const baseDesc = eq.description || eq.desc || '';
-    const aiLine =
-      nameSource === 'ai'
-        ? '이름·능력치·내구도 · Gemini\n'
-        : nameSource === 'client_fallback'
-          ? '이름 · 로컬 규칙(AI 응답 없음)\n'
-          : '';
+    const skipHint =
+      nameAiMeta && nameAiMeta.nameAiRequested && nameAiMeta.nameAiUsed === false
+        ? nameAiSkipHintKo(nameAiMeta.nameAiSkipReason)
+        : '';
+    let aiLine = '';
+    if (skipHint) {
+      aiLine = `${skipHint}\n`;
+    } else if (nameSource === 'ai') {
+      aiLine = '이름·능력치·내구도 · Gemini\n';
+    } else if (nameSource === 'client_fallback') {
+      aiLine = '이름 · 로컬 규칙(AI 응답 없음)\n';
+    }
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
       const sz =
@@ -1269,7 +1292,11 @@
       refreshMaterials();
       syncForgeUi();
       await refreshCraftedList();
-      showResultFromServer(serverEquipment, serverStats, data.nameSource);
+      showResultFromServer(serverEquipment, serverStats, data.nameSource, {
+        nameAiRequested: data.nameAiRequested,
+        nameAiUsed: data.nameAiUsed,
+        nameAiSkipReason: data.nameAiSkipReason,
+      });
       if (data.nameSource === 'ai' && data.nameClass === 'signature') {
         pendingSignatureCelebrateName = String(serverEquipment.name || '').trim() || '장비';
       }
