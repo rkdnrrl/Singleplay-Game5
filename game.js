@@ -9,6 +9,7 @@
   const platformApi = window.__ALP_PLATFORM_API__ || '';
 
   let forgeInFlight = false;
+  let smeltInFlight = false;
 
   const MAT_EMOJI_POOL = [
     '🐟', '🐠', '🐡', '🪸', '🦑', '🪼', '🐙', '✨', '🌌', '💎', '🔮', '🛸',
@@ -213,6 +214,99 @@
     }
   }
 
+  /** 서버/로컬 공통: 산출물 맵 복사 (표시용 엔트리만) */
+  function cloneSmeltStock(src) {
+    const out = {};
+    if (!src || typeof src !== 'object') return out;
+    for (const k of Object.keys(src)) {
+      const v = src[k];
+      if (!v || typeof v !== 'object') continue;
+      const c = Math.floor(Number(v.count));
+      if (!Number.isFinite(c) || c <= 0) continue;
+      const id = String(v.id || k).trim() || k;
+      out[id] = {
+        id,
+        name: v.name != null ? String(v.name) : id,
+        emoji: v.emoji != null ? String(v.emoji) : '◆',
+        count: c,
+      };
+    }
+    return out;
+  }
+
+  function addSmeltCountToStock(stock, materialName, add) {
+    const n = Math.floor(Number(add));
+    if (!Number.isFinite(n) || n <= 0) return;
+    const p = inferSmeltProduct(materialName);
+    const prev = stock[p.id];
+    const c = prev && typeof prev.count === 'number' ? prev.count : 0;
+    stock[p.id] = { ...p, count: c + n };
+  }
+
+  /** 로그인 시 서버 재고를 불러오고, 서버가 비어 있으면 로컬 산출물을 한 번 이관 */
+  async function syncSmeltFromServer() {
+    if (!alpToken || !platformApi) {
+      renderSmeltStock();
+      return;
+    }
+    try {
+      const res = await fetch(`${platformApi}/api/smelt/stock`, {
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      if (!res.ok) {
+        renderSmeltStock();
+        return;
+      }
+      const text = await res.text();
+      let data = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+      }
+      let serverStock = data && data.stock && typeof data.stock === 'object' ? data.stock : {};
+      const serverHasAny = Object.keys(serverStock).some((k) => {
+        const v = serverStock[k];
+        return v && typeof v.count === 'number' && v.count > 0;
+      });
+      if (!serverHasAny) {
+        const local = loadSmeltStock();
+        const localHasAny = Object.keys(local).some((k) => {
+          const v = local[k];
+          return v && typeof v.count === 'number' && v.count > 0;
+        });
+        if (localHasAny) {
+          const boot = await fetch(`${platformApi}/api/smelt/bootstrap`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${alpToken}`,
+            },
+            body: JSON.stringify({ stock: local }),
+          });
+          if (boot.ok) {
+            const bt = await boot.text();
+            let bd = null;
+            if (bt) {
+              try {
+                bd = JSON.parse(bt);
+              } catch {
+                bd = null;
+              }
+            }
+            if (bd && bd.stock && typeof bd.stock === 'object') serverStock = bd.stock;
+          }
+        }
+      }
+      saveSmeltStock(serverStock);
+      renderSmeltStock();
+    } catch {
+      renderSmeltStock();
+    }
+  }
+
   function getForgeTarget() {
     const el = document.querySelector('input[name="forgeTarget"]:checked');
     return el && el.value === 'furnace' ? 'furnace' : 'anvil';
@@ -283,31 +377,78 @@
     renderSmeltStock();
   }
 
-  function smeltFurnace() {
-    if (furnaceSelected.length === 0) return;
+  async function smeltFurnace() {
+    if (furnaceSelected.length === 0 || smeltInFlight) return;
     const usable = furnaceSelected.filter((m) => !isEquipmentMaterial(m));
     if (usable.length === 0) {
       setFurnaceMsg('장비는 용광로에 넣을 수 없어요. 낚시 재료만 녹일 수 있어요.');
       return;
     }
-    const stock = loadSmeltStock();
-    for (let i = 0; i < usable.length; i += 1) {
-      const p = inferSmeltProduct(usable[i].name);
-      const prev = stock[p.id];
-      if (prev && typeof prev.count === 'number') {
-        prev.count += 1;
-      } else {
-        stock[p.id] = { ...p, count: 1 };
-      }
+    const serverUsable = usable.filter((m) => m.serverId != null && String(m.serverId).trim() !== '');
+    const localUsable = usable.filter((m) => m.serverId == null || String(m.serverId).trim() === '');
+    if (serverUsable.length > 0 && (!alpToken || !platformApi)) {
+      setFurnaceMsg('서버에 저장된 재료를 녹이려면 게임에서 이 화면을 연 상태여야 해요.');
+      window.setTimeout(() => setFurnaceMsg(''), 3600);
+      return;
     }
-    saveSmeltStock(stock);
-    removeMaterialsAfterUse(usable);
-    furnaceSelected = furnaceSelected.filter((m) => !usable.some((u) => u.uid === m.uid));
-    refreshMaterials();
-    syncFurnaceUi();
-    syncForgeUi();
-    setFurnaceMsg(`${usable.length}개 재료를 녹였습니다.`);
-    window.setTimeout(() => setFurnaceMsg(''), 3200);
+
+    smeltInFlight = true;
+    if (btnSmelt) btnSmelt.disabled = true;
+
+    try {
+      let stock = cloneSmeltStock(loadSmeltStock());
+
+      if (serverUsable.length > 0) {
+        const catchIds = serverUsable.map((m) => String(m.serverId).trim());
+        const res = await fetch(`${platformApi}/api/smelt/melt`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${alpToken}`,
+          },
+          body: JSON.stringify({ catchIds }),
+        });
+        const text = await res.text();
+        let data = null;
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch {
+            data = null;
+          }
+        }
+        if (!res.ok || !data || !data.stock) {
+          const msg =
+            (data && data.error && data.message) ||
+            (data && data.error && data.error.message) ||
+            `용광로 서버 처리 실패 (${res.status})`;
+          setFurnaceMsg(msg);
+          window.setTimeout(() => setFurnaceMsg(''), 4200);
+          return;
+        }
+        stock = cloneSmeltStock(data.stock);
+      }
+
+      for (let i = 0; i < localUsable.length; i += 1) {
+        addSmeltCountToStock(stock, localUsable[i].name, 1);
+      }
+
+      saveSmeltStock(stock);
+      removeMaterialsAfterUse(usable);
+      furnaceSelected = furnaceSelected.filter((m) => !usable.some((u) => u.uid === m.uid));
+      refreshMaterials();
+      syncFurnaceUi();
+      syncForgeUi();
+      setFurnaceMsg(`${usable.length}개 재료를 녹였습니다.`);
+      window.setTimeout(() => setFurnaceMsg(''), 3200);
+    } catch {
+      setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
+      window.setTimeout(() => setFurnaceMsg(''), 4200);
+    } finally {
+      smeltInFlight = false;
+      if (btnSmelt) btnSmelt.disabled = furnaceSelected.length === 0;
+      syncFurnaceUi();
+    }
   }
 
   function stopForgeOverlayTimer() {
@@ -884,7 +1025,7 @@
   }
 
   function onStorage(e) {
-    if (e.key !== FORGE_MATERIALS_KEY && e.key !== FORGE_SPENT_UIDS_KEY) return;
+    if (e.key !== FORGE_MATERIALS_KEY && e.key !== FORGE_SPENT_UIDS_KEY && e.key !== SMELT_STOCK_KEY) return;
     refreshMaterials();
     selected = selected.filter((s) => materials.some((m) => m.uid === s.uid));
     furnaceSelected = furnaceSelected.filter((s) => materials.some((m) => m.uid === s.uid));
@@ -905,7 +1046,7 @@
       renderMaterials();
     });
   }
-  if (btnSmelt) btnSmelt.addEventListener('click', () => smeltFurnace());
+  if (btnSmelt) btnSmelt.addEventListener('click', () => void smeltFurnace());
   document.querySelectorAll('input[name="forgeTarget"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       renderMaterials();
@@ -921,5 +1062,5 @@
   refreshMaterials();
   syncFurnaceUi();
   syncForgeUi();
-  void refreshCraftedList();
+  void refreshCraftedList().then(() => void syncSmeltFromServer());
 })();
