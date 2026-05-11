@@ -3,10 +3,6 @@
 
   const FORGE_MATERIALS_KEY = 'WEB_ALP_SPACE_FISHING_FORGE_V1';
   const FORGE_SPENT_UIDS_KEY = 'WEB_ALP_FORGE_SPENT_UIDS_V1';
-  const CRAFTED_KEY = 'WEB_ALP_BLACKSMITH_CRAFTED_V1';
-  const DISCOVERED_KEY = 'WEB_ALP_BLACKSMITH_DISCOVERED_V1';
-
-  const RECIPES = window.FORGE_RECIPES || [];
 
   const urlParams = new URLSearchParams(window.location.search);
   const alpToken = urlParams.get('token');
@@ -160,135 +156,54 @@
     }
   }
 
-  function loadCrafted() {
-    try {
-      const raw = localStorage.getItem(CRAFTED_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
-    } catch {
-      return [];
+  const MAX_EQUIP_NAME = 30;
+
+  function endsWithBatchimKo(str) {
+    const s = String(str);
+    if (!s) return false;
+    const c = s.charCodeAt(s.length - 1);
+    if (Number.isNaN(c) || c < 0xac00 || c > 0xd7a3) return false;
+    return (c - 0xac00) % 28 !== 0;
+  }
+
+  function clampPart(s, maxChars) {
+    const t = String(s != null ? s : '').trim();
+    if (!t) return '재료';
+    if (t.length <= maxChars) return t;
+    return `${t.slice(0, Math.max(1, maxChars - 1))}…`;
+  }
+
+  /** 재료 이름만으로 짧고 읽기 자연스러운 장비 이름 */
+  function mergeEquipmentName(mats) {
+    const names = mats.map((m) => String(m.name != null ? m.name : '').trim()).filter((x) => x.length > 0);
+    if (names.length === 0) return '이름 없는 무기';
+    if (names.length === 2) {
+      const a = clampPart(names[0], 10);
+      const b = clampPart(names[1], 10);
+      const link = endsWithBatchimKo(a) ? '과' : '와';
+      let s = `${a}${link} ${b}의 무기`;
+      if (s.length <= MAX_EQUIP_NAME) return s;
+      s = `${a}·${b}의 무기`;
+      return s.slice(0, MAX_EQUIP_NAME);
     }
-  }
-
-  function saveCrafted(list) {
-    localStorage.setItem(CRAFTED_KEY, JSON.stringify(list));
-  }
-
-  function loadDiscovered() {
-    try {
-      const raw = localStorage.getItem(DISCOVERED_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return new Set(Array.isArray(arr) ? arr : []);
-    } catch {
-      return new Set();
+    if (names.length === 3) {
+      const p = names.map((x) => clampPart(x, 7)).join('·');
+      return `${p}의 무기`.slice(0, MAX_EQUIP_NAME);
     }
+    const a0 = clampPart(names[0], 8);
+    const a1 = clampPart(names[1], 6);
+    return `${a0}·${a1} 외 ${names.length - 2}가지 재료 무기`.slice(0, MAX_EQUIP_NAME);
   }
 
-  function saveDiscovered(set) {
-    localStorage.setItem(DISCOVERED_KEY, JSON.stringify([...set]));
-  }
-
-  function keywordsMatchRecipe(need, mats) {
-    if (need.length !== mats.length) return false;
-    const used = new Set();
-    for (let k = 0; k < need.length; k += 1) {
-      const kw = need[k];
-      let found = -1;
-      for (let i = 0; i < mats.length; i += 1) {
-        if (used.has(i)) continue;
-        if (String(mats[i].name).includes(kw)) {
-          found = i;
-          break;
-        }
-      }
-      if (found < 0) return false;
-      used.add(found);
-    }
-    return true;
-  }
-
-  /** need 길이와 같은 subset의 순서를 바꿔가며 매칭 */
-  function subsetMatchesNeed(need, subset) {
-    if (need.length !== subset.length) return false;
-    const k = subset.length;
-    if (k <= 1) return keywordsMatchRecipe(need, subset);
-
-    const idx = Array.from({ length: k }, (_, i) => i);
-    function permute(depth) {
-      if (depth === k) {
-        const order = idx.map((j) => subset[j]);
-        return keywordsMatchRecipe(need, order);
-      }
-      for (let i = depth; i < k; i += 1) {
-        [idx[depth], idx[i]] = [idx[i], idx[depth]];
-        if (permute(depth + 1)) return true;
-        [idx[depth], idx[i]] = [idx[i], idx[depth]];
-      }
-      return false;
-    }
-    return permute(0);
-  }
-
-  /** 담긴 재료 중 레시피에 쓰이는 k개를 찾음. 없으면 null */
-  function firstMatchingSubset(need, mats) {
-    const k = need.length;
+  function mergeEquipmentDesc(mats) {
     const n = mats.length;
-    if (k === 0 || n < k) return null;
-
-    if (k === 1) {
-      for (let i = 0; i < n; i += 1) {
-        const one = [mats[i]];
-        if (subsetMatchesNeed(need, one)) return one;
-      }
-      return null;
+    if (n === 2) {
+      const a = clampPart(mats[0].name, 14);
+      const b = clampPart(mats[1].name, 14);
+      const link = endsWithBatchimKo(a) ? '과' : '와';
+      return `${a}${link} ${b}를 섞어 제련했습니다.`.slice(0, 140);
     }
-    if (k === 2) {
-      for (let i = 0; i < n; i += 1) {
-        for (let j = i + 1; j < n; j += 1) {
-          const pair = [mats[i], mats[j]];
-          if (subsetMatchesNeed(need, pair)) return pair;
-        }
-      }
-      return null;
-    }
-    if (k === 3) {
-      for (let i = 0; i < n; i += 1) {
-        for (let j = i + 1; j < n; j += 1) {
-          for (let t = j + 1; t < n; t += 1) {
-            const tri = [mats[i], mats[j], mats[t]];
-            if (subsetMatchesNeed(need, tri)) return tri;
-          }
-        }
-      }
-      return null;
-    }
-
-    function comb(start, acc) {
-      if (acc.length === k) {
-        return subsetMatchesNeed(need, acc) ? acc.slice() : null;
-      }
-      for (let i = start; i < n; i += 1) {
-        acc.push(mats[i]);
-        const hit = comb(i + 1, acc);
-        acc.pop();
-        if (hit) return hit;
-      }
-      return null;
-    }
-    return comb(0, []);
-  }
-
-  /** @returns {null | { rec: object, used: typeof selected }} */
-  function findRecipeFor(mats) {
-    if (mats.length === 0) return null;
-    for (let r = 0; r < RECIPES.length; r += 1) {
-      const rec = RECIPES[r];
-      if (!rec.need || rec.need.length === 0) continue;
-      if (mats.length < rec.need.length) continue;
-      const used = firstMatchingSubset(rec.need, mats);
-      if (used) return { rec, used };
-    }
-    return null;
+    return `${n}가지 재료를 섞어 제련했습니다.`;
   }
 
   function tierLabel(t) {
@@ -398,7 +313,11 @@
         });
       }
     }
-    if (btnForge) btnForge.disabled = selected.length === 0;
+    if (btnForge) {
+      const hasServer = Boolean(alpToken && platformApi);
+      const allCatch = selected.every((m) => m.serverId != null && String(m.serverId).trim() !== '');
+      btnForge.disabled = selected.length < 2 || !hasServer || !allCatch;
+    }
     updateStatusMsg();
     renderMaterials();
   }
@@ -409,147 +328,176 @@
       statusMsgEl.textContent = '위쪽 재료 보관함에서 눌러 담으세요.';
       return;
     }
-    const hit = findRecipeFor(selected);
-    if (hit) {
-      statusMsgEl.innerHTML = `이 재료들로 <strong>${escapeHtml(hit.rec.out.emoji)} ${escapeHtml(hit.rec.out.name)}</strong> 제작이 가능합니다.`;
+    if (!alpToken || !platformApi) {
+      statusMsgEl.textContent = '게임에서 이 화면을 연 경우에만 서버에 제련할 수 있어요.';
       return;
     }
-    statusMsgEl.textContent = '담긴 재료로는 알려진 제작 조합이 없어요. 재료를 더 넣거나 바꿔 보세요.';
+    if (selected.length === 1) {
+      statusMsgEl.textContent = '재료를 하나 더 올리면 조합(제련)할 수 있어요.';
+      return;
+    }
+    const miss = selected.some((m) => m.serverId == null || String(m.serverId).trim() === '');
+    if (miss) {
+      statusMsgEl.textContent = '낚시에서 잡은 기록이 있는 재료만 제련할 수 있어요.';
+      return;
+    }
+    const preview = mergeEquipmentName(selected);
+    statusMsgEl.innerHTML = `제련 시 이름: <strong>${escapeHtml(preview)}</strong> (서버에 저장)`;
   }
 
   function hideResultCard() {
     if (resultCard) resultCard.classList.add('hidden');
   }
 
-  function showResultCard(rec, stats) {
+  function showResultFromServer(eq, stats) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
-    const tier = rec.out.tier || 'rare';
+    const tier = String(eq.tier || eq.rarity || 'rare').toLowerCase();
     resultCard.className = `result-card rarity-${rarityClass(tier)}`;
     resultRarity.className = `result-rarity rarity-${rarityClass(tier)}`;
     resultRarity.textContent = tierLabel(tier);
-    resultName.textContent = rec.out.name;
-    const baseDesc = rec.out.desc || '';
+    resultName.textContent = eq.name || eq.displayName || '장비';
+    const baseDesc = eq.description || eq.desc || '';
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
       resultDesc.textContent = `${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%`;
     } else {
       resultDesc.textContent = baseDesc;
     }
-    resultSpriteHost.textContent = rec.out.emoji || '⚒️';
+    const em = eq.emoji || eq.icon || matEmoji(String(eq.name || ''));
+    resultSpriteHost.textContent = em;
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
 
   async function forge() {
     if (forgeInFlight) return;
-    if (selected.length === 0) return;
-    const hit = findRecipeFor(selected);
-    if (!hit) {
-      if (statusMsgEl) {
-        statusMsgEl.textContent = '이 조합으로는 제련할 수 없어요. 재료를 바꿔 보세요.';
-      }
+    if (selected.length < 2) return;
+    if (!alpToken || !platformApi) {
+      if (statusMsgEl) statusMsgEl.textContent = '게임 연결(토큰)이 없어 제련할 수 없어요.';
       return;
     }
-    const { rec, used } = hit;
 
-    const catchIds = used
-      .map((m) => m.serverId)
-      .filter((id) => id != null && String(id).length > 0);
-    const canServerCraft =
-      Boolean(alpToken && platformApi) && catchIds.length === used.length;
-
-    let serverStats = null;
-    let serverEquipment = null;
-    if (canServerCraft) {
-      forgeInFlight = true;
-      if (btnForge) {
-        btnForge.disabled = true;
-        btnForge.textContent = '제련 중…';
-      }
-      try {
-        const res = await fetch(`${platformApi}/api/craft/equipment`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${alpToken}`,
-          },
-          body: JSON.stringify({ recipeId: rec.id, catchIds }),
-        });
-        const text = await res.text();
-        let data = null;
-        if (text) {
-          try {
-            data = JSON.parse(text);
-          } catch {
-            data = null;
-          }
-        }
-        if (!res.ok || !data || !data.equipment) {
-          const msg = (data && data.error && data.error.message) || `서버 저장 실패 (${res.status})`;
-          if (statusMsgEl) statusMsgEl.textContent = msg;
-          return;
-        }
-        serverEquipment = data.equipment;
-        serverStats = data.equipment.stats || null;
-      } catch {
-        if (statusMsgEl) {
-          statusMsgEl.textContent = '네트워크 오류로 서버에 저장하지 못했어요.';
-        }
-        return;
-      } finally {
-        forgeInFlight = false;
-        if (btnForge) btnForge.textContent = '⚒️ 제련하기';
-        syncForgeUi();
-      }
+    const used = selected.slice();
+    const catchIds = used.map((m) => m.serverId).filter((id) => id != null && String(id).trim() !== '');
+    if (catchIds.length !== used.length) {
+      if (statusMsgEl) statusMsgEl.textContent = '모든 재료에 낚시 기록(serverId)이 있어야 제련할 수 있어요.';
+      return;
     }
 
-    const uids = used.map((s) => s.uid);
-    appendSpent(uids);
-    removeMaterialsFromStore(uids);
+    const name = mergeEquipmentName(used);
+    const description = mergeEquipmentDesc(used);
 
-    const crafted = loadCrafted();
-    crafted.unshift({
-      recipeId: rec.id,
-      name: rec.out.name,
-      emoji: rec.out.emoji,
-      desc: rec.out.desc,
-      tier: rec.out.tier,
-      at: Date.now(),
-      stats: serverStats,
-      serverSaved: Boolean(serverEquipment && serverEquipment.id),
-    });
-    saveCrafted(crafted.slice(0, 80));
+    forgeInFlight = true;
+    if (btnForge) {
+      btnForge.disabled = true;
+      btnForge.textContent = '제련 중…';
+    }
+    try {
+      const res = await fetch(`${platformApi}/api/craft/equipment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${alpToken}`,
+        },
+        body: JSON.stringify({ catchIds, name, description }),
+      });
+      const text = await res.text();
+      let data = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+      }
+      if (!res.ok || !data || !data.equipment) {
+        const msg = (data && data.error && data.message) || (data && data.error && data.error.message) || `서버 저장 실패 (${res.status})`;
+        if (statusMsgEl) statusMsgEl.textContent = msg;
+        return;
+      }
 
-    const disc = loadDiscovered();
-    disc.add(rec.id);
-    saveDiscovered(disc);
+      const serverEquipment = data.equipment;
+      const serverStats = serverEquipment.stats || null;
 
-    const usedSet = new Set(uids);
-    selected = selected.filter((s) => !usedSet.has(s.uid));
-    refreshMaterials();
-    syncForgeUi();
-    renderCrafted();
-    showResultCard(rec, serverStats);
+      const uids = used.map((s) => s.uid);
+      appendSpent(uids);
+      removeMaterialsFromStore(uids);
+      const usedSet = new Set(uids);
+      selected = selected.filter((s) => !usedSet.has(s.uid));
+      refreshMaterials();
+      syncForgeUi();
+      await refreshCraftedList();
+      showResultFromServer(serverEquipment, serverStats);
+    } catch {
+      if (statusMsgEl) statusMsgEl.textContent = '네트워크 오류로 서버에 저장하지 못했어요.';
+    } finally {
+      forgeInFlight = false;
+      if (btnForge) btnForge.textContent = '⚒️ 제련하기';
+      syncForgeUi();
+    }
   }
 
-  function renderCrafted() {
+  function normalizeCraftedRow(item) {
+    return {
+      name: item.name || item.displayName || '장비',
+      desc: item.description || item.desc || '',
+      emoji: item.emoji || item.icon || matEmoji(String(item.name || item.displayName || '')),
+      stats: item.stats,
+    };
+  }
+
+  async function refreshCraftedList() {
     if (!craftedListEl) return;
-    const list = loadCrafted();
-    if (list.length === 0) {
-      craftedListEl.innerHTML = '<p class="log-empty">아직 없습니다.</p>';
+    if (!alpToken || !platformApi) {
+      craftedListEl.innerHTML =
+        '<p class="log-empty">게임에 연결되면 서버에 저장된 장비 목록을 불러옵니다.</p>';
       return;
     }
-    craftedListEl.innerHTML = '';
-    list.forEach((c) => {
-      const row = document.createElement('div');
-      row.className = 'crafted-row';
-      const st = c.stats;
-      const statsLine =
-        st && typeof st.attackBonus === 'number'
-          ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%</div>`
-          : '';
-      row.innerHTML = `
+    craftedListEl.innerHTML = '<p class="log-empty">불러오는 중…</p>';
+    try {
+      const res = await fetch(`${platformApi}/api/craft/equipment`, {
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      if (res.status === 404 || res.status === 405) {
+        craftedListEl.innerHTML =
+          '<p class="log-empty">장비 목록을 불러오는 API가 없습니다. 인벤토리에서 확인하세요.</p>';
+        return;
+      }
+      if (!res.ok) {
+        craftedListEl.innerHTML = '<p class="log-empty">목록을 불러오지 못했어요.</p>';
+        return;
+      }
+      const text = await res.text();
+      let data = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+      }
+      let list = [];
+      if (Array.isArray(data)) list = data;
+      else if (data && Array.isArray(data.equipment)) list = data.equipment;
+      else if (data && Array.isArray(data.items)) list = data.items;
+      else if (data && Array.isArray(data.list)) list = data.list;
+
+      if (list.length === 0) {
+        craftedListEl.innerHTML = '<p class="log-empty">아직 제작한 장비가 없습니다.</p>';
+        return;
+      }
+      craftedListEl.innerHTML = '';
+      list.forEach((item) => {
+        const c = normalizeCraftedRow(item);
+        const row = document.createElement('div');
+        row.className = 'crafted-row';
+        const st = c.stats;
+        const statsLine =
+          st && typeof st.attackBonus === 'number'
+            ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%</div>`
+            : '';
+        row.innerHTML = `
         <span class="cr-emoji">${c.emoji || '⚒️'}</span>
         <div>
           <strong>${escapeHtml(c.name)}</strong>
@@ -557,8 +505,11 @@
           ${statsLine}
         </div>
       `;
-      craftedListEl.appendChild(row);
-    });
+        craftedListEl.appendChild(row);
+      });
+    } catch {
+      craftedListEl.innerHTML = '<p class="log-empty">네트워크 오류로 목록을 불러오지 못했어요.</p>';
+    }
   }
 
   function onStorage(e) {
@@ -582,5 +533,5 @@
 
   refreshMaterials();
   syncForgeUi();
-  renderCrafted();
+  void refreshCraftedList();
 })();

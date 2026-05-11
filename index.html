@@ -13,7 +13,7 @@
   <div class="app">
     <main class="stage forge-stage">
       <div class="forge-workbench">
-        <p class="forge-slots-label">모루 위 재료 (개수 제한 없음 · 칩을 누르면 빼기)</p>
+        <p class="forge-slots-label">모루 위 재료 (2개 이상 조합 · 서버 저장 · 칩을 누르면 빼기)</p>
         <div class="anvil-block" aria-label="모루">
           <div class="anvil-chips-panel">
             <div id="selectedSlots" class="anvil-chips forge-slots--list"></div>
@@ -61,12 +61,11 @@
       <span class="result-rarity" id="resultRarity">장비</span>
       <span class="result-name" id="resultName"></span>
       <span class="result-size" id="resultDesc"></span>
-      <span class="result-added">대장간 기록에 추가됨</span>
+      <span class="result-added">서버에 저장됨</span>
     </div>
   </div>
 
   <script src="config.js"></script>
-  <script src="recipes.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
