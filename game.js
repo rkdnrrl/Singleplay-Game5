@@ -158,7 +158,7 @@
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
   let selected = [];
-  /** 용광로에 넣은 재료 (낚시 재료만) */
+  /** 용광로에 넣은 재료 (낚시 재료·장비) */
   let furnaceSelected = [];
   let resultHideTimer = 0;
   let forgeOverlayCountdownId = 0;
@@ -379,15 +379,32 @@
 
   async function smeltFurnace() {
     if (furnaceSelected.length === 0 || smeltInFlight) return;
-    const usable = furnaceSelected.filter((m) => !isEquipmentMaterial(m));
-    if (usable.length === 0) {
-      setFurnaceMsg('장비는 용광로에 넣을 수 없어요. 낚시 재료만 녹일 수 있어요.');
-      return;
-    }
-    const serverUsable = usable.filter((m) => m.serverId != null && String(m.serverId).trim() !== '');
-    const localUsable = usable.filter((m) => m.serverId == null || String(m.serverId).trim() === '');
-    if (serverUsable.length > 0 && (!alpToken || !platformApi)) {
-      setFurnaceMsg('서버에 저장된 재료를 녹이려면 게임에서 이 화면을 연 상태여야 해요.');
+    const toMelt = furnaceSelected.slice();
+
+    const serverCatches = toMelt.filter(
+      (m) => !isEquipmentMaterial(m) && m.serverId != null && String(m.serverId).trim() !== '',
+    );
+    const serverEquipment = toMelt.filter(
+      (m) =>
+        isEquipmentMaterial(m) &&
+        m.equipmentId != null &&
+        String(m.equipmentId).trim() !== '',
+    );
+    const localOnly = toMelt.filter(
+      (m) =>
+        !isEquipmentMaterial(m) &&
+        (m.serverId == null || String(m.serverId).trim() === ''),
+    );
+    const localEquipmentOrphans = toMelt.filter(
+      (m) =>
+        isEquipmentMaterial(m) &&
+        (m.equipmentId == null || String(m.equipmentId).trim() === ''),
+    );
+    const localInfer = localOnly.concat(localEquipmentOrphans);
+
+    const needsServer = serverCatches.length > 0 || serverEquipment.length > 0;
+    if (needsServer && (!alpToken || !platformApi)) {
+      setFurnaceMsg('낚시 재료·장비를 녹이려면 게임에서 이 화면을 연 상태여야 해요.');
       window.setTimeout(() => setFurnaceMsg(''), 3600);
       return;
     }
@@ -398,15 +415,16 @@
     try {
       let stock = cloneSmeltStock(loadSmeltStock());
 
-      if (serverUsable.length > 0) {
-        const catchIds = serverUsable.map((m) => String(m.serverId).trim());
+      if (needsServer) {
+        const catchIds = serverCatches.map((m) => String(m.serverId).trim());
+        const equipmentIds = serverEquipment.map((m) => String(m.equipmentId).trim());
         const res = await fetch(`${platformApi}/api/smelt/melt`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${alpToken}`,
           },
-          body: JSON.stringify({ catchIds }),
+          body: JSON.stringify({ catchIds, equipmentIds }),
         });
         const text = await res.text();
         let data = null;
@@ -429,17 +447,17 @@
         stock = cloneSmeltStock(data.stock);
       }
 
-      for (let i = 0; i < localUsable.length; i += 1) {
-        addSmeltCountToStock(stock, localUsable[i].name, 1);
+      for (let i = 0; i < localInfer.length; i += 1) {
+        addSmeltCountToStock(stock, localInfer[i].name, 1);
       }
 
       saveSmeltStock(stock);
-      removeMaterialsAfterUse(usable);
-      furnaceSelected = furnaceSelected.filter((m) => !usable.some((u) => u.uid === m.uid));
+      removeMaterialsAfterUse(toMelt);
+      furnaceSelected = furnaceSelected.filter((m) => !toMelt.some((u) => u.uid === m.uid));
       refreshMaterials();
       syncFurnaceUi();
       syncForgeUi();
-      setFurnaceMsg(`${usable.length}개 재료를 녹였습니다.`);
+      setFurnaceMsg(`${toMelt.length}개를 녹였습니다.`);
       window.setTimeout(() => setFurnaceMsg(''), 3200);
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
@@ -675,11 +693,6 @@
 
   function toggleSelect(m) {
     if (getForgeTarget() === 'furnace') {
-      if (isEquipmentMaterial(m)) {
-        setFurnaceMsg('장비는 용광로에 넣을 수 없어요.');
-        window.setTimeout(() => setFurnaceMsg(''), 2400);
-        return;
-      }
       const fi = furnaceSelected.findIndex((s) => s.uid === m.uid);
       if (fi >= 0) {
         furnaceSelected.splice(fi, 1);
