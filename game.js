@@ -147,13 +147,168 @@
   const resultSpriteHost = document.getElementById('resultSpriteHost');
   const forgeOverlayEl = document.getElementById('forgeOverlay');
   const forgeOverlayTimerEl = document.getElementById('forgeOverlayTimer');
+  const furnaceSlotsEl = document.getElementById('furnaceSlots');
+  const btnSmelt = document.getElementById('btnSmelt');
+  const btnClearFurnace = document.getElementById('btnClearFurnace');
+  const furnaceMsgEl = document.getElementById('furnaceMsg');
+  const smeltStockListEl = document.getElementById('smeltStockList');
 
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
   let selected = [];
+  /** 용광로에 넣은 재료 (낚시 재료만) */
+  let furnaceSelected = [];
   let resultHideTimer = 0;
   let forgeOverlayCountdownId = 0;
+
+  const SMELT_STOCK_KEY = 'WEB_ALP_FORGE_SMELT_STOCK_V1';
+
+  const SMELT_RULES = [
+    {
+      test: (n) => /유리|glass|프리즘|결정|크리스탈|수정|lens/i.test(n),
+      out: { id: 'glass', name: '유리액', emoji: '🫙' },
+    },
+    {
+      test: (n) => /금|gold|골드/i.test(n),
+      out: { id: 'gold', name: '금괴', emoji: '🟡' },
+    },
+    {
+      test: (n) => /구리|copper|동|bronze/i.test(n),
+      out: { id: 'copper', name: '구리괴', emoji: '🟠' },
+    },
+    {
+      test: (n) => /은|silver|실버/i.test(n),
+      out: { id: 'silver', name: '은괴', emoji: '⚪' },
+    },
+    {
+      test: (n) => /철|강철|패널|회로|금속|잔해|쓰레기|컨테이너|iron|steel/i.test(n),
+      out: { id: 'iron', name: '철괴', emoji: '⛓️' },
+    },
+  ];
+
+  function inferSmeltProduct(materialName) {
+    const n = String(materialName || '');
+    for (let i = 0; i < SMELT_RULES.length; i += 1) {
+      if (SMELT_RULES[i].test(n)) return { ...SMELT_RULES[i].out };
+    }
+    return { id: 'slag', name: '고철', emoji: '🔩' };
+  }
+
+  function loadSmeltStock() {
+    try {
+      const raw = localStorage.getItem(SMELT_STOCK_KEY);
+      const o = raw ? JSON.parse(raw) : {};
+      return o && typeof o === 'object' ? o : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveSmeltStock(stock) {
+    try {
+      localStorage.setItem(SMELT_STOCK_KEY, JSON.stringify(stock));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function getForgeTarget() {
+    const el = document.querySelector('input[name="forgeTarget"]:checked');
+    return el && el.value === 'furnace' ? 'furnace' : 'anvil';
+  }
+
+  function setFurnaceMsg(msg) {
+    if (furnaceMsgEl) furnaceMsgEl.textContent = msg || '';
+  }
+
+  function removeMaterialsAfterUse(used) {
+    const uids = used.map((u) => u.uid);
+    appendSpent(uids.filter((u) => !String(u).startsWith('eq-')));
+    removeMaterialsFromStore(uids);
+    const eqIds = new Set(
+      used.filter((m) => isEquipmentMaterial(m) && m.equipmentId != null).map((m) => String(m.equipmentId).trim()),
+    );
+    if (eqIds.size > 0) {
+      serverEquipmentForgePool = serverEquipmentForgePool.filter((e) => !eqIds.has(String(e.equipmentId).trim()));
+    }
+  }
+
+  function renderSmeltStock() {
+    if (!smeltStockListEl) return;
+    const stock = loadSmeltStock();
+    const entries = Object.keys(stock)
+      .map((k) => stock[k])
+      .filter((x) => x && x.count > 0);
+    if (entries.length === 0) {
+      smeltStockListEl.innerHTML = '<span class="smelt-pill smelt-pill--empty">아직 없음</span>';
+      return;
+    }
+    smeltStockListEl.innerHTML = '';
+    entries.forEach((e) => {
+      const pill = document.createElement('span');
+      pill.className = 'smelt-pill';
+      pill.innerHTML = `<span aria-hidden="true">${e.emoji || '◆'}</span> ${escapeHtml(e.name || '')} <strong>${e.count}</strong>`;
+      smeltStockListEl.appendChild(pill);
+    });
+  }
+
+  function syncFurnaceUi() {
+    if (furnaceSlotsEl) {
+      furnaceSlotsEl.innerHTML = '';
+      if (furnaceSelected.length === 0) {
+        const empty = document.createElement('span');
+        empty.className = 'furnace-empty';
+        empty.textContent = '—';
+        furnaceSlotsEl.appendChild(empty);
+      } else {
+        furnaceSelected.forEach((m) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'furnace-chip';
+          chip.title = '클릭하여 빼기';
+          const n = m.name;
+          const label = n.length > 20 ? `${n.slice(0, 18)}…` : n;
+          chip.textContent = label;
+          chip.addEventListener('click', () => {
+            furnaceSelected = furnaceSelected.filter((x) => x.uid !== m.uid);
+            syncFurnaceUi();
+            renderMaterials();
+          });
+          furnaceSlotsEl.appendChild(chip);
+        });
+      }
+    }
+    if (btnSmelt) btnSmelt.disabled = furnaceSelected.length === 0;
+    renderSmeltStock();
+  }
+
+  function smeltFurnace() {
+    if (furnaceSelected.length === 0) return;
+    const usable = furnaceSelected.filter((m) => !isEquipmentMaterial(m));
+    if (usable.length === 0) {
+      setFurnaceMsg('장비는 용광로에 넣을 수 없어요. 낚시 재료만 녹일 수 있어요.');
+      return;
+    }
+    const stock = loadSmeltStock();
+    for (let i = 0; i < usable.length; i += 1) {
+      const p = inferSmeltProduct(usable[i].name);
+      const prev = stock[p.id];
+      if (prev && typeof prev.count === 'number') {
+        prev.count += 1;
+      } else {
+        stock[p.id] = { ...p, count: 1 };
+      }
+    }
+    saveSmeltStock(stock);
+    removeMaterialsAfterUse(usable);
+    furnaceSelected = furnaceSelected.filter((m) => !usable.some((u) => u.uid === m.uid));
+    refreshMaterials();
+    syncFurnaceUi();
+    syncForgeUi();
+    setFurnaceMsg(`${usable.length}개 재료를 녹였습니다.`);
+    window.setTimeout(() => setFurnaceMsg(''), 3200);
+  }
 
   function stopForgeOverlayTimer() {
     if (forgeOverlayCountdownId) {
@@ -358,6 +513,7 @@
       row.className = `inv-item rarity-${rarityClass(m.rarity)}${isEquipmentMaterial(m) ? ' inv-item--equipment' : ''}`;
       row.dataset.uid = m.uid;
       if (selected.some((s) => s.uid === m.uid)) row.classList.add('selected');
+      if (furnaceSelected.some((s) => s.uid === m.uid)) row.classList.add('inv-item--furnace');
       const thumb = document.createElement('div');
       thumb.className = 'inv-thumb';
       mountForgeThumbOrImage(thumb, m.pixelArt, matEmoji(m.name), 56, 56);
@@ -377,6 +533,26 @@
   }
 
   function toggleSelect(m) {
+    if (getForgeTarget() === 'furnace') {
+      if (isEquipmentMaterial(m)) {
+        setFurnaceMsg('장비는 용광로에 넣을 수 없어요.');
+        window.setTimeout(() => setFurnaceMsg(''), 2400);
+        return;
+      }
+      const fi = furnaceSelected.findIndex((s) => s.uid === m.uid);
+      if (fi >= 0) {
+        furnaceSelected.splice(fi, 1);
+      } else {
+        const ai = selected.findIndex((s) => s.uid === m.uid);
+        if (ai >= 0) selected.splice(ai, 1);
+        furnaceSelected.push(m);
+      }
+      syncFurnaceUi();
+      syncForgeUi();
+      return;
+    }
+    const fi = furnaceSelected.findIndex((s) => s.uid === m.uid);
+    if (fi >= 0) furnaceSelected.splice(fi, 1);
     const i = selected.findIndex((s) => s.uid === m.uid);
     if (i >= 0) selected.splice(i, 1);
     else selected.push(m);
@@ -423,7 +599,7 @@
   function updateStatusMsg() {
     if (!statusMsgEl) return;
     if (selected.length === 0) {
-      statusMsgEl.textContent = '위쪽 재료 보관함에서 눌러 담으세요.';
+      statusMsgEl.textContent = '보관함에서 「모루·제련」을 고른 뒤 재료를 눌러 모루에 담으세요.';
       return;
     }
     if (!alpToken || !platformApi) {
@@ -711,7 +887,9 @@
     if (e.key !== FORGE_MATERIALS_KEY && e.key !== FORGE_SPENT_UIDS_KEY) return;
     refreshMaterials();
     selected = selected.filter((s) => materials.some((m) => m.uid === s.uid));
+    furnaceSelected = furnaceSelected.filter((s) => materials.some((m) => m.uid === s.uid));
     syncForgeUi();
+    syncFurnaceUi();
   }
 
   if (btnClear) {
@@ -720,6 +898,20 @@
       syncForgeUi();
     });
   }
+  if (btnClearFurnace) {
+    btnClearFurnace.addEventListener('click', () => {
+      furnaceSelected = [];
+      syncFurnaceUi();
+      renderMaterials();
+    });
+  }
+  if (btnSmelt) btnSmelt.addEventListener('click', () => smeltFurnace());
+  document.querySelectorAll('input[name="forgeTarget"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      renderMaterials();
+      setFurnaceMsg('');
+    });
+  });
   if (btnForge) btnForge.addEventListener('click', () => void forge());
   window.addEventListener('storage', onStorage);
   document.addEventListener('keydown', (e) => {
@@ -727,6 +919,7 @@
   });
 
   refreshMaterials();
+  syncFurnaceUi();
   syncForgeUi();
   void refreshCraftedList();
 })();
