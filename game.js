@@ -23,6 +23,75 @@
     return MAT_EMOJI_POOL[Math.abs(h >>> 0) % MAT_EMOJI_POOL.length];
   }
 
+  /** Singleplay-Game3 `mountPixelArt` / 적재함과 동일 톤 (#08081a 매트) */
+  const PIXEL_MAT = '#08081a';
+  function pixelPaintColor(hex, cidx) {
+    if (cidx === 0) return PIXEL_MAT;
+    if (!hex || typeof hex !== 'string') return PIXEL_MAT;
+    const h = hex.trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(h)) return PIXEL_MAT;
+    const r = parseInt(h.slice(1, 3), 16) / 255;
+    const g = parseInt(h.slice(3, 5), 16) / 255;
+    const b = parseInt(h.slice(5, 7), 16) / 255;
+    const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const cap = cidx === 0 ? 0.4 : cidx >= 5 ? 0.82 : 0.58;
+    if (L <= cap) return h.toLowerCase();
+    const f = cap / L;
+    const rr = Math.min(255, Math.round(r * f * 255));
+    const gg = Math.min(255, Math.round(g * f * 255));
+    const bb = Math.min(255, Math.round(b * f * 255));
+    return `#${rr.toString(16).padStart(2, '0')}${gg.toString(16).padStart(2, '0')}${bb.toString(16).padStart(2, '0')}`;
+  }
+
+  function sanitizeForgePixelArt(pa) {
+    if (!pa || !Array.isArray(pa.cells) || pa.cells.length < 4) return null;
+    const palIn = Array.isArray(pa.palette) ? pa.palette : [];
+    const palette = [PIXEL_MAT];
+    for (let i = 0; i < palIn.length && palette.length < 48; i += 1) {
+      const hx = String(palIn[i] || '').trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(hx)) palette.push(hx.toLowerCase());
+    }
+    if (palette.length < 2) return null;
+    let w = Number(pa.w) | 0;
+    let h = Number(pa.h) | 0;
+    const clen = pa.cells.length;
+    const cells = pa.cells.map((c) => Number(c) | 0);
+    if (w > 0 && h > 0 && w * h === clen) {
+      return { w, h, palette, cells, fromEmoji: !!pa.fromEmoji };
+    }
+    const side = Math.round(Math.sqrt(clen));
+    if (side >= 4 && side * side === clen) {
+      return { w: side, h: side, palette, cells, fromEmoji: !!pa.fromEmoji };
+    }
+    return null;
+  }
+
+  function mountForgePixelArt(hostEl, art, cssW, cssH) {
+    if (!hostEl || !art || !Array.isArray(art.cells) || !Array.isArray(art.palette)) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = art.w;
+    canvas.height = art.h;
+    canvas.className = 'pixel-art-canvas';
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = PIXEL_MAT;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < art.cells.length; i += 1) {
+      const cidx = art.cells[i];
+      const px = i % art.w;
+      const py = Math.floor(i / art.w);
+      const raw = cidx === 0 ? PIXEL_MAT : (art.palette[cidx] || PIXEL_MAT);
+      ctx.fillStyle = art.fromEmoji ? raw.toLowerCase() : pixelPaintColor(raw, cidx);
+      ctx.fillRect(px, py, 1, 1);
+    }
+    const scale = 2;
+    canvas.style.width = `${cssW != null ? cssW : art.w * scale}px`;
+    canvas.style.height = `${cssH != null ? cssH : art.h * scale}px`;
+    canvas.style.imageRendering = 'pixelated';
+    hostEl.innerHTML = '';
+    hostEl.appendChild(canvas);
+  }
+
   const materialListEl = document.getElementById('materialList');
   const materialScrollWrap = document.getElementById('materialScrollWrap');
   const matCountBadge = document.getElementById('matCountBadge');
@@ -264,12 +333,24 @@
       row.className = `inv-item rarity-${rarityClass(m.rarity)}`;
       row.dataset.uid = m.uid;
       if (selected.some((s) => s.uid === m.uid)) row.classList.add('selected');
-      const em = matEmoji(m.name);
-      row.innerHTML = `
-        <div class="inv-thumb"><span class="inv-emoji" aria-hidden="true">${em}</span></div>
-        <span class="inv-name">${escapeHtml(m.name)}</span>
-        <span class="inv-tag">${escapeHtml(rarityClass(m.rarity))}</span>
-      `;
+      const thumb = document.createElement('div');
+      thumb.className = 'inv-thumb';
+      const art = sanitizeForgePixelArt(m.pixelArt);
+      if (art) {
+        mountForgePixelArt(thumb, art, 56, 56);
+      } else {
+        const em = matEmoji(m.name);
+        thumb.innerHTML = `<span class="inv-emoji" aria-hidden="true">${em}</span>`;
+      }
+      row.appendChild(thumb);
+      const nameEl = document.createElement('span');
+      nameEl.className = 'inv-name';
+      nameEl.textContent = m.name != null ? String(m.name) : '';
+      row.appendChild(nameEl);
+      const tagEl = document.createElement('span');
+      tagEl.className = 'inv-tag';
+      tagEl.textContent = rarityClass(m.rarity);
+      row.appendChild(tagEl);
       row.addEventListener('click', () => toggleSelect(m));
       materialListEl.appendChild(row);
     });

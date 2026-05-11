@@ -562,6 +562,15 @@ body {
   font-size: 1.55rem;
 }
 
+.inventory-dock .inv-thumb .pixel-art-canvas {
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
 .result-card {
   position: fixed;
   left: 50%;
