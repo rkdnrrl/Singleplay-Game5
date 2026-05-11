@@ -377,7 +377,7 @@
     const baseDesc = eq.description || eq.desc || '';
     const aiLine =
       nameSource === 'ai'
-        ? '이름 · Gemini 생성\n'
+        ? '이름·능력치·내구도 · Gemini\n'
         : nameSource === 'client_fallback'
           ? '이름 · 로컬 규칙(AI 응답 없음)\n'
           : '';
@@ -387,7 +387,11 @@
         stats.avgSourceSize != null
           ? `\n재료 평균 크기 ${stats.avgSourceSize}${stats.maxSourceSize != null ? ` · 최대 ${stats.maxSourceSize}` : ''}`
           : '';
-      resultDesc.textContent = `${aiLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${sz}`;
+      const dur =
+        stats.durabilityMax != null && Number.isFinite(Number(stats.durabilityMax))
+          ? ` · 내구 ${stats.durability != null ? stats.durability : stats.durabilityMax}/${stats.durabilityMax}`
+          : '';
+      resultDesc.textContent = `${aiLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${dur}${sz}`;
     } else {
       resultDesc.textContent = `${aiLine}${baseDesc}`;
     }
@@ -568,9 +572,13 @@
         const row = document.createElement('div');
         row.className = 'crafted-row';
         const st = c.stats;
+        const durPart =
+          st && st.durabilityMax != null && Number.isFinite(Number(st.durabilityMax))
+            ? ` · 내구 ${st.durability != null ? st.durability : st.durabilityMax}/${st.durabilityMax}`
+            : '';
         const statsLine =
           st && typeof st.attackBonus === 'number'
-            ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%</div>`
+            ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%${durPart}</div>`
             : '';
         const sizeLine =
           st && st.avgSourceSize != null
