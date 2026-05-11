@@ -10,6 +10,7 @@
 
   let forgeInFlight = false;
   let smeltInFlight = false;
+  const MIN_SMELT_MATERIALS_FOR_FORGE = 5;
 
   const MAT_EMOJI_POOL = [
     '🐟', '🐠', '🐡', '🪸', '🦑', '🪼', '🐙', '✨', '🌌', '💎', '🔮', '🛸',
@@ -1070,7 +1071,9 @@
     if (btnForge) {
       const hasServer = Boolean(alpToken && platformApi);
       const allRef = selected.every((m) => materialHasForgeServerRef(m));
-      btnForge.disabled = selected.length < 2 || !hasServer || !allRef;
+      const smeltCount = selected.filter((m) => isSmeltMaterial(m)).length;
+      const smeltGateBlocked = smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE;
+      btnForge.disabled = selected.length < 2 || !hasServer || !allRef || smeltGateBlocked;
     }
     updateStatusMsg();
     renderMaterials();
@@ -1093,6 +1096,11 @@
     const miss = selected.some((m) => !materialHasForgeServerRef(m));
     if (miss) {
       statusMsgEl.textContent = '낚시 재료(serverId)·서버 장비·산출물만 제련 재료로 쓸 수 있어요.';
+      return;
+    }
+    const smeltCount = selected.filter((m) => isSmeltMaterial(m)).length;
+    if (smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE) {
+      statusMsgEl.textContent = `산출물 포함 제련은 산출물 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
       return;
     }
     if (selected.some((m) => isSmeltMaterial(m))) {
@@ -1156,6 +1164,13 @@
     }
 
     const used = selected.slice();
+    const smeltCount = used.filter((m) => isSmeltMaterial(m)).length;
+    if (smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE) {
+      if (statusMsgEl) {
+        statusMsgEl.textContent = `산출물 포함 제련은 산출물 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
+      }
+      return;
+    }
     if (!used.every((m) => materialHasForgeServerRef(m))) {
       if (statusMsgEl) statusMsgEl.textContent = '모든 재료가 유효한 참조(낚시/장비/산출물)를 가져야 제련할 수 있어요.';
       return;
