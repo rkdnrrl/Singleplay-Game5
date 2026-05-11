@@ -257,6 +257,21 @@ body {
   margin-top: 0.25rem;
 }
 
+.smelt-stock-dock {
+  position: fixed;
+  left: max(0.5rem, env(safe-area-inset-left));
+  bottom: max(0.5rem, env(safe-area-inset-bottom));
+  z-index: 12;
+  width: min(350px, calc(100vw - 1rem));
+  max-height: min(42vh, 290px);
+  padding: 0.55rem 0.65rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.42);
+}
+
 .smelt-stock-title {
   font-size: 0.68rem;
   color: var(--text-dim);
@@ -264,12 +279,41 @@ body {
   text-align: center;
 }
 
+.smelt-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.28rem;
+  margin-bottom: 0.4rem;
+}
+
+.smelt-filter {
+  border: 1px solid rgba(255, 200, 120, 0.24);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffd8a6;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  padding: 0.12rem 0.45rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.smelt-filter.is-active {
+  background: rgba(255, 180, 100, 0.2);
+  border-color: rgba(255, 200, 120, 0.52);
+  color: #fff0dc;
+}
+
 .smelt-stock-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 1.5rem;
+  max-height: min(24vh, 160px);
+  overflow-y: auto;
+  align-content: flex-start;
+  padding-right: 2px;
 }
 
 .smelt-pill {
@@ -1047,6 +1091,15 @@ body {
   }
   .inventory-dock .inv-scroll-wrap {
     max-height: min(22vh, 180px);
+  }
+
+  .smelt-stock-dock {
+    width: min(350px, calc(100vw - 1rem));
+    max-height: min(24vh, 185px);
+  }
+
+  .smelt-stock-dock .smelt-stock-list {
+    max-height: min(14vh, 96px);
   }
 
   .app {
