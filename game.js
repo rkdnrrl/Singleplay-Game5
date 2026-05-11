@@ -595,6 +595,56 @@
     }
   }
 
+  /**
+   * 대장간에서 직접 서버 보관함(catches/inventory)을 읽어 재료 캐시를 갱신.
+   * 낚시 게임을 거치지 않아도 재료가 보이도록 한다.
+   */
+  async function syncForgeMaterialsFromServer() {
+    if (!alpToken || !platformApi) return;
+    try {
+      const res = await fetch(`${platformApi}/api/catches/inventory?limit=200`, {
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      if (!res.ok) return;
+      const text = await res.text();
+      let data = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+      }
+      const catches = data && Array.isArray(data.catches) ? data.catches : [];
+      const serverItems = catches
+        .filter((c) => c && c.id != null && String(c.id).trim() !== '')
+        .map((c) => ({
+          uid: `srv-${String(c.id).trim()}`,
+          name: c.itemName != null ? String(c.itemName) : '재료',
+          rarity: c.rarity != null ? String(c.rarity).toLowerCase() : 'common',
+          size: c.size != null ? c.size : null,
+          coins: c.coinValue != null ? c.coinValue : 0,
+          serverId: String(c.id).trim(),
+          pixelArt: c.pixelArt || null,
+        }));
+
+      // 서버 항목으로 덮어쓰되, 서버 id가 없는 로컬 임시 항목은 유지
+      const current = loadMaterials();
+      const localOnly = current.filter((x) => x && (!x.serverId || String(x.serverId).trim() === ''));
+      const items = serverItems.concat(localOnly);
+      localStorage.setItem(
+        FORGE_MATERIALS_KEY,
+        JSON.stringify({ v: 3, items, updatedAt: Date.now(), source: 'forge-direct' }),
+      );
+      refreshMaterials();
+      renderMaterials();
+      syncForgeUi();
+      syncFurnaceUi();
+    } catch {
+      /* ignore */
+    }
+  }
+
   const MAX_EQUIP_NAME = 30;
 
   function hangulOnlyUi(s) {
@@ -1107,5 +1157,7 @@
   refreshMaterials();
   syncFurnaceUi();
   syncForgeUi();
-  void refreshCraftedList().then(() => void syncSmeltFromServer());
+  void syncForgeMaterialsFromServer()
+    .then(() => refreshCraftedList())
+    .then(() => syncSmeltFromServer());
 })();
