@@ -102,7 +102,8 @@
       pa &&
       typeof pa === 'object' &&
       typeof pa.imageDataUrl === 'string' &&
-      /^data:image\/(png|jpeg|webp);base64,/i.test(pa.imageDataUrl.trim())
+      /^data:image\/(png|jpeg|webp);base64,/i.test(pa.imageDataUrl.trim()) ||
+      /^data:image\/svg\+xml/i.test(pa.imageDataUrl.trim())
     );
   }
 
@@ -150,6 +151,7 @@
   const resultSpriteHost = document.getElementById('resultSpriteHost');
   const forgeOverlayEl = document.getElementById('forgeOverlay');
   const forgeOverlayTimerEl = document.getElementById('forgeOverlayTimer');
+  const forgeOverlayBonusEl = document.getElementById('forgeOverlayBonus');
   const signatureCelebrateEl = document.getElementById('signatureCelebrate');
   const signatureCelebrateNameEl = document.getElementById('signatureCelebrateName');
   const signatureCelebrateOkBtn = document.getElementById('signatureCelebrateOk');
@@ -186,6 +188,7 @@
   let signatureCelebrateTimer = 0;
   let pendingSignatureCelebrateName = null;
   let forgeOverlayCountdownId = 0;
+  let forgeScanBonusToastShown = false;
   let smeltCategory = 'all';
   /** 보관함 목록 필터: all | material(잔해·폐품형) | equipment | soul(생명·우주 신비형) */
   let materialDockFilter = 'all';
@@ -939,9 +942,26 @@
     }
   }
 
+  function hideForgeOverlayScanBonus() {
+    forgeScanBonusToastShown = false;
+    if (!forgeOverlayBonusEl) return;
+    forgeOverlayBonusEl.classList.add('forge-overlay-bonus--hidden');
+    forgeOverlayBonusEl.textContent = '';
+  }
+
+  /** 예상 시간 초과 시(연금술 조합 지연) 게임머니 보너스 안내 — UI만, 실제 지갑 연동은 게임 쪽에서 처리 */
+  function showForgeOverlayScanBonusOnce(exceedSeconds) {
+    if (forgeScanBonusToastShown || !forgeOverlayBonusEl) return;
+    forgeScanBonusToastShown = true;
+    const bonus = 100 + exceedSeconds * 40;
+    forgeOverlayBonusEl.textContent = `연금술 조합이 길어졌어요. 게임머니 보너스 +${bonus}을 받았어요!`;
+    forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
+  }
+
   /** 20→0초 예상, 이후 예상시간 N초 초과로 증가 */
   function startForgeOverlayTimer() {
     stopForgeOverlayTimer();
+    hideForgeOverlayScanBonus();
     if (!forgeOverlayTimerEl) return;
     let countdown = 20;
     let exceed = 0;
@@ -953,6 +973,7 @@
       } else {
         exceed += 1;
         forgeOverlayTimerEl.textContent = `예상시간 ${exceed}초 초과`;
+        showForgeOverlayScanBonusOnce(exceed);
       }
     }, 1000);
   }
@@ -989,6 +1010,7 @@
       startForgeOverlayTimer();
     } else {
       stopForgeOverlayTimer();
+      hideForgeOverlayScanBonus();
     }
     forgeOverlayEl.classList.toggle('forge-overlay--hidden', !visible);
     forgeOverlayEl.setAttribute('aria-hidden', visible ? 'false' : 'true');

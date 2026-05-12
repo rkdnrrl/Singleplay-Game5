@@ -1407,6 +1407,23 @@ body.forge-scroll-lock {
   font-variant-numeric: tabular-nums;
 }
 
+.forge-overlay-bonus {
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--coin);
+  text-shadow: 0 0 14px rgba(255, 213, 79, 0.35);
+  margin: -0.35rem 0 0.55rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 10px;
+  background: rgba(255, 213, 79, 0.08);
+  border: 1px solid rgba(255, 213, 79, 0.28);
+}
+
+.forge-overlay-bonus--hidden {
+  display: none;
+}
+
 .forge-progress-dots {
   display: flex;
   gap: 0.35rem;
