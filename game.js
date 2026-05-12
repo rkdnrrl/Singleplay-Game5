@@ -1490,6 +1490,8 @@
   const FORGE_TOUCH_DRAG_SLOP = 14;
   /** 짧은 탭으로 상세 모달 열기 (드래그와 구분) */
   const FORGE_MATERIAL_DETAIL_TAP_MAX_DIST = 28;
+  /** 드롭 영역에 닿았을 때 probe에서 바로 드래그로 전환하는 최소 이동(px) */
+  const FORGE_TOUCH_PROBE_PANEL_MIN = 10;
   let touchDragSession = null;
   let touchDragGhostEl = null;
 
@@ -1550,13 +1552,80 @@
     else if (panel === 'anvil' && anvilPanelEl) anvilPanelEl.classList.add('forge-drop-hover');
   }
 
+  function removeForgeTouchDocumentListeners() {
+    document.removeEventListener('touchmove', onForgeTouchProbeMove, { capture: true });
+    document.removeEventListener('touchend', onForgeTouchProbeEnd, { capture: true });
+    document.removeEventListener('touchcancel', onForgeTouchProbeEnd, { capture: true });
+    document.removeEventListener('touchmove', onForgeTouchDragMove, { capture: true });
+    document.removeEventListener('touchend', onForgeTouchDragEnd, { capture: true });
+    document.removeEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
+  }
+
+  function forgeTouchShouldCommitDragFromProbe(dx, dy, dist, clientX, clientY) {
+    if (!touchDragSession || dist < 10) return false;
+    const panel = forgeDropPanelAtPoint(clientX, clientY, touchDragSession.kind === 'smelt');
+    if (dist >= FORGE_TOUCH_PROBE_PANEL_MIN && panel) return true;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+    if (adx >= 14 && dist >= 16 && adx + 6 >= ady) return true;
+    if (adx >= 12 && dist >= 36) return true;
+    return false;
+  }
+
+  function commitProbeToForgeDrag() {
+    const s = touchDragSession;
+    if (!s || s.phase !== 'probe') return;
+    document.removeEventListener('touchmove', onForgeTouchProbeMove, { capture: true });
+    document.removeEventListener('touchend', onForgeTouchProbeEnd, { capture: true });
+    document.removeEventListener('touchcancel', onForgeTouchProbeEnd, { capture: true });
+    s.phase = 'drag';
+    if (s.sourceEl) {
+      s._restoreTouchAction = s.sourceEl.style.touchAction;
+      s.sourceEl.style.touchAction = 'none';
+    }
+    s.dragging = true;
+    document.documentElement.classList.add('forge-touch-drag-active');
+    showForgeTouchDragGhost(s.label, s.kind);
+    if (s.sourceEl) {
+      if (s.kind === 'smelt') s.sourceEl.classList.add('smelt-pill--dragging');
+      else s.sourceEl.classList.add('inv-item--dragging');
+    }
+    const lt = s.lastTouch;
+    positionForgeTouchDragGhost(lt.clientX, lt.clientY);
+    const panel = forgeDropPanelAtPoint(lt.clientX, lt.clientY, s.kind === 'smelt');
+    setForgeTouchDropHover(panel);
+    document.addEventListener('touchmove', onForgeTouchDragMove, { capture: true, passive: false });
+    document.addEventListener('touchend', onForgeTouchDragEnd, { capture: true, passive: false });
+    document.addEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
+  }
+
+  function onForgeTouchProbeMove(ev) {
+    if (!touchDragSession || touchDragSession.phase !== 'probe' || ev.touches.length !== 1) return;
+    const t = ev.touches[0];
+    touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
+    const dx = t.clientX - touchDragSession.x0;
+    const dy = t.clientY - touchDragSession.y0;
+    const dist = Math.hypot(dx, dy);
+    if (forgeTouchShouldCommitDragFromProbe(dx, dy, dist, t.clientX, t.clientY)) {
+      commitProbeToForgeDrag();
+    }
+  }
+
+  function onForgeTouchProbeEnd(ev) {
+    if (!touchDragSession || touchDragSession.phase !== 'probe') return;
+    const t = ev.changedTouches && ev.changedTouches[0];
+    if (t) touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
+    const opened = finalizeForgeTouchDrag(ev.type === 'touchend');
+    if (opened && ev.cancelable) {
+      ev.preventDefault();
+    }
+  }
+
   function finalizeForgeTouchDrag(applyDrop) {
     const s = touchDragSession;
     if (!s) return false;
     let openedMaterialDetailFromTap = false;
-    document.removeEventListener('touchmove', onForgeTouchDragMove, { capture: true });
-    document.removeEventListener('touchend', onForgeTouchDragEnd, { capture: true });
-    document.removeEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
+    removeForgeTouchDocumentListeners();
     if (s.sourceEl) {
       if ('_restoreTouchAction' in s) {
         s.sourceEl.style.touchAction = s._restoreTouchAction;
@@ -1601,7 +1670,7 @@
   }
 
   function onForgeTouchDragMove(ev) {
-    if (!touchDragSession || ev.touches.length !== 1) return;
+    if (!touchDragSession || touchDragSession.phase !== 'drag' || ev.touches.length !== 1) return;
     const t = ev.touches[0];
     touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
     const dist = Math.hypot(t.clientX - touchDragSession.x0, t.clientY - touchDragSession.y0);
@@ -1624,7 +1693,7 @@
   }
 
   function onForgeTouchDragEnd(ev) {
-    if (!touchDragSession) return;
+    if (!touchDragSession || touchDragSession.phase !== 'drag') return;
     const t = ev.changedTouches && ev.changedTouches[0];
     if (t) touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
     const openedDetail = finalizeForgeTouchDrag(ev.type === 'touchend');
@@ -1646,15 +1715,12 @@
       x0: t.clientX,
       y0: t.clientY,
       dragging: false,
+      phase: 'probe',
       lastTouch: { clientX: t.clientX, clientY: t.clientY },
     };
-    if (touchDragSession.sourceEl) {
-      touchDragSession._restoreTouchAction = touchDragSession.sourceEl.style.touchAction;
-      touchDragSession.sourceEl.style.touchAction = 'none';
-    }
-    document.addEventListener('touchmove', onForgeTouchDragMove, { capture: true, passive: false });
-    document.addEventListener('touchend', onForgeTouchDragEnd, { capture: true, passive: false });
-    document.addEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
+    document.addEventListener('touchmove', onForgeTouchProbeMove, { capture: true, passive: true });
+    document.addEventListener('touchend', onForgeTouchProbeEnd, { capture: true, passive: false });
+    document.addEventListener('touchcancel', onForgeTouchProbeEnd, { capture: true });
   }
 
   let forgeMaterialDropZonesWired = false;

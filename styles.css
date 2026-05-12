@@ -450,6 +450,7 @@ html.material-detail-open body {
 
 .smelt-pill--draggable {
   cursor: grab;
+  touch-action: pan-y;
 }
 
 .smelt-pill--draggable:active {
@@ -908,12 +909,12 @@ html.material-detail-open body {
   font-size: 0.82rem;
   border-left: 3px solid transparent;
   cursor: pointer;
-  touch-action: manipulation;
 }
 
 .inv-item.inv-item--draggable {
   cursor: grab;
   -webkit-user-drag: element;
+  touch-action: pan-y;
 }
 
 .inv-item.inv-item--draggable:active {
