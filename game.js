@@ -518,6 +518,123 @@
 
   const MAX_SMELT_YIELDS_PER_ITEM = 3;
 
+  /** 녹일 때 이름·설명 끄트머리에 붙은 원소 힌트만 신뢰 (전체 문장 키워드 남발·고철 보너스 방지) */
+  function materialSmeltTextBlob(name, hintText) {
+    const a = String(name || '').trim();
+    const b = String(hintText || '').trim();
+    if (a && b) return `${a}\n${b}`;
+    return a || b;
+  }
+
+  function splitSmeltCompositionTokens(inner) {
+    return String(inner || '')
+      .split(/[,，、·+|｜/／]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
+  function matchSmeltTokenToCatalogId(token) {
+    const t0 = String(token || '').trim();
+    if (!t0) return '';
+    const t = t0.toLowerCase();
+    if (/^[a-z0-9_-]+$/.test(t)) {
+      const byId = SMELT_CATALOG.find((e) => String(e.id).toLowerCase() === t);
+      if (byId) return byId.id;
+    }
+    let best = { id: '', score: 0 };
+    for (const entry of SMELT_CATALOG) {
+      const kws = Array.isArray(entry.keywords) ? entry.keywords : [];
+      for (const kw of kws) {
+        const k = String(kw || '').trim();
+        if (!k) continue;
+        const kl = k.toLowerCase();
+        if (t === kl) {
+          if (k.length > best.score) best = { id: entry.id, score: k.length };
+          continue;
+        }
+        if (t.length >= 2 && k.length >= 2 && (t.includes(kl) || kl.includes(t))) {
+          const sc = Math.min(t.length, k.length);
+          if (sc > best.score) best = { id: entry.id, score: sc };
+        }
+      }
+    }
+    return best.id || '';
+  }
+
+  function dedupeSmeltIdsInOrder(ids) {
+    const seen = new Set();
+    const out = [];
+    for (const id of ids) {
+      const x = String(id || '').trim();
+      if (!x || seen.has(x)) continue;
+      seen.add(x);
+      out.push(x);
+      if (out.length >= MAX_SMELT_YIELDS_PER_ITEM) break;
+    }
+    return out;
+  }
+
+  /** 이름/설명 끝에 붙은 「원소: …」「#smelt: …」「（a,b）」 등 */
+  function parseExplicitSmeltCompositionTail(blob) {
+    const text = String(blob || '').trim();
+    if (!text) return null;
+    const mHash = text.match(/[#＃](?:smelt|원소)\s*[:：]\s*([\w\-가-힣,\s·+|｜/／]+)\s*$/i);
+    if (mHash) {
+      const ids = dedupeSmeltIdsInOrder(
+        splitSmeltCompositionTokens(mHash[1]).map((tok) => matchSmeltTokenToCatalogId(tok)),
+      );
+      if (ids.length) return ids;
+    }
+    const mKo = text.match(
+      /(?:원소|성분|기초\s*재료|분해\s*성분)\s*[:：]\s*([\w\-가-힣,\s·+|｜/／]+)\s*$/i,
+    );
+    if (mKo) {
+      const ids = dedupeSmeltIdsInOrder(
+        splitSmeltCompositionTokens(mKo[1]).map((tok) => matchSmeltTokenToCatalogId(tok)),
+      );
+      if (ids.length) return ids;
+    }
+    const mParen = text.match(/(?:（|\()([^)）]{1,120})(?:）|\))\s*$/);
+    if (mParen && /[,，、·+]/.test(mParen[1])) {
+      const ids = dedupeSmeltIdsInOrder(
+        splitSmeltCompositionTokens(mParen[1]).map((tok) => matchSmeltTokenToCatalogId(tok)),
+      );
+      if (ids.length) return ids;
+    }
+    const mSq = text.match(/[〔【]([^〕】]{1,120})[〕】]\s*$/);
+    if (mSq && /[,，、·+]/.test(mSq[1])) {
+      const ids = dedupeSmeltIdsInOrder(
+        splitSmeltCompositionTokens(mSq[1]).map((tok) => matchSmeltTokenToCatalogId(tok)),
+      );
+      if (ids.length) return ids;
+    }
+    return null;
+  }
+
+  /** 문자열 끝부분(꼬리)에만 걸린 키워드로 카탈로그 id 추론 (이름+설명 blob의 마지막 구간) */
+  function inferSmeltProductsTailAnchored(fullBlob) {
+    const n = String(fullBlob || '');
+    const len = n.length;
+    if (!len) return [];
+    const tailChars = Math.min(80, Math.max(28, Math.floor(len * 0.45)));
+    const idxMin = Math.max(0, len - tailChars);
+    const cands = [];
+    for (const entry of SMELT_CATALOG) {
+      const kws = Array.isArray(entry.keywords) ? [...entry.keywords] : [];
+      kws.sort((a, b) => String(b).length - String(a).length);
+      let bestIdx = -1;
+      for (const kw of kws) {
+        const k = String(kw || '').trim();
+        if (k.length < 1) continue;
+        const idx = n.toLowerCase().lastIndexOf(k.toLowerCase());
+        if (idx >= idxMin) bestIdx = bestIdx === -1 ? idx : Math.max(bestIdx, idx);
+      }
+      if (bestIdx >= 0) cands.push({ id: entry.id, idx: bestIdx });
+    }
+    cands.sort((a, b) => a.idx - b.idx || String(a.id).localeCompare(String(b.id)));
+    return dedupeSmeltIdsInOrder(cands.map((c) => c.id));
+  }
+
   function hashMaterialNameSmelt(s) {
     let h = 2166136261 >>> 0;
     const str = String(s || '');
@@ -528,8 +645,16 @@
     return h >>> 0;
   }
 
-  function inferSmeltProducts(materialName) {
+  function inferSmeltProducts(materialName, hintText) {
     const n = String(materialName || '');
+    const blob = materialSmeltTextBlob(n, hintText);
+
+    const explicit = parseExplicitSmeltCompositionTail(blob);
+    if (explicit && explicit.length > 0) return explicit;
+
+    const tailIds = inferSmeltProductsTailAnchored(blob);
+    if (tailIds.length > 0) return tailIds;
+
     const hits = [];
     for (let i = 0; i < SMELT_RULES.length; i += 1) {
       if (SMELT_RULES[i].test(n)) hits.push(SMELT_RULES[i].out.id);
@@ -587,10 +712,10 @@
     return out;
   }
 
-  function addSmeltCountToStock(stock, materialName, add) {
+  function addSmeltCountToStock(stock, materialName, add, hintText) {
     const n = Math.floor(Number(add));
     if (!Number.isFinite(n) || n <= 0) return;
-    const ids = inferSmeltProducts(materialName);
+    const ids = inferSmeltProducts(materialName, hintText);
     for (const pid of ids) {
       const p = inferSmeltProductById(pid);
       const prev = stock[p.id];
@@ -910,7 +1035,9 @@
       }
 
       for (let i = 0; i < localInfer.length; i += 1) {
-        addSmeltCountToStock(stock, localInfer[i].name, 1);
+        const mi = localInfer[i];
+        const hint = [mi && mi.desc, mi && mi.description].filter(Boolean).join('\n');
+        addSmeltCountToStock(stock, mi.name, 1, hint);
       }
 
       saveSmeltStock(stock);
@@ -2082,7 +2209,13 @@
     }
 
     const name = mergeEquipmentName(used);
-    const description = mergeEquipmentDesc(used);
+    const smeltForgeIds = used
+      .filter((m) => isSmeltMaterial(m))
+      .map((m) => String(m.smeltId || '').trim())
+      .filter(Boolean);
+    const smeltHintLine =
+      smeltForgeIds.length > 0 ? `\n#smelt:${smeltForgeIds.join(',')}` : '';
+    const description = `${mergeEquipmentDesc(used)}${smeltHintLine}`;
 
     forgeInFlight = true;
     pendingSignatureCelebrateName = null;
