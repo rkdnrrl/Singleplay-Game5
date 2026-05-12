@@ -1342,6 +1342,8 @@
       aiLine = '이름·능력치·내구도 · Gemini\n';
     } else if (nameSource === 'client_fallback') {
       aiLine = '이름 · 로컬 규칙(AI 응답 없음)\n';
+    } else if (nameSource === 'smelt_procedural') {
+      aiLine = '이름 · 산출물 절차 생성\n';
     }
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
