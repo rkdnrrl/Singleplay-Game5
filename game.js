@@ -1491,11 +1491,13 @@
   /** 짧은 탭으로 상세 모달 열기 (드래그와 구분) */
   const FORGE_MATERIAL_DETAIL_TAP_MAX_DIST = 28;
   /** 드롭 영역에 닿았을 때 probe에서 바로 드래그로 전환하는 최소 이동(px) */
-  const FORGE_TOUCH_PROBE_PANEL_MIN = 10;
+  const FORGE_TOUCH_PROBE_PANEL_MIN = 28;
+  /** 터치 직후 이 시간(ms) 안에는 “움직임만으로” 잡기 시작 안 함(스크롤·살짝 밀림과 구분). 롱프레스 잡기는 별도 타이머로 가능 */
+  const FORGE_TOUCH_MOTION_COMMIT_DEAD_MS = 80;
   /** 손가락을 거의 고정한 채 누르면 잡기(드래그 모드)로 전환 */
-  const FORGE_LONG_PRESS_MS = 200;
+  const FORGE_LONG_PRESS_MS = 320;
   /** 롱프레스 전에 이동이 이 이상이면 “누르기” 취소(스크롤·즉시 드래그와 구분) */
-  const FORGE_LONG_PRESS_CANCEL_MOVE = 18;
+  const FORGE_LONG_PRESS_CANCEL_MOVE = 14;
   let touchDragSession = null;
   let touchDragGhostEl = null;
 
@@ -1566,13 +1568,15 @@
   }
 
   function forgeTouchShouldCommitDragFromProbe(dx, dy, dist, clientX, clientY) {
-    if (!touchDragSession || dist < 10) return false;
+    if (!touchDragSession || dist < 16) return false;
+    const age = Date.now() - touchDragSession.probeStartedAt;
+    if (age < FORGE_TOUCH_MOTION_COMMIT_DEAD_MS) return false;
     const panel = forgeDropPanelAtPoint(clientX, clientY, touchDragSession.kind === 'smelt');
     if (dist >= FORGE_TOUCH_PROBE_PANEL_MIN && panel) return true;
     const adx = Math.abs(dx);
     const ady = Math.abs(dy);
-    if (adx >= 14 && dist >= 16 && adx + 6 >= ady) return true;
-    if (adx >= 12 && dist >= 36) return true;
+    if (adx >= 26 && dist >= 34 && adx + 12 >= ady) return true;
+    if (adx >= 20 && dist >= 56) return true;
     return false;
   }
 
@@ -1732,6 +1736,7 @@
       dragging: false,
       phase: 'probe',
       longPressTimerId: 0,
+      probeStartedAt: Date.now(),
       lastTouch: { clientX: t.clientX, clientY: t.clientY },
     };
     touchDragSession.longPressTimerId = window.setTimeout(() => {
