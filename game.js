@@ -1373,7 +1373,40 @@
     dl.appendChild(dd);
   }
 
-  function closeMaterialDetailModal() {
+  function formatEquipmentStatsSummary(st) {
+    if (!st || typeof st !== 'object') return '';
+    const parts = [];
+    if (typeof st.attackBonus === 'number' && Number.isFinite(st.attackBonus)) {
+      parts.push(`공격 +${st.attackBonus}`);
+    }
+    if (typeof st.defenseBonus === 'number' && Number.isFinite(st.defenseBonus)) {
+      parts.push(`방어 +${st.defenseBonus}`);
+    }
+    if (st.speedBonus != null && Number.isFinite(Number(st.speedBonus))) {
+      parts.push(`스피드 +${(Number(st.speedBonus) * 100).toFixed(1)}%`);
+    }
+    if (st.durabilityMax != null && Number.isFinite(Number(st.durabilityMax))) {
+      const max = Number(st.durabilityMax);
+      const cur = st.durability != null && Number.isFinite(Number(st.durability)) ? Number(st.durability) : max;
+      parts.push(`내구 ${cur}/${max}`);
+    }
+    return parts.join(' · ');
+  }
+
+  function appendEquipmentStatsDetail(dl, stats) {
+    if (!dl) return;
+    const st = stats && typeof stats === 'object' ? stats : null;
+    const line = formatEquipmentStatsSummary(st);
+    if (line) {
+      appendMaterialDetailRow(dl, '능력치', line);
+      return;
+    }
+    if (st) {
+      appendMaterialDetailRow(dl, '능력치', '등록된 보너스·내구 수치가 없습니다.');
+    } else {
+      appendMaterialDetailRow(dl, '능력치', '목록을 다시 불러오면 표시됩니다. (능력치 데이터 없음)');
+    }
+  }
     if (!materialDetailModalEl) return;
     materialDetailModalEl.classList.add('material-detail-modal--hidden');
     materialDetailModalEl.setAttribute('aria-hidden', 'true');
@@ -1391,6 +1424,7 @@
     materialDetailDlEl.innerHTML = '';
     if (isEquipmentMaterial(m)) {
       appendMaterialDetailRow(materialDetailDlEl, '분류', materialDetailKindLabel(m));
+      appendEquipmentStatsDetail(materialDetailDlEl, m.stats);
       appendMaterialDetailRow(materialDetailDlEl, '장비 ID', m.equipmentId);
     } else {
       appendMaterialDetailRow(materialDetailDlEl, '분류', materialDetailKindLabel(m));
@@ -2107,6 +2141,12 @@
             kind: 'equipment',
             equipmentId: id,
             serverId: null,
+            stats:
+              item.stats != null && typeof item.stats === 'object' && !Array.isArray(item.stats)
+                ? { ...item.stats }
+                : null,
+            description: item.description != null ? String(item.description) : '',
+            desc: item.desc != null ? String(item.desc) : '',
           };
         });
       refreshMaterials();
