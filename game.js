@@ -1205,7 +1205,28 @@
       // 서버 항목으로 덮어쓰되, 서버 id가 없는 로컬 임시 항목은 유지
       const current = loadMaterials();
       const localOnly = current.filter((x) => x && (!x.serverId || String(x.serverId).trim() === ''));
-      const items = serverItems.concat(localOnly);
+      const merged = serverItems.concat(localOnly);
+      const seenCatch = new Set();
+      const seenEquip = new Set();
+      const items = [];
+      for (const it of merged) {
+        if (!it) continue;
+        if (it.equipmentId != null && String(it.equipmentId).trim() !== '') {
+          const k = `e:${String(it.equipmentId).trim()}`;
+          if (seenEquip.has(k)) continue;
+          seenEquip.add(k);
+          items.push(it);
+          continue;
+        }
+        if (it.serverId != null && String(it.serverId).trim() !== '') {
+          const k = `c:${String(it.serverId).trim()}`;
+          if (seenCatch.has(k)) continue;
+          seenCatch.add(k);
+          items.push(it);
+          continue;
+        }
+        items.push(it);
+      }
       localStorage.setItem(
         FORGE_MATERIALS_KEY,
         JSON.stringify({ v: 3, items, updatedAt: Date.now(), source: 'forge-direct' }),
@@ -1422,7 +1443,13 @@
     document.removeEventListener('touchmove', onForgeTouchDragMove, { capture: true });
     document.removeEventListener('touchend', onForgeTouchDragEnd, { capture: true });
     document.removeEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
-    if (s.sourceEl) s.sourceEl.classList.remove('smelt-pill--dragging', 'inv-item--dragging');
+    if (s.sourceEl) {
+      if ('_restoreTouchAction' in s) {
+        s.sourceEl.style.touchAction = s._restoreTouchAction;
+        delete s._restoreTouchAction;
+      }
+      s.sourceEl.classList.remove('smelt-pill--dragging', 'inv-item--dragging');
+    }
     hideForgeTouchDragGhost();
     clearForgeDnDHover();
     document.documentElement.classList.remove('forge-touch-drag-active');
@@ -1457,7 +1484,9 @@
         else touchDragSession.sourceEl.classList.add('inv-item--dragging');
       }
     }
-    ev.preventDefault();
+    if (ev.cancelable) {
+      ev.preventDefault();
+    }
     positionForgeTouchDragGhost(t.clientX, t.clientY);
     const panel = forgeDropPanelAtPoint(t.clientX, t.clientY, touchDragSession.kind === 'smelt');
     setForgeTouchDropHover(panel);
@@ -1485,6 +1514,10 @@
       dragging: false,
       lastTouch: { clientX: t.clientX, clientY: t.clientY },
     };
+    if (touchDragSession.sourceEl) {
+      touchDragSession._restoreTouchAction = touchDragSession.sourceEl.style.touchAction;
+      touchDragSession.sourceEl.style.touchAction = 'none';
+    }
     document.addEventListener('touchmove', onForgeTouchDragMove, { capture: true, passive: false });
     document.addEventListener('touchend', onForgeTouchDragEnd, { capture: true });
     document.addEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
@@ -1795,6 +1828,20 @@
           : { kind: 'catch', id: String(m.serverId).trim() },
     );
 
+    const nonSmeltForgeKeys = [];
+    for (const m of used) {
+      if (isSmeltMaterial(m)) continue;
+      if (isEquipmentMaterial(m)) nonSmeltForgeKeys.push(`equipment:${String(m.equipmentId).trim()}`);
+      else nonSmeltForgeKeys.push(`catch:${String(m.serverId).trim()}`);
+    }
+    if (new Set(nonSmeltForgeKeys).size !== nonSmeltForgeKeys.length) {
+      if (statusMsgEl) {
+        statusMsgEl.textContent =
+          '같은 낚시 재료나 장비가 두 번 올라가 있습니다. 하나를 빼거나 보관함을 새로고침한 뒤 다시 시도해 주세요.';
+      }
+      return;
+    }
+
     const name = mergeEquipmentName(used);
     const description = mergeEquipmentDesc(used);
 
@@ -1829,7 +1876,11 @@
         }
       }
       if (!res.ok || !data || !data.equipment) {
-        const msg = (data && data.error && data.message) || (data && data.error && data.error.message) || `서버 저장 실패 (${res.status})`;
+        const msg =
+          (data && data.error && data.error.message) ||
+          (data && data.error && data.message) ||
+          (data && data.message) ||
+          `서버 저장 실패 (${res.status})`;
         if (statusMsgEl) statusMsgEl.textContent = msg;
         return;
       }

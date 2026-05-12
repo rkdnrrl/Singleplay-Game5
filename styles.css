@@ -444,7 +444,6 @@ html.forge-touch-drag-active body {
 
 .smelt-pill--draggable {
   cursor: grab;
-  touch-action: pan-y;
 }
 
 .smelt-pill--draggable:active {
@@ -909,7 +908,6 @@ html.forge-touch-drag-active body {
 .inv-item.inv-item--draggable {
   cursor: grab;
   -webkit-user-drag: element;
-  touch-action: pan-y;
 }
 
 .inv-item.inv-item--draggable:active {
