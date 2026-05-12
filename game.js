@@ -172,6 +172,9 @@
   const materialDetailTitleEl = document.getElementById('materialDetailTitle');
   const materialDetailRarityEl = document.getElementById('materialDetailRarity');
   const materialDetailDlEl = document.getElementById('materialDetailDl');
+  /** 터치로 상세를 연 직후 합성 click이 배경/행에 닿아 바로 닫히는 것 방지 */
+  let materialDetailBackdropIgnoreUntil = 0;
+  let materialDetailSyntheticClickSuppressUntil = 0;
 
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
@@ -1549,7 +1552,8 @@
 
   function finalizeForgeTouchDrag(applyDrop) {
     const s = touchDragSession;
-    if (!s) return;
+    if (!s) return false;
+    let openedMaterialDetailFromTap = false;
     document.removeEventListener('touchmove', onForgeTouchDragMove, { capture: true });
     document.removeEventListener('touchend', onForgeTouchDragEnd, { capture: true });
     document.removeEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
@@ -1584,9 +1588,16 @@
       Math.hypot(s.lastTouch.clientX - s.x0, s.lastTouch.clientY - s.y0) <= FORGE_MATERIAL_DETAIL_TAP_MAX_DIST
     ) {
       const mm = findMaterialByUid(s.uid);
-      if (mm) openMaterialDetailModal(mm);
+      if (mm) {
+        openMaterialDetailModal(mm);
+        const suppressUntil = Date.now() + 500;
+        materialDetailBackdropIgnoreUntil = suppressUntil;
+        materialDetailSyntheticClickSuppressUntil = suppressUntil;
+        openedMaterialDetailFromTap = true;
+      }
     }
     touchDragSession = null;
+    return openedMaterialDetailFromTap;
   }
 
   function onForgeTouchDragMove(ev) {
@@ -1616,7 +1627,10 @@
     if (!touchDragSession) return;
     const t = ev.changedTouches && ev.changedTouches[0];
     if (t) touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
-    finalizeForgeTouchDrag(ev.type === 'touchend');
+    const openedDetail = finalizeForgeTouchDrag(ev.type === 'touchend');
+    if (openedDetail && ev.cancelable) {
+      ev.preventDefault();
+    }
   }
 
   function beginForgeTouchDrag(spec, ev) {
@@ -1639,7 +1653,7 @@
       touchDragSession.sourceEl.style.touchAction = 'none';
     }
     document.addEventListener('touchmove', onForgeTouchDragMove, { capture: true, passive: false });
-    document.addEventListener('touchend', onForgeTouchDragEnd, { capture: true });
+    document.addEventListener('touchend', onForgeTouchDragEnd, { capture: true, passive: false });
     document.addEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
   }
 
@@ -1767,6 +1781,7 @@
       });
       row.addEventListener('click', () => {
         if (suppressMaterialRowClick) return;
+        if (Date.now() < materialDetailSyntheticClickSuppressUntil) return;
         openMaterialDetailModal(m);
       });
 
@@ -2249,7 +2264,12 @@
     materialDetailModalWired = true;
     const backdrop = materialDetailModalEl.querySelector('.material-detail-backdrop');
     if (materialDetailCloseBtn) materialDetailCloseBtn.addEventListener('click', () => closeMaterialDetailModal());
-    if (backdrop) backdrop.addEventListener('click', () => closeMaterialDetailModal());
+    if (backdrop) {
+      backdrop.addEventListener('click', () => {
+        if (Date.now() < materialDetailBackdropIgnoreUntil) return;
+        closeMaterialDetailModal();
+      });
+    }
   }
 
   refreshMaterials();
