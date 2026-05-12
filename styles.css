@@ -38,6 +38,16 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
+  /* 가로 스와이프가 브라우저 뒤로 가기·히스토리 네비로 이어지는 것 완화 */
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
+}
+
+/* 터치 드래그 중: 제스처를 페이지(뒤로 가기)에 넘기지 않음 */
+html.forge-touch-drag-active,
+html.forge-touch-drag-active body {
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .app {
@@ -434,6 +444,7 @@ body {
 
 .smelt-pill--draggable {
   cursor: grab;
+  touch-action: pan-y;
 }
 
 .smelt-pill--draggable:active {
@@ -898,6 +909,7 @@ body {
 .inv-item.inv-item--draggable {
   cursor: grab;
   -webkit-user-drag: element;
+  touch-action: pan-y;
 }
 
 .inv-item.inv-item--draggable:active {

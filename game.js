@@ -1425,6 +1425,7 @@
     if (s.sourceEl) s.sourceEl.classList.remove('smelt-pill--dragging', 'inv-item--dragging');
     hideForgeTouchDragGhost();
     clearForgeDnDHover();
+    document.documentElement.classList.remove('forge-touch-drag-active');
     if (applyDrop && s.dragging && s.lastTouch) {
       const { clientX, clientY } = s.lastTouch;
       const panel = forgeDropPanelAtPoint(clientX, clientY, s.kind === 'smelt');
@@ -1449,6 +1450,7 @@
     if (!touchDragSession.dragging) {
       if (dist <= FORGE_TOUCH_DRAG_SLOP) return;
       touchDragSession.dragging = true;
+      document.documentElement.classList.add('forge-touch-drag-active');
       showForgeTouchDragGhost(touchDragSession.label, touchDragSession.kind);
       if (touchDragSession.sourceEl) {
         if (touchDragSession.kind === 'smelt') touchDragSession.sourceEl.classList.add('smelt-pill--dragging');
