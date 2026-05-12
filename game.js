@@ -1345,15 +1345,11 @@
     }
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
-      const sz =
-        stats.avgSourceSize != null
-          ? `\n재료 평균 크기 ${stats.avgSourceSize}${stats.maxSourceSize != null ? ` · 최대 ${stats.maxSourceSize}` : ''}`
-          : '';
       const dur =
         stats.durabilityMax != null && Number.isFinite(Number(stats.durabilityMax))
           ? ` · 내구 ${stats.durability != null ? stats.durability : stats.durabilityMax}/${stats.durabilityMax}`
           : '';
-      resultDesc.textContent = `${aiLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${dur}${sz}`;
+      resultDesc.textContent = `${aiLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${dur}`;
     } else {
       resultDesc.textContent = `${aiLine}${baseDesc}`;
     }
@@ -1588,15 +1584,10 @@
           st && typeof st.attackBonus === 'number'
             ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%${durPart}</div>`
             : '';
-        const sizeLine =
-          st && st.avgSourceSize != null
-            ? `<div class="cr-stats cr-stats--sub">재료 평균 크기 ${escapeHtml(String(st.avgSourceSize))}${st.maxSourceSize != null ? ` · 최대 ${escapeHtml(String(st.maxSourceSize))}` : ''}</div>`
-            : '';
         body.innerHTML = `
           <strong>${escapeHtml(c.name)}</strong>
           <div class="cr-desc">${escapeHtml(c.desc || '')}</div>
           ${statsLine}
-          ${sizeLine}
         `;
         row.appendChild(body);
         craftedListEl.appendChild(row);
