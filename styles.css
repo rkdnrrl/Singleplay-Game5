@@ -50,6 +50,12 @@ html.forge-touch-drag-active body {
   touch-action: none;
 }
 
+html.material-detail-open,
+html.material-detail-open body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .app {
   position: relative;
   z-index: 10;
@@ -1454,6 +1460,140 @@ body.forge-scroll-lock {
 }
 
 /* ── AI 시그니처 이름 축하 (제련 완료 후) ───────────────── */
+.material-detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+}
+
+.material-detail-modal--hidden {
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.material-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 18, 0.65);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.material-detail-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 22rem;
+  max-height: min(78dvh, 32rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(165deg, #1a1a2e 0%, #12121f 100%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  padding: 1.1rem 1rem 1rem;
+}
+
+.material-detail-close {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.material-detail-close:active {
+  transform: scale(0.95);
+}
+
+.material-detail-thumb {
+  width: 5.5rem;
+  height: 5.5rem;
+  margin: 0 auto 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pixel-mat);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.material-detail-title {
+  font-family: Jua, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 400;
+  text-align: center;
+  color: var(--text);
+  margin: 0 1.75rem 0.35rem;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.material-detail-rarity {
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+
+.material-detail-rarity.rarity-common {
+  color: var(--common);
+}
+.material-detail-rarity.rarity-rare {
+  color: var(--rare);
+}
+.material-detail-rarity.rarity-epic {
+  color: var(--epic);
+}
+.material-detail-rarity.rarity-legendary {
+  color: var(--legendary);
+}
+
+.material-detail-dl {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  margin: 0;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.material-detail-dl dt {
+  margin: 0;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.material-detail-dl dd {
+  margin: 0;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.material-detail-hint {
+  margin: 0.85rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.4;
+}
+
 .signature-celebrate {
   position: fixed;
   inset: 0;

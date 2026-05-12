@@ -166,6 +166,13 @@
   const furnacePanelEl = document.querySelector('.furnace-panel');
   const anvilPanelEl = document.querySelector('.refine-panel.forge-workbench') || document.querySelector('.refine-panel');
 
+  const materialDetailModalEl = document.getElementById('materialDetailModal');
+  const materialDetailCloseBtn = document.getElementById('materialDetailClose');
+  const materialDetailThumbEl = document.getElementById('materialDetailThumb');
+  const materialDetailTitleEl = document.getElementById('materialDetailTitle');
+  const materialDetailRarityEl = document.getElementById('materialDetailRarity');
+  const materialDetailDlEl = document.getElementById('materialDetailDl');
+
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
@@ -1017,6 +1024,16 @@
     return true;
   }
 
+  function materialDetailKindLabel(m) {
+    if (!m) return '';
+    if (isEquipmentMaterial(m)) return '제작 장비(서버 보관함)';
+    const t = catchItemTypeLower(m);
+    if (MAT_DOCK_SOUL_TYPES.has(t)) return '낚시 — 영혼·우주·특수형';
+    if (MAT_DOCK_MATERIAL_TYPES.has(t)) return '낚시 — 잔해·폐품형';
+    if (t) return `낚시 — 유형: ${t}`;
+    return '낚시 재료';
+  }
+
   function renderMaterialDockFilterUi() {
     if (!materialDockFiltersEl) return;
     materialDockFiltersEl.querySelectorAll('.material-dock-filter').forEach((btn) => {
@@ -1344,6 +1361,61 @@
     return materials.find((m) => m && m.uid === u) || null;
   }
 
+  function appendMaterialDetailRow(dl, label, valueText) {
+    if (!dl) return;
+    const v = valueText != null ? String(valueText).trim() : '';
+    if (!v) return;
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = v.length > 480 ? `${v.slice(0, 478)}…` : v;
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  }
+
+  function closeMaterialDetailModal() {
+    if (!materialDetailModalEl) return;
+    materialDetailModalEl.classList.add('material-detail-modal--hidden');
+    materialDetailModalEl.setAttribute('aria-hidden', 'true');
+    document.documentElement.classList.remove('material-detail-open');
+    document.body.classList.remove('material-detail-open');
+  }
+
+  function openMaterialDetailModal(m) {
+    if (!m || !materialDetailModalEl || !materialDetailThumbEl || !materialDetailTitleEl || !materialDetailRarityEl || !materialDetailDlEl) return;
+    materialDetailTitleEl.textContent = m.name != null ? String(m.name) : '이름 없음';
+    const tier = rarityClass(m.rarity);
+    materialDetailRarityEl.textContent = tierLabel(tier);
+    materialDetailRarityEl.className = `material-detail-rarity rarity-${tier}`;
+    mountForgeThumbOrImage(materialDetailThumbEl, m.pixelArt, matEmoji(String(m.name || '')), 88, 88);
+    materialDetailDlEl.innerHTML = '';
+    if (isEquipmentMaterial(m)) {
+      appendMaterialDetailRow(materialDetailDlEl, '분류', materialDetailKindLabel(m));
+      appendMaterialDetailRow(materialDetailDlEl, '장비 ID', m.equipmentId);
+    } else {
+      appendMaterialDetailRow(materialDetailDlEl, '분류', materialDetailKindLabel(m));
+      appendMaterialDetailRow(materialDetailDlEl, '인벤토리 ID', m.serverId);
+      const it = catchItemTypeLower(m);
+      if (it) appendMaterialDetailRow(materialDetailDlEl, '유형 코드', it);
+      if (m.size != null && String(m.size).trim() !== '') {
+        appendMaterialDetailRow(materialDetailDlEl, '크기·길이', String(m.size).trim());
+      }
+      if (m.coins != null && Number(m.coins) > 0) {
+        appendMaterialDetailRow(materialDetailDlEl, '코인 가치', String(m.coins));
+      }
+    }
+    const desc =
+      (m.description != null && String(m.description).trim()) ||
+      (m.desc != null && String(m.desc).trim()) ||
+      '';
+    if (desc) appendMaterialDetailRow(materialDetailDlEl, '설명', desc);
+    materialDetailModalEl.classList.remove('material-detail-modal--hidden');
+    materialDetailModalEl.setAttribute('aria-hidden', 'false');
+    document.documentElement.classList.add('material-detail-open');
+    document.body.classList.add('material-detail-open');
+    if (materialDetailCloseBtn) window.requestAnimationFrame(() => materialDetailCloseBtn.focus());
+  }
+
   function applyMaterialToFurnaceByUid(uid) {
     const m = findMaterialByUid(uid);
     if (!m) return;
@@ -1377,6 +1449,8 @@
 
   /** 모바일: 손가락을 따라다니는 드래그 미리보기 + 드롭 하이라이트 */
   const FORGE_TOUCH_DRAG_SLOP = 14;
+  /** 짧은 탭으로 상세 모달 열기 (드래그와 구분) */
+  const FORGE_MATERIAL_DETAIL_TAP_MAX_DIST = 28;
   let touchDragSession = null;
   let touchDragGhostEl = null;
 
@@ -1465,6 +1539,16 @@
         if (panel === 'furnace') applyMaterialToFurnaceByUid(s.uid);
         else if (panel === 'anvil') applyMaterialToAnvilByUid(s.uid);
       }
+    } else if (
+      applyDrop &&
+      !s.dragging &&
+      s.kind === 'material' &&
+      s.uid &&
+      s.lastTouch &&
+      Math.hypot(s.lastTouch.clientX - s.x0, s.lastTouch.clientY - s.y0) <= FORGE_MATERIAL_DETAIL_TAP_MAX_DIST
+    ) {
+      const mm = findMaterialByUid(s.uid);
+      if (mm) openMaterialDetailModal(mm);
     }
     touchDragSession = null;
   }
@@ -1627,7 +1711,11 @@
       tagEl.textContent = rarityClass(m.rarity);
       row.appendChild(tagEl);
 
+      let suppressMaterialRowClick = false;
+      row.title = '눌러 정보 보기 · 끌어 용광로·모루로 이동';
+
       row.addEventListener('dragstart', (e) => {
+        suppressMaterialRowClick = true;
         if (!e.dataTransfer) return;
         e.dataTransfer.setData(FORGE_DRAG_MATERIAL_UID, m.uid);
         e.dataTransfer.setData('text/plain', m.uid);
@@ -1637,6 +1725,13 @@
       row.addEventListener('dragend', () => {
         row.classList.remove('inv-item--dragging');
         clearForgeDnDHover();
+        window.setTimeout(() => {
+          suppressMaterialRowClick = false;
+        }, 220);
+      });
+      row.addEventListener('click', () => {
+        if (suppressMaterialRowClick) return;
+        openMaterialDetailModal(m);
       });
 
       row.addEventListener(
@@ -2100,11 +2195,24 @@
   if (btnForge) btnForge.addEventListener('click', () => void forge());
   window.addEventListener('storage', onStorage);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') hideResultCard();
+    if (e.key === 'Escape') {
+      hideResultCard();
+      closeMaterialDetailModal();
+    }
   });
+
+  let materialDetailModalWired = false;
+  function wireMaterialDetailModal() {
+    if (materialDetailModalWired || !materialDetailModalEl) return;
+    materialDetailModalWired = true;
+    const backdrop = materialDetailModalEl.querySelector('.material-detail-backdrop');
+    if (materialDetailCloseBtn) materialDetailCloseBtn.addEventListener('click', () => closeMaterialDetailModal());
+    if (backdrop) backdrop.addEventListener('click', () => closeMaterialDetailModal());
+  }
 
   refreshMaterials();
   wireForgeMaterialDropZones();
+  wireMaterialDetailModal();
   syncFurnaceUi();
   syncForgeUi();
   void syncForgeMaterialsFromServer()

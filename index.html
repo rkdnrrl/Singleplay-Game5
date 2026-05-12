@@ -118,6 +118,25 @@
   </div>
 
   <div
+    id="materialDetailModal"
+    class="material-detail-modal material-detail-modal--hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="materialDetailTitle"
+    aria-hidden="true"
+  >
+    <div class="material-detail-backdrop" role="presentation"></div>
+    <div class="material-detail-card">
+      <button type="button" class="material-detail-close" id="materialDetailClose" aria-label="닫기">×</button>
+      <div class="material-detail-thumb" id="materialDetailThumb"></div>
+      <h2 class="material-detail-title" id="materialDetailTitle"></h2>
+      <p class="material-detail-rarity" id="materialDetailRarity"></p>
+      <dl class="material-detail-dl" id="materialDetailDl"></dl>
+      <p class="material-detail-hint">끌어서 용광로 또는 모루에 놓을 수 있어요.</p>
+    </div>
+  </div>
+
+  <div
     id="signatureCelebrate"
     class="signature-celebrate signature-celebrate--hidden"
     role="dialog"
