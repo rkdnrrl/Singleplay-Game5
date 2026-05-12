@@ -492,12 +492,37 @@
     makeSmeltRule(entry.id, entry.name, entry.emoji, entry.keywords),
   );
 
-  function inferSmeltProduct(materialName) {
-    const n = String(materialName || '');
-    for (let i = 0; i < SMELT_RULES.length; i += 1) {
-      if (SMELT_RULES[i].test(n)) return { ...SMELT_RULES[i].out };
+  const MAX_SMELT_YIELDS_PER_ITEM = 3;
+
+  function hashMaterialNameSmelt(s) {
+    let h = 2166136261 >>> 0;
+    const str = String(s || '');
+    for (let i = 0; i < str.length; i += 1) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
     }
-    return { id: 'slag', name: '고철', emoji: '🔩' };
+    return h >>> 0;
+  }
+
+  function inferSmeltProducts(materialName) {
+    const n = String(materialName || '');
+    const hits = [];
+    for (let i = 0; i < SMELT_RULES.length; i += 1) {
+      if (SMELT_RULES[i].test(n)) hits.push(SMELT_RULES[i].out.id);
+    }
+    const seen = new Set();
+    const dedup = [];
+    for (const id of hits) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      dedup.push(id);
+      if (dedup.length >= MAX_SMELT_YIELDS_PER_ITEM) break;
+    }
+    if (dedup.length === 0) return ['slag'];
+    if (dedup.length === 1 && dedup[0] !== 'slag') {
+      if (hashMaterialNameSmelt(n) % 5 === 0) return [dedup[0], 'slag'];
+    }
+    return dedup;
   }
 
   function loadSmeltStock() {
@@ -541,10 +566,21 @@
   function addSmeltCountToStock(stock, materialName, add) {
     const n = Math.floor(Number(add));
     if (!Number.isFinite(n) || n <= 0) return;
-    const p = inferSmeltProduct(materialName);
-    const prev = stock[p.id];
-    const c = prev && typeof prev.count === 'number' ? prev.count : 0;
-    stock[p.id] = { ...p, count: c + n };
+    const ids = inferSmeltProducts(materialName);
+    for (const pid of ids) {
+      const p = inferSmeltProductById(pid);
+      const prev = stock[p.id];
+      const c = prev && typeof prev.count === 'number' ? prev.count : 0;
+      stock[p.id] = { id: p.id, name: p.name, emoji: p.emoji, count: c + n };
+    }
+  }
+
+  function inferSmeltProductById(pid) {
+    const id = String(pid || '').trim();
+    const hit = SMELT_CATALOG.find((e) => e.id === id);
+    if (hit) return { id: hit.id, name: hit.name, emoji: hit.emoji };
+    if (id === 'slag') return { id: 'slag', name: '고철', emoji: '🔩' };
+    return { id, name: id, emoji: '◆' };
   }
 
   function getSmeltGainSummary(beforeStock, afterStock) {
