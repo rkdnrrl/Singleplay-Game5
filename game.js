@@ -949,12 +949,12 @@
     forgeOverlayBonusEl.textContent = '';
   }
 
-  /** 예상 시간 초과 시(연금술 조합 지연) 게임머니 보너스 안내 — UI만, 실제 지갑 연동은 게임 쪽에서 처리 */
+  /** 예상 시간 초과 시(제작 지연) 게임머니 보너스 안내 — UI만, 실제 지갑 연동은 게임 쪽에서 처리 */
   function showForgeOverlayScanBonusOnce(exceedSeconds) {
     if (forgeScanBonusToastShown || !forgeOverlayBonusEl) return;
     forgeScanBonusToastShown = true;
     const bonus = 100 + exceedSeconds * 40;
-    forgeOverlayBonusEl.textContent = `연금술 조합이 길어졌어요. 게임머니 보너스 +${bonus}을 받았어요!`;
+    forgeOverlayBonusEl.textContent = `제작이 예상보다 길어졌어요. 게임머니 보너스 +${bonus}을 받았어요!`;
     forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
   }
 
