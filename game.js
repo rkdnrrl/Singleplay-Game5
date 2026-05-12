@@ -1407,6 +1407,8 @@
       appendMaterialDetailRow(dl, '능력치', '목록을 다시 불러오면 표시됩니다. (능력치 데이터 없음)');
     }
   }
+
+  function closeMaterialDetailModal() {
     if (!materialDetailModalEl) return;
     materialDetailModalEl.classList.add('material-detail-modal--hidden');
     materialDetailModalEl.setAttribute('aria-hidden', 'true');
