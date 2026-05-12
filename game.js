@@ -1490,14 +1490,10 @@
   const FORGE_TOUCH_DRAG_SLOP = 14;
   /** 짧은 탭으로 상세 모달 열기 (드래그와 구분) */
   const FORGE_MATERIAL_DETAIL_TAP_MAX_DIST = 28;
-  /** 드롭 영역에 닿았을 때 probe에서 바로 드래그로 전환하는 최소 이동(px) */
-  const FORGE_TOUCH_PROBE_PANEL_MIN = 28;
-  /** 터치 직후 이 시간(ms) 안에는 “움직임만으로” 잡기 시작 안 함(스크롤·살짝 밀림과 구분). 롱프레스 잡기는 별도 타이머로 가능 */
-  const FORGE_TOUCH_MOTION_COMMIT_DEAD_MS = 80;
-  /** 손가락을 거의 고정한 채 누르면 잡기(드래그 모드)로 전환 */
-  const FORGE_LONG_PRESS_MS = 320;
-  /** 롱프레스 전에 이동이 이 이상이면 “누르기” 취소(스크롤·즉시 드래그와 구분) */
-  const FORGE_LONG_PRESS_CANCEL_MOVE = 14;
+  /** 손가락을 잠깐 누른 뒤에만 잡기(드래그 모드) — 움직여서 용광로·모루 위로 가도 자동 잡기 없음 */
+  const FORGE_LONG_PRESS_MS = 300;
+  /** 롱프레스 취소: 이 거리 이상 움직이면 “누르기” 없이 스크롤·탭으로 처리 */
+  const FORGE_LONG_PRESS_CANCEL_MOVE = 12;
   let touchDragSession = null;
   let touchDragGhostEl = null;
 
@@ -1567,19 +1563,6 @@
     document.removeEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
   }
 
-  function forgeTouchShouldCommitDragFromProbe(dx, dy, dist, clientX, clientY) {
-    if (!touchDragSession || dist < 16) return false;
-    const age = Date.now() - touchDragSession.probeStartedAt;
-    if (age < FORGE_TOUCH_MOTION_COMMIT_DEAD_MS) return false;
-    const panel = forgeDropPanelAtPoint(clientX, clientY, touchDragSession.kind === 'smelt');
-    if (dist >= FORGE_TOUCH_PROBE_PANEL_MIN && panel) return true;
-    const adx = Math.abs(dx);
-    const ady = Math.abs(dy);
-    if (adx >= 26 && dist >= 34 && adx + 12 >= ady) return true;
-    if (adx >= 20 && dist >= 56) return true;
-    return false;
-  }
-
   function clearForgeTouchLongPressTimer(s) {
     if (!s || !s.longPressTimerId) return;
     window.clearTimeout(s.longPressTimerId);
@@ -1623,9 +1606,6 @@
     const dist = Math.hypot(dx, dy);
     if (dist > FORGE_LONG_PRESS_CANCEL_MOVE) {
       clearForgeTouchLongPressTimer(touchDragSession);
-    }
-    if (forgeTouchShouldCommitDragFromProbe(dx, dy, dist, t.clientX, t.clientY)) {
-      commitProbeToForgeDrag();
     }
   }
 
@@ -1736,7 +1716,6 @@
       dragging: false,
       phase: 'probe',
       longPressTimerId: 0,
-      probeStartedAt: Date.now(),
       lastTouch: { clientX: t.clientX, clientY: t.clientY },
     };
     touchDragSession.longPressTimerId = window.setTimeout(() => {
