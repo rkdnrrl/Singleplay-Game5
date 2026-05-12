@@ -915,6 +915,54 @@ body {
   box-shadow: 0 0 0 4px rgba(255, 140, 60, 0.12);
 }
 
+@media (hover: none) and (pointer: coarse) {
+  .furnace-panel.forge-drop-hover,
+  .refine-panel.forge-workbench.forge-drop-hover {
+    outline-width: 3px;
+    outline-offset: 4px;
+    box-shadow: 0 0 0 8px rgba(255, 140, 60, 0.2);
+  }
+}
+
+/* 터치 드래그 시 손가락 근처에 보이는 미리보기 (모바일용) */
+.forge-touch-drag-ghost {
+  position: fixed;
+  z-index: 4000;
+  left: 0;
+  top: 0;
+  max-width: min(300px, 78vw);
+  padding: 0.42rem 0.62rem;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  transform: translate(-50%, calc(-100% - 14px));
+  will-change: transform, left, top;
+}
+
+.forge-touch-drag-ghost--material {
+  background: linear-gradient(180deg, #3a3548 0%, #252030 100%);
+  color: #f0e8ff;
+}
+
+.forge-touch-drag-ghost--smelt {
+  background: linear-gradient(180deg, #4a4035 0%, #2a221c 100%);
+  color: #ffe0b2;
+  border-color: rgba(255, 200, 120, 0.45);
+}
+
+.forge-touch-drag-ghost--hidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .inv-item.rarity-common {
   border-color: var(--common);
 }

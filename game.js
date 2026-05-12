@@ -774,41 +774,21 @@
           clearForgeDnDHover();
         });
 
-        const TOUCH_SLOP = 18;
-        const touchState = { active: false, x0: 0, y0: 0, moved: false };
         pill.addEventListener(
           'touchstart',
           (ev) => {
-            if (ev.touches.length !== 1) return;
-            const t = ev.touches[0];
-            touchState.active = true;
-            touchState.x0 = t.clientX;
-            touchState.y0 = t.clientY;
-            touchState.moved = false;
+            beginForgeTouchDrag(
+              {
+                kind: 'smelt',
+                smeltSid: sid,
+                label: `${entry.emoji || '◆'} ${entry.name != null ? String(entry.name) : ''}`.trim(),
+                sourceEl: pill,
+              },
+              ev,
+            );
           },
           { passive: true },
         );
-        pill.addEventListener(
-          'touchmove',
-          (ev) => {
-            if (!touchState.active || ev.touches.length !== 1) return;
-            const t = ev.touches[0];
-            if (Math.hypot(t.clientX - touchState.x0, t.clientY - touchState.y0) > TOUCH_SLOP) touchState.moved = true;
-          },
-          { passive: true },
-        );
-        pill.addEventListener('touchend', (ev) => {
-          if (!touchState.active) return;
-          touchState.active = false;
-          const t = ev.changedTouches[0];
-          if (!t || !touchState.moved) {
-            touchState.moved = false;
-            return;
-          }
-          touchState.moved = false;
-          const el = document.elementFromPoint(t.clientX, t.clientY);
-          if (el && anvilPanelEl && anvilPanelEl.contains(el)) tryAddSmeltToAnvilBySid(sid);
-        });
       }
 
       smeltStockListEl.appendChild(pill);
@@ -1374,6 +1354,140 @@
     if (anvilPanelEl) anvilPanelEl.classList.remove('forge-drop-hover');
   }
 
+  /** 모바일: 손가락을 따라다니는 드래그 미리보기 + 드롭 하이라이트 */
+  const FORGE_TOUCH_DRAG_SLOP = 14;
+  let touchDragSession = null;
+  let touchDragGhostEl = null;
+
+  function getOrCreateForgeTouchDragGhost() {
+    if (touchDragGhostEl) return touchDragGhostEl;
+    touchDragGhostEl = document.createElement('div');
+    touchDragGhostEl.className = 'forge-touch-drag-ghost forge-touch-drag-ghost--hidden';
+    touchDragGhostEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(touchDragGhostEl);
+    return touchDragGhostEl;
+  }
+
+  function showForgeTouchDragGhost(text, kind) {
+    const g = getOrCreateForgeTouchDragGhost();
+    const raw = String(text || '').trim();
+    g.textContent = raw.length > 42 ? `${raw.slice(0, 40)}…` : raw;
+    g.classList.remove(
+      'forge-touch-drag-ghost--hidden',
+      'forge-touch-drag-ghost--smelt',
+      'forge-touch-drag-ghost--material',
+    );
+    g.classList.add(kind === 'smelt' ? 'forge-touch-drag-ghost--smelt' : 'forge-touch-drag-ghost--material');
+  }
+
+  function positionForgeTouchDragGhost(clientX, clientY) {
+    const g = touchDragGhostEl;
+    if (!g) return;
+    g.style.left = `${clientX}px`;
+    g.style.top = `${clientY}px`;
+  }
+
+  function hideForgeTouchDragGhost() {
+    if (!touchDragGhostEl) return;
+    touchDragGhostEl.classList.add('forge-touch-drag-ghost--hidden');
+    touchDragGhostEl.classList.remove('forge-touch-drag-ghost--smelt', 'forge-touch-drag-ghost--material');
+    touchDragGhostEl.textContent = '';
+  }
+
+  function forgeDropPanelAtPoint(clientX, clientY, smeltOnlyDrag) {
+    let stack;
+    try {
+      stack = document.elementsFromPoint(clientX, clientY);
+    } catch {
+      return null;
+    }
+    if (!stack || stack.length === 0) return null;
+    for (let i = 0; i < stack.length; i += 1) {
+      const el = stack[i];
+      if (anvilPanelEl && anvilPanelEl.contains(el)) return 'anvil';
+      if (!smeltOnlyDrag && furnacePanelEl && furnacePanelEl.contains(el)) return 'furnace';
+    }
+    return null;
+  }
+
+  function setForgeTouchDropHover(panel) {
+    clearForgeDnDHover();
+    if (panel === 'furnace' && furnacePanelEl) furnacePanelEl.classList.add('forge-drop-hover');
+    else if (panel === 'anvil' && anvilPanelEl) anvilPanelEl.classList.add('forge-drop-hover');
+  }
+
+  function finalizeForgeTouchDrag(applyDrop) {
+    const s = touchDragSession;
+    if (!s) return;
+    document.removeEventListener('touchmove', onForgeTouchDragMove, { capture: true });
+    document.removeEventListener('touchend', onForgeTouchDragEnd, { capture: true });
+    document.removeEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
+    if (s.sourceEl) s.sourceEl.classList.remove('smelt-pill--dragging', 'inv-item--dragging');
+    hideForgeTouchDragGhost();
+    clearForgeDnDHover();
+    if (applyDrop && s.dragging && s.lastTouch) {
+      const { clientX, clientY } = s.lastTouch;
+      const panel = forgeDropPanelAtPoint(clientX, clientY, s.kind === 'smelt');
+      if (s.kind === 'smelt') {
+        if (panel === 'anvil' && s.smeltSid) tryAddSmeltToAnvilBySid(s.smeltSid);
+        else if (panel === 'furnace' && statusMsgEl) {
+          statusMsgEl.textContent = '기초 재료는 모루로만 끌어다 놓을 수 있어요.';
+        }
+      } else if (s.kind === 'material' && s.uid) {
+        if (panel === 'furnace') applyMaterialToFurnaceByUid(s.uid);
+        else if (panel === 'anvil') applyMaterialToAnvilByUid(s.uid);
+      }
+    }
+    touchDragSession = null;
+  }
+
+  function onForgeTouchDragMove(ev) {
+    if (!touchDragSession || ev.touches.length !== 1) return;
+    const t = ev.touches[0];
+    touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
+    const dist = Math.hypot(t.clientX - touchDragSession.x0, t.clientY - touchDragSession.y0);
+    if (!touchDragSession.dragging) {
+      if (dist <= FORGE_TOUCH_DRAG_SLOP) return;
+      touchDragSession.dragging = true;
+      showForgeTouchDragGhost(touchDragSession.label, touchDragSession.kind);
+      if (touchDragSession.sourceEl) {
+        if (touchDragSession.kind === 'smelt') touchDragSession.sourceEl.classList.add('smelt-pill--dragging');
+        else touchDragSession.sourceEl.classList.add('inv-item--dragging');
+      }
+    }
+    ev.preventDefault();
+    positionForgeTouchDragGhost(t.clientX, t.clientY);
+    const panel = forgeDropPanelAtPoint(t.clientX, t.clientY, touchDragSession.kind === 'smelt');
+    setForgeTouchDropHover(panel);
+  }
+
+  function onForgeTouchDragEnd(ev) {
+    if (!touchDragSession) return;
+    const t = ev.changedTouches && ev.changedTouches[0];
+    if (t) touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
+    finalizeForgeTouchDrag(ev.type === 'touchend');
+  }
+
+  function beginForgeTouchDrag(spec, ev) {
+    if (touchDragSession) return;
+    if (!ev.touches || ev.touches.length !== 1) return;
+    const t = ev.touches[0];
+    touchDragSession = {
+      kind: spec.kind,
+      uid: spec.uid,
+      smeltSid: spec.smeltSid,
+      label: spec.label || '',
+      sourceEl: spec.sourceEl || null,
+      x0: t.clientX,
+      y0: t.clientY,
+      dragging: false,
+      lastTouch: { clientX: t.clientX, clientY: t.clientY },
+    };
+    document.addEventListener('touchmove', onForgeTouchDragMove, { capture: true, passive: false });
+    document.addEventListener('touchend', onForgeTouchDragEnd, { capture: true });
+    document.addEventListener('touchcancel', onForgeTouchDragEnd, { capture: true });
+  }
+
   let forgeMaterialDropZonesWired = false;
   function wireForgeMaterialDropZones() {
     if (forgeMaterialDropZonesWired || !furnacePanelEl || !anvilPanelEl) return;
@@ -1490,41 +1604,21 @@
         clearForgeDnDHover();
       });
 
-      const TOUCH_MATERIAL_SLOP = 18;
-      const touchState = { active: false, x0: 0, y0: 0, moved: false };
       row.addEventListener(
         'touchstart',
         (e) => {
-          if (e.touches.length !== 1) return;
-          const t = e.touches[0];
-          touchState.active = true;
-          touchState.x0 = t.clientX;
-          touchState.y0 = t.clientY;
-          touchState.moved = false;
+          beginForgeTouchDrag(
+            {
+              kind: 'material',
+              uid: m.uid,
+              label: m.name != null ? String(m.name) : '재료',
+              sourceEl: row,
+            },
+            e,
+          );
         },
         { passive: true },
       );
-      row.addEventListener(
-        'touchmove',
-        (e) => {
-          if (!touchState.active || e.touches.length !== 1) return;
-          const t = e.touches[0];
-          if (Math.hypot(t.clientX - touchState.x0, t.clientY - touchState.y0) > TOUCH_MATERIAL_SLOP) touchState.moved = true;
-        },
-        { passive: true },
-      );
-      row.addEventListener('touchend', (e) => {
-        if (!touchState.active) return;
-        touchState.active = false;
-        const t = e.changedTouches[0];
-        if (!t) return;
-        if (touchState.moved) {
-          const el = document.elementFromPoint(t.clientX, t.clientY);
-          if (el && furnacePanelEl && furnacePanelEl.contains(el)) applyMaterialToFurnaceByUid(m.uid);
-          else if (el && anvilPanelEl && anvilPanelEl.contains(el)) applyMaterialToAnvilByUid(m.uid);
-        }
-        touchState.moved = false;
-      });
 
       materialListEl.appendChild(row);
     });
