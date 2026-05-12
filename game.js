@@ -747,13 +747,18 @@
     filtered.forEach((entry) => {
       const pill = document.createElement('div');
       const sid = String(entry.id != null ? entry.id : '').trim();
-      const currentSelected = countSelectedSmeltById(sid);
-      const canAdd = currentSelected < Number(entry.count || 0);
+      const stockQtyRaw = Math.floor(Number(entry.count));
+      const stockQty = Number.isFinite(stockQtyRaw) && stockQtyRaw > 0 ? stockQtyRaw : 0;
+      const onAnvil = countSelectedSmeltById(sid);
+      const displayQty = Math.max(0, stockQty - onAnvil);
+      const canAdd = displayQty > 0;
       pill.className = `smelt-pill${canAdd ? ' smelt-pill--draggable' : ' smelt-pill--disabled'}`;
       pill.setAttribute('role', 'listitem');
       pill.draggable = canAdd;
-      pill.title = canAdd ? '모루 쪽으로 끌어다 놓기' : '이미 모루에 올린 수량만큼 선택됨';
-      pill.innerHTML = `<span aria-hidden="true">${entry.emoji || '◆'}</span> ${escapeHtml(entry.name || '')} <strong>${entry.count}</strong>`;
+      pill.title = canAdd
+        ? `남은 ${displayQty}개 · 모루로 끌어다 놓기 (모루에 ${onAnvil}개 올려 둠)`
+        : '모루에 모두 올려 두었습니다. 「선택 비우기」로 돌려 받을 수 있어요.';
+      pill.innerHTML = `<span aria-hidden="true">${entry.emoji || '◆'}</span> ${escapeHtml(entry.name || '')} <strong>${displayQty}</strong>`;
 
       if (canAdd) {
         pill.addEventListener('dragstart', (ev) => {
