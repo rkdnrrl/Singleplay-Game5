@@ -1492,6 +1492,10 @@
   const FORGE_MATERIAL_DETAIL_TAP_MAX_DIST = 28;
   /** 드롭 영역에 닿았을 때 probe에서 바로 드래그로 전환하는 최소 이동(px) */
   const FORGE_TOUCH_PROBE_PANEL_MIN = 10;
+  /** 손가락을 거의 고정한 채 누르면 잡기(드래그 모드)로 전환 */
+  const FORGE_LONG_PRESS_MS = 200;
+  /** 롱프레스 전에 이동이 이 이상이면 “누르기” 취소(스크롤·즉시 드래그와 구분) */
+  const FORGE_LONG_PRESS_CANCEL_MOVE = 18;
   let touchDragSession = null;
   let touchDragGhostEl = null;
 
@@ -1572,9 +1576,16 @@
     return false;
   }
 
+  function clearForgeTouchLongPressTimer(s) {
+    if (!s || !s.longPressTimerId) return;
+    window.clearTimeout(s.longPressTimerId);
+    s.longPressTimerId = 0;
+  }
+
   function commitProbeToForgeDrag() {
     const s = touchDragSession;
     if (!s || s.phase !== 'probe') return;
+    clearForgeTouchLongPressTimer(s);
     document.removeEventListener('touchmove', onForgeTouchProbeMove, { capture: true });
     document.removeEventListener('touchend', onForgeTouchProbeEnd, { capture: true });
     document.removeEventListener('touchcancel', onForgeTouchProbeEnd, { capture: true });
@@ -1606,6 +1617,9 @@
     const dx = t.clientX - touchDragSession.x0;
     const dy = t.clientY - touchDragSession.y0;
     const dist = Math.hypot(dx, dy);
+    if (dist > FORGE_LONG_PRESS_CANCEL_MOVE) {
+      clearForgeTouchLongPressTimer(touchDragSession);
+    }
     if (forgeTouchShouldCommitDragFromProbe(dx, dy, dist, t.clientX, t.clientY)) {
       commitProbeToForgeDrag();
     }
@@ -1625,6 +1639,7 @@
     const s = touchDragSession;
     if (!s) return false;
     let openedMaterialDetailFromTap = false;
+    clearForgeTouchLongPressTimer(s);
     removeForgeTouchDocumentListeners();
     if (s.sourceEl) {
       if ('_restoreTouchAction' in s) {
@@ -1716,8 +1731,14 @@
       y0: t.clientY,
       dragging: false,
       phase: 'probe',
+      longPressTimerId: 0,
       lastTouch: { clientX: t.clientX, clientY: t.clientY },
     };
+    touchDragSession.longPressTimerId = window.setTimeout(() => {
+      if (!touchDragSession || touchDragSession.phase !== 'probe') return;
+      touchDragSession.longPressTimerId = 0;
+      commitProbeToForgeDrag();
+    }, FORGE_LONG_PRESS_MS);
     document.addEventListener('touchmove', onForgeTouchProbeMove, { capture: true, passive: true });
     document.addEventListener('touchend', onForgeTouchProbeEnd, { capture: true, passive: false });
     document.addEventListener('touchcancel', onForgeTouchProbeEnd, { capture: true });
