@@ -184,6 +184,7 @@
 
   const SMELT_STOCK_KEY = 'WEB_ALP_FORGE_SMELT_STOCK_V1';
   const FORGE_DRAG_MATERIAL_UID = 'application/x-forge-material-uid';
+  const FORGE_DRAG_SMELT_UID = 'application/x-forge-smelt-id';
   const SMELT_CATEGORY_NAMES = {
     all: '전체',
     metal: '금속',
@@ -552,7 +553,7 @@
     }
   }
 
-  /** 서버/로컬 공통: 산출물 맵 복사 (표시용 엔트리만) */
+  /** 서버/로컬 공통: 기초 재료(용광로 재고) 맵 복사 (표시용 엔트리만) */
   function cloneSmeltStock(src) {
     const out = {};
     if (!src || typeof src !== 'object') return out;
@@ -645,7 +646,7 @@
     });
   }
 
-  /** 로그인 시 서버 재고를 불러오고, 서버가 비어 있으면 로컬 산출물을 한 번 이관 */
+  /** 로그인 시 서버 재고를 불러오고, 서버가 비어 있으면 로컬 기초 재료를 한 번 이관 */
   async function syncSmeltFromServer() {
     if (!alpToken || !platformApi) {
       renderSmeltStock();
@@ -739,33 +740,71 @@
     const filtered = entries.filter((e) => matchSmeltCategory(e, smeltCategory));
     if (filtered.length === 0) {
       const catLabel = SMELT_CATEGORY_NAMES[smeltCategory] || '선택한 카테고리';
-      smeltStockListEl.innerHTML = `<span class="smelt-pill smelt-pill--empty">${escapeHtml(catLabel)} 산출물 없음</span>`;
+      smeltStockListEl.innerHTML = `<span class="smelt-pill smelt-pill--empty">${escapeHtml(catLabel)} 기초 재료 없음</span>`;
       return;
     }
     smeltStockListEl.innerHTML = '';
-    filtered.forEach((e) => {
-      const pill = document.createElement('button');
-      const sid = String(e.id != null ? e.id : '').trim();
+    filtered.forEach((entry) => {
+      const pill = document.createElement('div');
+      const sid = String(entry.id != null ? entry.id : '').trim();
       const currentSelected = countSelectedSmeltById(sid);
-      const canAdd = currentSelected < Number(e.count || 0);
-      pill.className = 'smelt-pill';
-      pill.type = 'button';
-      pill.disabled = !canAdd;
-      pill.title = canAdd ? '클릭하여 모루 재료에 추가' : '이미 보유 수량만큼 선택됨';
-      pill.innerHTML = `<span aria-hidden="true">${e.emoji || '◆'}</span> ${escapeHtml(e.name || '')} <strong>${e.count}</strong>`;
-      pill.addEventListener('click', () => {
-        const latestStock = cloneSmeltStock(loadSmeltStock());
-        const latest = latestStock[sid];
-        const maxCount = latest && typeof latest.count === 'number' ? latest.count : 0;
-        const inSelected = countSelectedSmeltById(sid);
-        if (inSelected >= maxCount) {
-          if (statusMsgEl) statusMsgEl.textContent = '해당 산출물은 보유 수량만큼만 모루에 올릴 수 있어요.';
-          syncForgeUi();
-          return;
-        }
-        selected.push(makeSmeltSelectionMaterial(latest || e));
-        syncForgeUi();
-      });
+      const canAdd = currentSelected < Number(entry.count || 0);
+      pill.className = `smelt-pill${canAdd ? ' smelt-pill--draggable' : ' smelt-pill--disabled'}`;
+      pill.setAttribute('role', 'listitem');
+      pill.draggable = canAdd;
+      pill.title = canAdd ? '모루 쪽으로 끌어다 놓기' : '이미 모루에 올린 수량만큼 선택됨';
+      pill.innerHTML = `<span aria-hidden="true">${entry.emoji || '◆'}</span> ${escapeHtml(entry.name || '')} <strong>${entry.count}</strong>`;
+
+      if (canAdd) {
+        pill.addEventListener('dragstart', (ev) => {
+          if (!ev.dataTransfer) return;
+          ev.dataTransfer.setData(FORGE_DRAG_SMELT_UID, sid);
+          ev.dataTransfer.setData('text/plain', `forge-smelt:${sid}`);
+          ev.dataTransfer.effectAllowed = 'copyMove';
+          pill.classList.add('smelt-pill--dragging');
+        });
+        pill.addEventListener('dragend', () => {
+          pill.classList.remove('smelt-pill--dragging');
+          clearForgeDnDHover();
+        });
+
+        const TOUCH_SLOP = 18;
+        const touchState = { active: false, x0: 0, y0: 0, moved: false };
+        pill.addEventListener(
+          'touchstart',
+          (ev) => {
+            if (ev.touches.length !== 1) return;
+            const t = ev.touches[0];
+            touchState.active = true;
+            touchState.x0 = t.clientX;
+            touchState.y0 = t.clientY;
+            touchState.moved = false;
+          },
+          { passive: true },
+        );
+        pill.addEventListener(
+          'touchmove',
+          (ev) => {
+            if (!touchState.active || ev.touches.length !== 1) return;
+            const t = ev.touches[0];
+            if (Math.hypot(t.clientX - touchState.x0, t.clientY - touchState.y0) > TOUCH_SLOP) touchState.moved = true;
+          },
+          { passive: true },
+        );
+        pill.addEventListener('touchend', (ev) => {
+          if (!touchState.active) return;
+          touchState.active = false;
+          const t = ev.changedTouches[0];
+          if (!t || !touchState.moved) {
+            touchState.moved = false;
+            return;
+          }
+          touchState.moved = false;
+          const el = document.elementFromPoint(t.clientX, t.clientY);
+          if (el && anvilPanelEl && anvilPanelEl.contains(el)) tryAddSmeltToAnvilBySid(sid);
+        });
+      }
+
       smeltStockListEl.appendChild(pill);
     });
   }
@@ -884,7 +923,7 @@
       const gains = getSmeltGainSummary(beforeStock, stock);
       const gainText = formatSmeltGainSummary(gains);
       setFurnaceMsg(
-        gainText ? `${toMelt.length}개를 녹였습니다. 산출: ${gainText}` : `${toMelt.length}개를 녹였습니다.`,
+        gainText ? `${toMelt.length}개를 녹였습니다. 기초 재료: ${gainText}` : `${toMelt.length}개를 녹였습니다.`,
       );
       window.setTimeout(() => setFurnaceMsg(''), 3200);
     } catch {
@@ -1032,6 +1071,42 @@
     const sid = String(smeltId || '').trim();
     if (!sid) return 0;
     return selected.filter((m) => isSmeltMaterial(m) && String(m.smeltId).trim() === sid).length;
+  }
+
+  function tryAddSmeltToAnvilBySid(sidRaw) {
+    const sid = String(sidRaw || '').trim();
+    if (!sid) return false;
+    const latestStock = cloneSmeltStock(loadSmeltStock());
+    const latest = latestStock[sid];
+    const maxCount = latest && typeof latest.count === 'number' ? latest.count : 0;
+    const inSelected = countSelectedSmeltById(sid);
+    if (inSelected >= maxCount) {
+      if (statusMsgEl) statusMsgEl.textContent = '해당 기초 재료는 보유 수량만큼만 모루에 올릴 수 있어요.';
+      syncForgeUi();
+      return true;
+    }
+    selected.push(makeSmeltSelectionMaterial(latest || { id: sid, name: sid, emoji: '◆' }));
+    syncForgeUi();
+    return true;
+  }
+
+  function readSmeltDragSid(dt) {
+    if (!dt) return '';
+    try {
+      const a = dt.getData(FORGE_DRAG_SMELT_UID);
+      if (a) return String(a).trim();
+      const b = dt.getData('text/plain');
+      if (b && String(b).startsWith('forge-smelt:')) return String(b).slice('forge-smelt:'.length).trim();
+    } catch {
+      /* ignore */
+    }
+    return '';
+  }
+
+  function tryAddSmeltToAnvilFromDataTransfer(dt) {
+    const sid = readSmeltDragSid(dt);
+    if (!sid) return false;
+    return tryAddSmeltToAnvilBySid(sid);
   }
 
   function consumeSmeltSelectionMaterials(used) {
@@ -1228,10 +1303,10 @@
     return 'common';
   }
 
-  function materialDragPayloadPresent(dt) {
+  function forgeDockDragPayloadPresent(dt) {
     if (!dt || !dt.types) return false;
     const types = Array.from(dt.types);
-    return types.includes(FORGE_DRAG_MATERIAL_UID) || types.includes('text/plain');
+    return types.includes(FORGE_DRAG_MATERIAL_UID) || types.includes(FORGE_DRAG_SMELT_UID) || types.includes('text/plain');
   }
 
   function readMaterialDragUid(dt) {
@@ -1240,7 +1315,10 @@
       const a = dt.getData(FORGE_DRAG_MATERIAL_UID);
       if (a) return String(a).trim();
       const b = dt.getData('text/plain');
-      return b ? String(b).trim() : '';
+      if (!b) return '';
+      const s = String(b).trim();
+      if (s.startsWith('forge-smelt:')) return '';
+      return s;
     } catch {
       return '';
     }
@@ -1287,14 +1365,14 @@
   function wireForgeMaterialDropZones() {
     if (forgeMaterialDropZonesWired || !furnacePanelEl || !anvilPanelEl) return;
     forgeMaterialDropZonesWired = true;
-    const bindPanel = (panel, applyFn) => {
+    const bindPanel = (panel, kind) => {
       panel.addEventListener('dragenter', (e) => {
-        if (!materialDragPayloadPresent(e.dataTransfer)) return;
+        if (!forgeDockDragPayloadPresent(e.dataTransfer)) return;
         e.preventDefault();
         panel.classList.add('forge-drop-hover');
       });
       panel.addEventListener('dragover', (e) => {
-        if (!materialDragPayloadPresent(e.dataTransfer)) return;
+        if (!forgeDockDragPayloadPresent(e.dataTransfer)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         panel.classList.add('forge-drop-hover');
@@ -1306,12 +1384,22 @@
       panel.addEventListener('drop', (e) => {
         e.preventDefault();
         clearForgeDnDHover();
-        const uid = readMaterialDragUid(e.dataTransfer);
-        if (uid) applyFn(uid);
+        if (kind === 'furnace') {
+          if (readSmeltDragSid(e.dataTransfer)) {
+            if (statusMsgEl) statusMsgEl.textContent = '기초 재료는 모루로만 끌어다 놓을 수 있어요.';
+            return;
+          }
+          const uid = readMaterialDragUid(e.dataTransfer);
+          if (uid) applyMaterialToFurnaceByUid(uid);
+        } else {
+          if (tryAddSmeltToAnvilFromDataTransfer(e.dataTransfer)) return;
+          const uid = readMaterialDragUid(e.dataTransfer);
+          if (uid) applyMaterialToAnvilByUid(uid);
+        }
       });
     };
-    bindPanel(furnacePanelEl, applyMaterialToFurnaceByUid);
-    bindPanel(anvilPanelEl, applyMaterialToAnvilByUid);
+    bindPanel(furnacePanelEl, 'furnace');
+    bindPanel(anvilPanelEl, 'anvil');
     document.addEventListener('dragend', clearForgeDnDHover, true);
   }
 
@@ -1474,7 +1562,7 @@
   function updateStatusMsg() {
     if (!statusMsgEl) return;
     if (selected.length === 0) {
-      statusMsgEl.textContent = '보관함 재료를 끌어 용광로 또는 모루 칸에 놓으세요.';
+      statusMsgEl.textContent = '보관함 재료와 기초 재료를 끌어 용광로 또는 모루 칸에 놓으세요.';
       return;
     }
     if (!alpToken || !platformApi) {
@@ -1487,16 +1575,16 @@
     }
     const miss = selected.some((m) => !materialHasForgeServerRef(m));
     if (miss) {
-      statusMsgEl.textContent = '낚시 재료(serverId)·서버 장비·산출물만 제련 재료로 쓸 수 있어요.';
+      statusMsgEl.textContent = '낚시 재료(serverId)·서버 장비·기초 재료만 제련 재료로 쓸 수 있어요.';
       return;
     }
     const smeltCount = selected.filter((m) => isSmeltMaterial(m)).length;
     if (smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE) {
-      statusMsgEl.textContent = `산출물 포함 제련은 산출물 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
+      statusMsgEl.textContent = `기초 재료를 쓰는 제련은 기초 재료 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
       return;
     }
     if (selected.some((m) => isSmeltMaterial(m))) {
-      statusMsgEl.textContent = '산출물 포함 조합은 서버에 저장됩니다.';
+      statusMsgEl.textContent = '기초 재료가 섞인 조합은 서버에 저장됩니다.';
       return;
     }
     statusMsgEl.textContent =
@@ -1546,7 +1634,7 @@
     } else if (nameSource === 'client_fallback') {
       aiLine = '이름 · 로컬 규칙(AI 응답 없음)\n';
     } else if (nameSource === 'smelt_procedural') {
-      aiLine = '이름 · 산출물 절차 생성\n';
+      aiLine = '이름 · 기초 재료 절차 생성\n';
     }
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
@@ -1581,12 +1669,12 @@
     const smeltCount = used.filter((m) => isSmeltMaterial(m)).length;
     if (smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE) {
       if (statusMsgEl) {
-        statusMsgEl.textContent = `산출물 포함 제련은 산출물 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
+        statusMsgEl.textContent = `기초 재료를 쓰는 제련은 기초 재료 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
       }
       return;
     }
     if (!used.every((m) => materialHasForgeServerRef(m))) {
-      if (statusMsgEl) statusMsgEl.textContent = '모든 재료가 유효한 참조(낚시/장비/산출물)를 가져야 제련할 수 있어요.';
+      if (statusMsgEl) statusMsgEl.textContent = '모든 재료가 유효한 참조(낚시/장비/기초 재료)를 가져야 제련할 수 있어요.';
       return;
     }
 

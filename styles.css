@@ -427,13 +427,26 @@ body {
   border: 1px solid rgba(255, 200, 120, 0.2);
   color: #ffe0b2;
   font-family: inherit;
-  cursor: pointer;
+  cursor: default;
   line-height: 1.2;
+  user-select: none;
 }
 
-.smelt-pill:disabled {
+.smelt-pill--draggable {
+  cursor: grab;
+}
+
+.smelt-pill--draggable:active {
+  cursor: grabbing;
+}
+
+.smelt-pill--dragging {
+  opacity: 0.55;
+}
+
+.smelt-pill--disabled {
   opacity: 0.48;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .smelt-pill--empty {
