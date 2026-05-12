@@ -1302,6 +1302,7 @@
     }
     updateStatusMsg();
     renderMaterials();
+    renderSmeltStock();
   }
 
   function updateStatusMsg() {
