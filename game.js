@@ -10,6 +10,7 @@
 
   let forgeInFlight = false;
   let smeltInFlight = false;
+  /** 기초 재료만 모루에 올린 조합에만 적용. 보관함 재료(낚시·장비)와 섞으면 기초 재료 1개부터 제련 가능. */
   const MIN_SMELT_MATERIALS_FOR_FORGE = 5;
 
   const MAT_EMOJI_POOL = [
@@ -1048,6 +1049,13 @@
     return Boolean(m && m.kind === 'smelt' && m.smeltId != null && String(m.smeltId).trim() !== '');
   }
 
+  /** true면 제련 버튼 비활성: 기초 재료만 있고 그 개수가 MIN 미만일 때. */
+  function isForgeBlockedSmeltOnlyMinCount(sel) {
+    if (!Array.isArray(sel) || sel.length === 0) return false;
+    const smeltCount = sel.filter((m) => isSmeltMaterial(m)).length;
+    return smeltCount > 0 && smeltCount === sel.length && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE;
+  }
+
   function materialHasForgeServerRef(m) {
     if (!m) return false;
     if (isSmeltMaterial(m)) return true;
@@ -1555,8 +1563,7 @@
     if (btnForge) {
       const hasServer = Boolean(alpToken && platformApi);
       const allRef = selected.every((m) => materialHasForgeServerRef(m));
-      const smeltCount = selected.filter((m) => isSmeltMaterial(m)).length;
-      const smeltGateBlocked = smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE;
+      const smeltGateBlocked = isForgeBlockedSmeltOnlyMinCount(selected);
       btnForge.disabled = selected.length < 2 || !hasServer || !allRef || smeltGateBlocked;
     }
     updateStatusMsg();
@@ -1583,13 +1590,15 @@
       statusMsgEl.textContent = '낚시 재료(serverId)·서버 장비·기초 재료만 제련 재료로 쓸 수 있어요.';
       return;
     }
-    const smeltCount = selected.filter((m) => isSmeltMaterial(m)).length;
-    if (smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE) {
-      statusMsgEl.textContent = `기초 재료를 쓰는 제련은 기초 재료 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
+    if (isForgeBlockedSmeltOnlyMinCount(selected)) {
+      statusMsgEl.textContent = `기초 재료만 쓸 때는 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 이상이 필요해요. 보관함 재료와 함께 올리면 더 적게 써도 제련할 수 있어요.`;
       return;
     }
     if (selected.some((m) => isSmeltMaterial(m))) {
-      statusMsgEl.textContent = '기초 재료가 섞인 조합은 서버에 저장됩니다.';
+      const mixed = selected.some((m) => !isSmeltMaterial(m));
+      statusMsgEl.textContent = mixed
+        ? '보관함 재료와 기초 재료를 함께 쓰는 조합입니다. 「⚒️ 제련하기」로 서버에 저장돼요.'
+        : '기초 재료만으로 제련합니다. 「⚒️ 제련하기」로 서버에 저장돼요.';
       return;
     }
     statusMsgEl.textContent =
@@ -1671,10 +1680,9 @@
     }
 
     const used = selected.slice();
-    const smeltCount = used.filter((m) => isSmeltMaterial(m)).length;
-    if (smeltCount > 0 && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE) {
+    if (isForgeBlockedSmeltOnlyMinCount(used)) {
       if (statusMsgEl) {
-        statusMsgEl.textContent = `기초 재료를 쓰는 제련은 기초 재료 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개가 필요해요.`;
+        statusMsgEl.textContent = `기초 재료만 쓸 때는 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 이상이 필요해요. 보관함 재료와 함께 올리면 더 적게 써도 제련할 수 있어요.`;
       }
       return;
     }
