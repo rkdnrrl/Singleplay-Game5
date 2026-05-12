@@ -161,6 +161,9 @@
   const furnaceMsgEl = document.getElementById('furnaceMsg');
   const smeltStockListEl = document.getElementById('smeltStockList');
   const smeltCategoryFiltersEl = document.getElementById('smeltCategoryFilters');
+  const materialDockFiltersEl = document.getElementById('materialDockFilters');
+  const furnacePanelEl = document.querySelector('.furnace-panel');
+  const anvilPanelEl = document.querySelector('.refine-panel.forge-workbench') || document.querySelector('.refine-panel');
 
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
@@ -173,8 +176,14 @@
   let pendingSignatureCelebrateName = null;
   let forgeOverlayCountdownId = 0;
   let smeltCategory = 'all';
+  /** 보관함 목록 필터: all | material(잔해·폐품형) | equipment | soul(생명·우주 신비형) */
+  let materialDockFilter = 'all';
+
+  const MAT_DOCK_SOUL_TYPES = new Set(['fish', 'creature', 'cosmic', 'crystal', 'artifact']);
+  const MAT_DOCK_MATERIAL_TYPES = new Set(['scrap', 'debris']);
 
   const SMELT_STOCK_KEY = 'WEB_ALP_FORGE_SMELT_STOCK_V1';
+  const FORGE_DRAG_MATERIAL_UID = 'application/x-forge-material-uid';
   const SMELT_CATEGORY_NAMES = {
     all: '전체',
     metal: '금속',
@@ -700,11 +709,6 @@
     }
   }
 
-  function getForgeTarget() {
-    const el = document.querySelector('input[name="forgeTarget"]:checked');
-    return el && el.value === 'furnace' ? 'furnace' : 'anvil';
-  }
-
   function setFurnaceMsg(msg) {
     if (furnaceMsgEl) furnaceMsgEl.textContent = msg || '';
   }
@@ -750,10 +754,6 @@
       pill.title = canAdd ? '클릭하여 모루 재료에 추가' : '이미 보유 수량만큼 선택됨';
       pill.innerHTML = `<span aria-hidden="true">${e.emoji || '◆'}</span> ${escapeHtml(e.name || '')} <strong>${e.count}</strong>`;
       pill.addEventListener('click', () => {
-        if (getForgeTarget() === 'furnace') {
-          if (statusMsgEl) statusMsgEl.textContent = '산출물은 모루·제련에서만 재료로 쓸 수 있어요.';
-          return;
-        }
         const latestStock = cloneSmeltStock(loadSmeltStock());
         const latest = latestStock[sid];
         const maxCount = latest && typeof latest.count === 'number' ? latest.count : 0;
@@ -965,6 +965,41 @@
     return Boolean(m && (m.kind === 'equipment' || m.equipmentId != null));
   }
 
+  function catchItemTypeLower(m) {
+    if (!m || isEquipmentMaterial(m)) return '';
+    return String(m.itemType != null ? m.itemType : m.type || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  /** 낚시 재료를 보관함 필터 탭으로 분류 (장비 제외). */
+  function materialDockBucketForCatch(m) {
+    const t = catchItemTypeLower(m);
+    if (MAT_DOCK_SOUL_TYPES.has(t)) return 'soul';
+    if (MAT_DOCK_MATERIAL_TYPES.has(t)) return 'material';
+    if (!t) return 'material';
+    return 'material';
+  }
+
+  function materialMatchesDockFilter(m, filter) {
+    if (!m) return false;
+    if (filter === 'all') return true;
+    if (filter === 'equipment') return isEquipmentMaterial(m);
+    if (isEquipmentMaterial(m)) return false;
+    const b = materialDockBucketForCatch(m);
+    if (filter === 'material') return b === 'material';
+    if (filter === 'soul') return b === 'soul';
+    return true;
+  }
+
+  function renderMaterialDockFilterUi() {
+    if (!materialDockFiltersEl) return;
+    materialDockFiltersEl.querySelectorAll('.material-dock-filter').forEach((btn) => {
+      const f = btn.getAttribute('data-filter') || 'all';
+      btn.classList.toggle('is-active', f === materialDockFilter);
+    });
+  }
+
   function isSmeltMaterial(m) {
     return Boolean(m && m.kind === 'smelt' && m.smeltId != null && String(m.smeltId).trim() !== '');
   }
@@ -1092,6 +1127,7 @@
           uid: `srv-${String(c.id).trim()}`,
           name: c.itemName != null ? String(c.itemName) : '재료',
           rarity: c.rarity != null ? String(c.rarity).toLowerCase() : 'common',
+          itemType: c.itemType != null ? String(c.itemType).toLowerCase().trim() : '',
           size: c.size != null ? c.size : null,
           coins: c.coinValue != null ? c.coinValue : 0,
           serverId: String(c.id).trim(),
@@ -1192,6 +1228,93 @@
     return 'common';
   }
 
+  function materialDragPayloadPresent(dt) {
+    if (!dt || !dt.types) return false;
+    const types = Array.from(dt.types);
+    return types.includes(FORGE_DRAG_MATERIAL_UID) || types.includes('text/plain');
+  }
+
+  function readMaterialDragUid(dt) {
+    if (!dt) return '';
+    try {
+      const a = dt.getData(FORGE_DRAG_MATERIAL_UID);
+      if (a) return String(a).trim();
+      const b = dt.getData('text/plain');
+      return b ? String(b).trim() : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function findMaterialByUid(uid) {
+    const u = String(uid || '').trim();
+    if (!u) return null;
+    return materials.find((m) => m && m.uid === u) || null;
+  }
+
+  function applyMaterialToFurnaceByUid(uid) {
+    const m = findMaterialByUid(uid);
+    if (!m) return;
+    const fi = furnaceSelected.findIndex((s) => s.uid === uid);
+    if (fi >= 0) furnaceSelected.splice(fi, 1);
+    else {
+      const ai = selected.findIndex((s) => s.uid === uid);
+      if (ai >= 0) selected.splice(ai, 1);
+      furnaceSelected.push(m);
+    }
+    syncFurnaceUi();
+    syncForgeUi();
+  }
+
+  function applyMaterialToAnvilByUid(uid) {
+    const m = findMaterialByUid(uid);
+    if (!m) return;
+    const fi = furnaceSelected.findIndex((s) => s.uid === uid);
+    if (fi >= 0) furnaceSelected.splice(fi, 1);
+    const i = selected.findIndex((s) => s.uid === uid);
+    if (i >= 0) selected.splice(i, 1);
+    else selected.push(m);
+    syncForgeUi();
+    syncFurnaceUi();
+  }
+
+  function clearForgeDnDHover() {
+    if (furnacePanelEl) furnacePanelEl.classList.remove('forge-drop-hover');
+    if (anvilPanelEl) anvilPanelEl.classList.remove('forge-drop-hover');
+  }
+
+  let forgeMaterialDropZonesWired = false;
+  function wireForgeMaterialDropZones() {
+    if (forgeMaterialDropZonesWired || !furnacePanelEl || !anvilPanelEl) return;
+    forgeMaterialDropZonesWired = true;
+    const bindPanel = (panel, applyFn) => {
+      panel.addEventListener('dragenter', (e) => {
+        if (!materialDragPayloadPresent(e.dataTransfer)) return;
+        e.preventDefault();
+        panel.classList.add('forge-drop-hover');
+      });
+      panel.addEventListener('dragover', (e) => {
+        if (!materialDragPayloadPresent(e.dataTransfer)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        panel.classList.add('forge-drop-hover');
+      });
+      panel.addEventListener('dragleave', (e) => {
+        const rt = e.relatedTarget;
+        if (rt == null || !panel.contains(rt)) panel.classList.remove('forge-drop-hover');
+      });
+      panel.addEventListener('drop', (e) => {
+        e.preventDefault();
+        clearForgeDnDHover();
+        const uid = readMaterialDragUid(e.dataTransfer);
+        if (uid) applyFn(uid);
+      });
+    };
+    bindPanel(furnacePanelEl, applyMaterialToFurnaceByUid);
+    bindPanel(anvilPanelEl, applyMaterialToAnvilByUid);
+    document.addEventListener('dragend', clearForgeDnDHover, true);
+  }
+
   function refreshMaterials() {
     const spent = getSpentSet();
     const fromLocal = loadMaterials();
@@ -1209,20 +1332,36 @@
 
   function renderMaterials() {
     if (!materialListEl) return;
-    if (matCountBadge) matCountBadge.textContent = String(materials.length);
+    const visible = materials.filter((m) => materialMatchesDockFilter(m, materialDockFilter));
+    if (matCountBadge) {
+      matCountBadge.textContent =
+        materialDockFilter === 'all' || materials.length === 0
+          ? String(materials.length)
+          : `${visible.length}/${materials.length}`;
+    }
 
     if (materials.length === 0) {
       materialListEl.innerHTML =
         '<p class="log-empty">재료가 없습니다. 낚시로 재료를 모은 뒤 새로고침 하세요.</p>';
+      renderMaterialDockFilterUi();
+      syncScrollOverflow();
+      return;
+    }
+
+    if (visible.length === 0) {
+      materialListEl.innerHTML =
+        '<p class="log-empty">이 탭에 해당하는 항목이 없습니다. 다른 필터를 선택해 보세요.</p>';
+      renderMaterialDockFilterUi();
       syncScrollOverflow();
       return;
     }
 
     materialListEl.innerHTML = '';
-    materials.forEach((m) => {
+    visible.forEach((m) => {
       const row = document.createElement('div');
-      row.className = `inv-item rarity-${rarityClass(m.rarity)}${isEquipmentMaterial(m) ? ' inv-item--equipment' : ''}`;
+      row.className = `inv-item inv-item--draggable rarity-${rarityClass(m.rarity)}${isEquipmentMaterial(m) ? ' inv-item--equipment' : ''}`;
       row.dataset.uid = m.uid;
+      row.draggable = true;
       if (selected.some((s) => s.uid === m.uid)) row.classList.add('selected');
       if (furnaceSelected.some((s) => s.uid === m.uid)) row.classList.add('inv-item--furnace');
       const thumb = document.createElement('div');
@@ -1237,32 +1376,59 @@
       tagEl.className = 'inv-tag';
       tagEl.textContent = rarityClass(m.rarity);
       row.appendChild(tagEl);
-      row.addEventListener('click', () => toggleSelect(m));
+
+      row.addEventListener('dragstart', (e) => {
+        if (!e.dataTransfer) return;
+        e.dataTransfer.setData(FORGE_DRAG_MATERIAL_UID, m.uid);
+        e.dataTransfer.setData('text/plain', m.uid);
+        e.dataTransfer.effectAllowed = 'copyMove';
+        row.classList.add('inv-item--dragging');
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('inv-item--dragging');
+        clearForgeDnDHover();
+      });
+
+      const TOUCH_MATERIAL_SLOP = 18;
+      const touchState = { active: false, x0: 0, y0: 0, moved: false };
+      row.addEventListener(
+        'touchstart',
+        (e) => {
+          if (e.touches.length !== 1) return;
+          const t = e.touches[0];
+          touchState.active = true;
+          touchState.x0 = t.clientX;
+          touchState.y0 = t.clientY;
+          touchState.moved = false;
+        },
+        { passive: true },
+      );
+      row.addEventListener(
+        'touchmove',
+        (e) => {
+          if (!touchState.active || e.touches.length !== 1) return;
+          const t = e.touches[0];
+          if (Math.hypot(t.clientX - touchState.x0, t.clientY - touchState.y0) > TOUCH_MATERIAL_SLOP) touchState.moved = true;
+        },
+        { passive: true },
+      );
+      row.addEventListener('touchend', (e) => {
+        if (!touchState.active) return;
+        touchState.active = false;
+        const t = e.changedTouches[0];
+        if (!t) return;
+        if (touchState.moved) {
+          const el = document.elementFromPoint(t.clientX, t.clientY);
+          if (el && furnacePanelEl && furnacePanelEl.contains(el)) applyMaterialToFurnaceByUid(m.uid);
+          else if (el && anvilPanelEl && anvilPanelEl.contains(el)) applyMaterialToAnvilByUid(m.uid);
+        }
+        touchState.moved = false;
+      });
+
       materialListEl.appendChild(row);
     });
+    renderMaterialDockFilterUi();
     syncScrollOverflow();
-  }
-
-  function toggleSelect(m) {
-    if (getForgeTarget() === 'furnace') {
-      const fi = furnaceSelected.findIndex((s) => s.uid === m.uid);
-      if (fi >= 0) {
-        furnaceSelected.splice(fi, 1);
-      } else {
-        const ai = selected.findIndex((s) => s.uid === m.uid);
-        if (ai >= 0) selected.splice(ai, 1);
-        furnaceSelected.push(m);
-      }
-      syncFurnaceUi();
-      syncForgeUi();
-      return;
-    }
-    const fi = furnaceSelected.findIndex((s) => s.uid === m.uid);
-    if (fi >= 0) furnaceSelected.splice(fi, 1);
-    const i = selected.findIndex((s) => s.uid === m.uid);
-    if (i >= 0) selected.splice(i, 1);
-    else selected.push(m);
-    syncForgeUi();
   }
 
   function removeSelectedUid(uid) {
@@ -1308,7 +1474,7 @@
   function updateStatusMsg() {
     if (!statusMsgEl) return;
     if (selected.length === 0) {
-      statusMsgEl.textContent = '보관함에서 「모루·제련」을 고른 뒤 재료를 눌러 모루에 담으세요.';
+      statusMsgEl.textContent = '보관함 재료를 끌어 용광로 또는 모루 칸에 놓으세요.';
       return;
     }
     if (!alpToken || !platformApi) {
@@ -1673,12 +1839,16 @@
       });
     });
   }
-  document.querySelectorAll('input[name="forgeTarget"]').forEach((radio) => {
-    radio.addEventListener('change', () => {
-      renderMaterials();
-      setFurnaceMsg('');
+  if (materialDockFiltersEl) {
+    materialDockFiltersEl.querySelectorAll('.material-dock-filter').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const next = btn.getAttribute('data-filter') || 'all';
+        if (next === materialDockFilter) return;
+        materialDockFilter = next;
+        renderMaterials();
+      });
     });
-  });
+  }
   if (btnForge) btnForge.addEventListener('click', () => void forge());
   window.addEventListener('storage', onStorage);
   document.addEventListener('keydown', (e) => {
@@ -1686,6 +1856,7 @@
   });
 
   refreshMaterials();
+  wireForgeMaterialDropZones();
   syncFurnaceUi();
   syncForgeUi();
   void syncForgeMaterialsFromServer()
