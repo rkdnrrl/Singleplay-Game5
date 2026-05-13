@@ -1715,3 +1715,43 @@ body.forge-scroll-lock {
 .signature-celebrate-dismiss:active {
   transform: translateY(1px);
 }
+
+/* ── 숙련도 표시 바 ───────────────────────── */
+.proficiency-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.5rem;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 0.78rem;
+  color: #b0b8c4;
+  transition: background 0.3s, border-color 0.3s;
+}
+.proficiency-bar[data-tier="0"] { border-color: rgba(120,120,130,0.3); }
+.proficiency-bar[data-tier="1"] { border-color: rgba(100,200,100,0.35); color: #a0d0a0; }
+.proficiency-bar[data-tier="2"] { border-color: rgba(100,160,255,0.4); color: #90c0ff; }
+.proficiency-bar[data-tier="3"] { border-color: rgba(200,100,255,0.4); color: #d090ff; }
+.proficiency-bar[data-tier="4"] { border-color: rgba(255,200,40,0.5); color: #ffe06a; }
+.prof-label {
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 0.82rem;
+}
+.prof-count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+/* 레벨업 애니메이션 */
+@keyframes profLevelUpPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255,215,0,0.7); }
+  60%  { box-shadow: 0 0 0 8px rgba(255,215,0,0); }
+  100% { box-shadow: none; }
+}
+.proficiency-bar.prof-level-up {
+  animation: profLevelUpPulse 2s ease-out forwards;
+  border-color: rgba(255,215,0,0.7) !important;
+  color: #ffe06a !important;
+}

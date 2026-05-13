@@ -10,8 +10,8 @@
 
   let forgeInFlight = false;
   let smeltInFlight = false;
-  /** 기초 재료만 모루에 올린 조합에만 적용. 보관함 재료(낚시·장비)와 섞으면 기초 재료 1개부터 제련 가능. */
-  const MIN_SMELT_MATERIALS_FOR_FORGE = 5;
+  /** 모루는 산출물(smelt)만 허용 — 최소 2개. */
+  const MIN_SMELT_MATERIALS_FOR_FORGE = 2;
 
   const MAT_EMOJI_POOL = [
     '🐟', '🐠', '🐡', '🪸', '🦑', '🪼', '🐙', '✨', '🌌', '💎', '🔮', '🛸',
@@ -181,6 +181,9 @@
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
+  /** 대장간 숙련도 (서버에서 로드) */
+  let smithingProficiency = 0;
+  let smithingProfLevelInfo = { tier: 0, name: '견습 대장장이', mul: 1.0, next: 10 };
   let selected = [];
   /** 용광로에 넣은 재료 (낚시 재료·장비) */
   let furnaceSelected = [];
@@ -1198,11 +1201,11 @@
     return Boolean(m && m.kind === 'smelt' && m.smeltId != null && String(m.smeltId).trim() !== '');
   }
 
-  /** true면 제련 버튼 비활성: 기초 재료만 있고 그 개수가 MIN 미만일 때. */
+  /** true면 제련 버튼 비활성: 선택 수량이 최소 미만이거나 smelt 아닌 재료가 있을 때. */
   function isForgeBlockedSmeltOnlyMinCount(sel) {
-    if (!Array.isArray(sel) || sel.length === 0) return false;
-    const smeltCount = sel.filter((m) => isSmeltMaterial(m)).length;
-    return smeltCount > 0 && smeltCount === sel.length && smeltCount < MIN_SMELT_MATERIALS_FOR_FORGE;
+    if (!Array.isArray(sel) || sel.length === 0) return true;
+    if (sel.length < MIN_SMELT_MATERIALS_FOR_FORGE) return true;
+    return sel.some((m) => !isSmeltMaterial(m));
   }
 
   function materialHasForgeServerRef(m) {
@@ -1621,6 +1624,14 @@
   function applyMaterialToAnvilByUid(uid) {
     const m = findMaterialByUid(uid);
     if (!m) return;
+    // 모루는 기초 재료(산출물)만 허용
+    if (!isSmeltMaterial(m)) {
+      if (statusMsgEl) {
+        statusMsgEl.textContent = '낚시 재료·장비는 먼저 용광로에서 녹여야 해요. 재료를 용광로로 이동시켜 드릴게요.';
+      }
+      applyMaterialToFurnaceByUid(uid);
+      return;
+    }
     const fi = furnaceSelected.findIndex((s) => s.uid === uid);
     if (fi >= 0) furnaceSelected.splice(fi, 1);
     const i = selected.findIndex((s) => s.uid === uid);
@@ -1794,7 +1805,10 @@
         }
       } else if (s.kind === 'material' && s.uid) {
         if (panel === 'furnace') applyMaterialToFurnaceByUid(s.uid);
-        else if (panel === 'anvil') applyMaterialToAnvilByUid(s.uid);
+        else if (panel === 'anvil') {
+          // applyMaterialToAnvilByUid 내부에서 비-smelt 검사 후 용광로로 리다이렉트
+          applyMaterialToAnvilByUid(s.uid);
+        }
       }
     } else if (
       applyDrop &&
@@ -1982,7 +1996,7 @@
       row.appendChild(tagEl);
 
       let suppressMaterialRowClick = false;
-      row.title = '눌러 정보 보기 · 끌어 용광로·모루로 이동';
+      row.title = '눌러 정보 보기 · 끌어 용광로로 이동 (녹인 산출물로 모루에서 제련)';
 
       row.addEventListener('dragstart', (e) => {
         suppressMaterialRowClick = true;
@@ -2033,6 +2047,43 @@
     syncForgeUi();
   }
 
+  /** 숙련도 표시 갱신 */
+  function updateProficiencyDisplay(levelUp) {
+    const barEl = document.getElementById('proficiencyBar');
+    const labelEl = document.getElementById('profLabel');
+    const countEl = document.getElementById('profCount');
+    if (!barEl || !labelEl || !countEl) return;
+    labelEl.textContent = smithingProfLevelInfo.name;
+    const nextText = smithingProfLevelInfo.next != null
+      ? ` (다음: ${smithingProfLevelInfo.next}회)`
+      : ' (최고 등급)';
+    countEl.textContent = `${smithingProficiency}회${nextText}`;
+    barEl.dataset.tier = String(smithingProfLevelInfo.tier);
+    if (levelUp) {
+      barEl.classList.add('prof-level-up');
+      window.setTimeout(() => barEl.classList.remove('prof-level-up'), 2000);
+    }
+  }
+
+  /** 서버에서 숙련도 로드 */
+  async function loadProficiency() {
+    if (!alpToken || !platformApi) return;
+    try {
+      const res = await fetch(`${platformApi}/api/craft/proficiency`, {
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.smithingProficiency === 'number') {
+        smithingProficiency = data.smithingProficiency;
+        smithingProfLevelInfo = data.levelInfo || smithingProfLevelInfo;
+        updateProficiencyDisplay(false);
+      }
+    } catch {
+      /* 숙련도 로드 실패는 무시 */
+    }
+  }
+
   function syncForgeUi() {
     if (selectedSlotsEl) {
       selectedSlotsEl.innerHTML = '';
@@ -2057,9 +2108,9 @@
     }
     if (btnForge) {
       const hasServer = Boolean(alpToken && platformApi);
-      const allRef = selected.every((m) => materialHasForgeServerRef(m));
+      // 모루: 산출물 2개 이상이어야 활성화
       const smeltGateBlocked = isForgeBlockedSmeltOnlyMinCount(selected);
-      btnForge.disabled = selected.length < 2 || !hasServer || !allRef || smeltGateBlocked;
+      btnForge.disabled = !hasServer || smeltGateBlocked;
     }
     updateStatusMsg();
     renderMaterials();
@@ -2069,35 +2120,28 @@
   function updateStatusMsg() {
     if (!statusMsgEl) return;
     if (selected.length === 0) {
-      statusMsgEl.textContent = '보관함 재료와 기초 재료를 끌어 용광로 또는 모루 칸에 놓으세요.';
+      statusMsgEl.textContent = '기초 재료(산출물)를 모루에 끌어다 놓으세요. 낚시·장비는 먼저 용광로에 녹이세요.';
       return;
     }
     if (!alpToken || !platformApi) {
       statusMsgEl.textContent = '게임에서 이 화면을 연 경우에만 서버에 제련할 수 있어요.';
       return;
     }
-    if (selected.length === 1) {
-      statusMsgEl.textContent = '재료를 하나 더 올리면 조합(제련)할 수 있어요.';
+    const nonSmelt = selected.filter((m) => !isSmeltMaterial(m));
+    if (nonSmelt.length > 0) {
+      statusMsgEl.textContent = `모루에는 기초 재료(산출물)만 올릴 수 있어요. 낚시·장비는 용광로에 먼저 녹이세요.`;
       return;
     }
-    const miss = selected.some((m) => !materialHasForgeServerRef(m));
-    if (miss) {
-      statusMsgEl.textContent = '낚시 재료(serverId)·서버 장비·기초 재료만 제련 재료로 쓸 수 있어요.';
+    if (selected.length < MIN_SMELT_MATERIALS_FOR_FORGE) {
+      statusMsgEl.textContent = `기초 재료(산출물)가 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 필요해요.`;
       return;
     }
-    if (isForgeBlockedSmeltOnlyMinCount(selected)) {
-      statusMsgEl.textContent = `기초 재료만 쓸 때는 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 이상이 필요해요. 보관함 재료와 함께 올리면 더 적게 써도 제련할 수 있어요.`;
-      return;
-    }
-    if (selected.some((m) => isSmeltMaterial(m))) {
-      const mixed = selected.some((m) => !isSmeltMaterial(m));
-      statusMsgEl.textContent = mixed
-        ? '보관함 재료와 기초 재료를 함께 쓰는 조합입니다. 「⚒️ 제련하기」로 서버에 저장돼요.'
-        : '기초 재료만으로 제련합니다. 「⚒️ 제련하기」로 서버에 저장돼요.';
+    if (selected.every((m) => isSmeltMaterial(m))) {
+      statusMsgEl.textContent = `기초 재료 ${selected.length}개 — 「⚒️ 제련하기」로 장비를 만들어요.`;
       return;
     }
     statusMsgEl.textContent =
-      '「⚒️ 제련하기」를 누르면 서버에서 AI가 이름·능력치·내구도를 정하고 저장해요.';
+      `기초 재료(산출물) ${selected.length}개 — 「⚒️ 제련하기」를 누르면 AI가 이름·능력치를 정해요.`;
   }
 
   function hideResultCard() {
@@ -2168,21 +2212,24 @@
 
   async function forge() {
     if (forgeInFlight) return;
-    if (selected.length < 2) return;
+    if (selected.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
     if (!alpToken || !platformApi) {
       if (statusMsgEl) statusMsgEl.textContent = '게임 연결(토큰)이 없어 제련할 수 없어요.';
       return;
     }
 
     const used = selected.slice();
-    if (isForgeBlockedSmeltOnlyMinCount(used)) {
+    // 모루는 산출물(smelt)만 허용
+    if (used.some((m) => !isSmeltMaterial(m))) {
       if (statusMsgEl) {
-        statusMsgEl.textContent = `기초 재료만 쓸 때는 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 이상이 필요해요. 보관함 재료와 함께 올리면 더 적게 써도 제련할 수 있어요.`;
+        statusMsgEl.textContent = '모루에는 기초 재료(산출물)만 올릴 수 있어요. 낚시 재료·장비를 용광로에 먼저 녹이세요.';
       }
       return;
     }
-    if (!used.every((m) => materialHasForgeServerRef(m))) {
-      if (statusMsgEl) statusMsgEl.textContent = '모든 재료가 유효한 참조(낚시/장비/기초 재료)를 가져야 제련할 수 있어요.';
+    if (used.length < MIN_SMELT_MATERIALS_FOR_FORGE) {
+      if (statusMsgEl) {
+        statusMsgEl.textContent = `기초 재료(산출물)가 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 필요해요.`;
+      }
       return;
     }
 
@@ -2193,20 +2240,6 @@
           ? { kind: 'equipment', id: String(m.equipmentId).trim() }
           : { kind: 'catch', id: String(m.serverId).trim() },
     );
-
-    const nonSmeltForgeKeys = [];
-    for (const m of used) {
-      if (isSmeltMaterial(m)) continue;
-      if (isEquipmentMaterial(m)) nonSmeltForgeKeys.push(`equipment:${String(m.equipmentId).trim()}`);
-      else nonSmeltForgeKeys.push(`catch:${String(m.serverId).trim()}`);
-    }
-    if (new Set(nonSmeltForgeKeys).size !== nonSmeltForgeKeys.length) {
-      if (statusMsgEl) {
-        statusMsgEl.textContent =
-          '같은 낚시 재료나 장비가 두 번 올라가 있습니다. 하나를 빼거나 보관함을 새로고침한 뒤 다시 시도해 주세요.';
-      }
-      return;
-    }
 
     const name = mergeEquipmentName(used);
     const smeltForgeIds = used
@@ -2259,6 +2292,14 @@
 
       const serverEquipment = data.equipment;
       const serverStats = serverEquipment.stats || null;
+
+      // 숙련도 업데이트
+      if (typeof data.smithingProficiency === 'number') {
+        const prevProfTier = smithingProfLevelInfo.tier;
+        smithingProficiency = data.smithingProficiency;
+        smithingProfLevelInfo = data.proficiencyLevelInfo || smithingProfLevelInfo;
+        updateProficiencyDisplay(prevProfTier < smithingProfLevelInfo.tier);
+      }
 
       const uids = used.map((s) => s.uid);
       appendSpent(uids.filter((u) => !String(u).startsWith('eq-') && !String(u).startsWith('smelt-')));
@@ -2503,6 +2544,7 @@
   wireMaterialDetailModal();
   syncFurnaceUi();
   syncForgeUi();
+  void loadProficiency();
   void syncForgeMaterialsFromServer()
     .then(() => refreshCraftedList())
     .then(() => syncSmeltFromServer());
