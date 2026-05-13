@@ -181,9 +181,9 @@
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
-  /** 대장간 숙련도 (서버에서 로드) */
+  /** 대장간 숙련도 (서버에서 로드, float) */
   let smithingProficiency = 0;
-  let smithingProfLevelInfo = { tier: 0, name: '견습 대장장이', mul: 1.0, next: 10 };
+  let smithingProfLevelInfo = { mul: 1.0 };
   let selected = [];
   /** 용광로에 넣은 재료 (낚시 재료·장비) */
   let furnaceSelected = [];
@@ -565,6 +565,26 @@
       total += strengthScoreFromTier(m.rarity || smeltTierFromId(m.smeltId));
     }
     return total / smeltOnly.length;
+  }
+
+  /**
+   * 클라이언트 측 성공률 계산 (서버 calcSuccessRate 와 동일 공식)
+   * @param {number} prof 현재 숙련도
+   * @param {number} avgStr 재료 평균 강도
+   * @returns {number} 0~1
+   */
+  function clientSuccessRate(prof, avgStr) {
+    const base = 0.65 + Math.sqrt(Math.max(0, prof)) * 0.06;
+    const adj  = -(Math.max(1, Math.min(4, avgStr)) - 2) * 0.05;
+    return Math.min(0.93, Math.max(0.20, base + adj));
+  }
+
+  /**
+   * 숙련도 float → 스탯 배율 (서버 proficiencyMulFromValue 동일 공식)
+   * mul = 1.0 + ln(1 + n) × 0.30
+   */
+  function clientProfMul(prof) {
+    return 1.0 + Math.log(1 + Math.max(0, prof)) * 0.30;
   }
 
   const MAX_SMELT_YIELDS_PER_ITEM = 3;
@@ -2097,21 +2117,20 @@
     syncForgeUi();
   }
 
-  /** 숙련도 표시 갱신 */
-  function updateProficiencyDisplay(levelUp) {
+  /** 숙련도 표시 갱신 (숫자 + 보너스 %) */
+  function updateProficiencyDisplay(gained) {
     const barEl = document.getElementById('proficiencyBar');
     const labelEl = document.getElementById('profLabel');
     const countEl = document.getElementById('profCount');
     if (!barEl || !labelEl || !countEl) return;
-    labelEl.textContent = smithingProfLevelInfo.name;
-    const nextText = smithingProfLevelInfo.next != null
-      ? ` (다음: ${smithingProfLevelInfo.next}회)`
-      : ' (최고 등급)';
-    countEl.textContent = `${smithingProficiency}회${nextText}`;
-    barEl.dataset.tier = String(smithingProfLevelInfo.tier);
-    if (levelUp) {
+    labelEl.textContent = '대장장이 능력치';
+    const profVal = Number(smithingProficiency) || 0;
+    const mul = clientProfMul(profVal);
+    const bonusPct = ((mul - 1.0) * 100).toFixed(1);
+    countEl.textContent = `${profVal.toFixed(3)}  (+${bonusPct}% 보너스)`;
+    if (gained) {
       barEl.classList.add('prof-level-up');
-      window.setTimeout(() => barEl.classList.remove('prof-level-up'), 2000);
+      window.setTimeout(() => barEl.classList.remove('prof-level-up'), 1200);
     }
   }
 
@@ -2126,7 +2145,7 @@
       const data = await res.json();
       if (typeof data.smithingProficiency === 'number') {
         smithingProficiency = data.smithingProficiency;
-        smithingProfLevelInfo = data.levelInfo || smithingProfLevelInfo;
+        smithingProfLevelInfo = data.levelInfo || { mul: 1.0 };
         updateProficiencyDisplay(false);
       }
     } catch {
@@ -2190,7 +2209,8 @@
     if (selected.every((m) => isSmeltMaterial(m))) {
       const avgStr = calcSelectedAvgStrength(selected);
       const strInfo = strengthLabelUi(avgStr);
-      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · 재료 강도 [${strInfo.label}] — 「⚒️ 제련하기」로 장비를 만들어요.`;
+      const successPct = Math.round(clientSuccessRate(smithingProficiency, avgStr) * 100);
+      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · 강도 [${strInfo.label}] · 성공률 약 ${successPct}% — 「⚒️ 제련하기」`;
       statusMsgEl.className = `status-msg ${strInfo.cls}`;
       return;
     }
@@ -2219,6 +2239,51 @@
       unknown: 'AI 이름을 쓰지 못하고 로컬 규칙으로 이름·스탯을 정했어요.',
     };
     return map[r] || map.unknown;
+  }
+
+  /**
+   * 제련 실패 결과 표시
+   * @param {{ successRatePct, materialStrengthLabel, returnedMaterials, proficiencyGain }} data
+   */
+  function showForgeFailure(data) {
+    if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
+    window.clearTimeout(resultHideTimer);
+
+    resultCard.className = 'result-card result-card--failed';
+    resultRarity.className = 'result-rarity result-rarity--failed';
+    resultRarity.textContent = '제련 실패';
+    resultName.textContent = '장비가 부서졌습니다';
+
+    // 반환 재료 목록
+    const returned = Array.isArray(data.returnedMaterials) ? data.returnedMaterials : [];
+    let returnLine = '';
+    if (returned.length > 0) {
+      const items = returned.map((r) => `${r.emoji || '◆'} ${r.name} ×${r.count}`).join('  ');
+      returnLine = `\n회수된 산출물: ${items}`;
+    } else {
+      returnLine = '\n회수된 산출물 없음';
+    }
+
+    const gainStr = data.proficiencyGain != null
+      ? `  (능력치 +${Number(data.proficiencyGain).toFixed(4)})`
+      : '';
+    resultDesc.textContent = `성공률 ${data.successRatePct ?? '?'}% · 강도 [${data.materialStrengthLabel || '?'}]${gainStr}${returnLine}`;
+
+    // 깨진 이모지
+    resultSpriteHost.innerHTML = '<span style="font-size:2.5rem;line-height:1">💥</span>';
+
+    resultCard.classList.remove('hidden');
+    if (statusMsgEl) {
+      statusMsgEl.textContent = `제련 실패! 재료 일부가 회수됐어요.`;
+      statusMsgEl.className = 'status-msg strength--weak';
+    }
+    resultHideTimer = window.setTimeout(() => {
+      hideResultCard();
+      if (statusMsgEl) {
+        statusMsgEl.className = 'status-msg';
+        statusMsgEl.textContent = '기초 재료(산출물)를 모루에 끌어다 놓으세요.';
+      }
+    }, 5000);
   }
 
   function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel) {
@@ -2324,27 +2389,24 @@
           data = null;
         }
       }
-      if (!res.ok || !data || !data.equipment) {
+      // HTTP 오류 처리
+      if (!res.ok) {
         const msg =
           (data && data.error && data.error.message) ||
-          (data && data.error && data.message) ||
           (data && data.message) ||
-          `서버 저장 실패 (${res.status})`;
+          `서버 오류 (${res.status})`;
         if (statusMsgEl) statusMsgEl.textContent = msg;
         return;
       }
 
-      const serverEquipment = data.equipment;
-      const serverStats = serverEquipment.stats || null;
-
-      // 숙련도 업데이트
+      // ── 숙련도 공통 업데이트 ─────────────────────────────────
       if (typeof data.smithingProficiency === 'number') {
-        const prevProfTier = smithingProfLevelInfo.tier;
         smithingProficiency = data.smithingProficiency;
-        smithingProfLevelInfo = data.proficiencyLevelInfo || smithingProfLevelInfo;
-        updateProficiencyDisplay(prevProfTier < smithingProfLevelInfo.tier);
+        smithingProfLevelInfo = data.proficiencyLevelInfo || { mul: 1.0 };
+        updateProficiencyDisplay(true);
       }
 
+      // ── 재료 공통 처리 ───────────────────────────────────────
       const uids = used.map((s) => s.uid);
       appendSpent(uids.filter((u) => !String(u).startsWith('eq-') && !String(u).startsWith('smelt-')));
       removeMaterialsFromStore(uids);
@@ -2352,8 +2414,28 @@
       const usedSet = new Set(uids);
       selected = selected.filter((s) => !usedSet.has(s.uid));
       refreshMaterials();
+
+      // ── 실패 처리 ────────────────────────────────────────────
+      if (data.success === false) {
+        // 반환된 산출물을 로컬에도 반영 (서버와 동기화)
+        await syncSmeltFromServer();
+        syncForgeUi();
+        showForgeFailure(data);
+        return;
+      }
+
+      // ── 성공 처리 ────────────────────────────────────────────
+      if (!data.equipment) {
+        if (statusMsgEl) statusMsgEl.textContent = '서버 응답 형식 오류 — 다시 시도하세요.';
+        return;
+      }
+      const serverEquipment = data.equipment;
+      const serverStats = serverEquipment.stats || null;
+
       syncForgeUi();
       await refreshCraftedList();
+      // 성공 후 smelt 재고 동기화 (혹시 생긴 편차 보정)
+      void syncSmeltFromServer();
       showResultFromServer(serverEquipment, serverStats, data.nameSource, {
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
