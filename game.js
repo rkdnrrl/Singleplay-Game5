@@ -195,6 +195,8 @@
   let smeltCategory = 'all';
   /** 보관함 목록 필터: all | material(잔해·폐품형) | equipment | soul(생명·우주 신비형) */
   let materialDockFilter = 'all';
+  /** 제련할 장비 종류: weapon | armor */
+  let forgeSlot = 'weapon';
 
   const MAT_DOCK_SOUL_TYPES = new Set(['fish', 'creature', 'cosmic', 'crystal', 'artifact']);
   const MAT_DOCK_MATERIAL_TYPES = new Set(['scrap', 'debris']);
@@ -2474,6 +2476,7 @@
         },
         body: JSON.stringify({
           materials: materialsPayload,
+          slot: forgeSlot,
         }),
       });
       const text = await res.text();
@@ -2674,9 +2677,12 @@
           st && st.durabilityMax != null && Number.isFinite(Number(st.durabilityMax))
             ? ` · 내구 ${st.durability != null ? st.durability : st.durabilityMax}/${st.durabilityMax}`
             : '';
+        const SLOT_EMOJI_MAP = { weapon:'⚔️',head:'🪖',chest:'🧥',pants:'👖',gloves:'🧤',boots:'👢',accessory:'💍' };
+        const slotTag = st && st.equipSlot ? `<span style="opacity:0.55">${SLOT_EMOJI_MAP[st.equipSlot]||''}</span> ` : '';
+        const hpPart = st && st.hpBonus > 0 ? ` · HP +${st.hpBonus}` : '';
         const statsLine =
           st && typeof st.attackBonus === 'number'
-            ? `<div class="cr-stats">공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 스피드 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%${durPart}</div>`
+            ? `<div class="cr-stats">${slotTag}공격 +${st.attackBonus} · 방어 +${st.defenseBonus} · 속도 +${(Number(st.speedBonus || 0) * 100).toFixed(1)}%${durPart}${hpPart}</div>`
             : '';
         body.innerHTML = `
           <strong>${escapeHtml(c.name)}</strong>
@@ -2739,6 +2745,34 @@
     });
   }
   if (btnForge) btnForge.addEventListener('click', () => void forge());
+
+  const FORGE_SLOT_DEFS = [
+    { id: 'weapon',    emoji: '⚔️', label: '무기'    },
+    { id: 'head',      emoji: '🪖', label: '머리'    },
+    { id: 'chest',     emoji: '🧥', label: '상의'    },
+    { id: 'pants',     emoji: '👖', label: '하의'    },
+    { id: 'gloves',    emoji: '🧤', label: '손'      },
+    { id: 'boots',     emoji: '👢', label: '다리'    },
+    { id: 'accessory', emoji: '💍', label: '악세서리' },
+  ];
+  const forgeSlotToggleEl = document.getElementById('forgeSlotToggle');
+  let slotBtns = {};
+  if (forgeSlotToggleEl) {
+    for (const def of FORGE_SLOT_DEFS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'forge-slot-btn' + (def.id === 'weapon' ? ' forge-slot-active' : '');
+      btn.textContent = `${def.emoji} ${def.label}`;
+      btn.addEventListener('click', () => {
+        forgeSlot = def.id;
+        Object.values(slotBtns).forEach(b => b.classList.remove('forge-slot-active'));
+        btn.classList.add('forge-slot-active');
+        if (btnForge) btnForge.textContent = `⚒️ ${def.label} 제련`;
+      });
+      slotBtns[def.id] = btn;
+      forgeSlotToggleEl.appendChild(btn);
+    }
+  }
   window.addEventListener('storage', onStorage);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
