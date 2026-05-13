@@ -10,6 +10,7 @@
 
   let forgeInFlight = false;
   let smeltInFlight = false;
+  let serverMeltLost = []; // 마지막 장비 녹임에서 소실된 재료 목록
   /** 모루는 산출물(smelt)만 허용 — 최소 2개. */
   const MIN_SMELT_MATERIALS_FOR_FORGE = 2;
 
@@ -1187,6 +1188,12 @@
           return;
         }
         stock = cloneSmeltStock(data.stock);
+        // 장비 녹임 소실 정보 저장
+        if (Array.isArray(data.lost) && data.lost.length > 0) {
+          serverMeltLost = data.lost;
+        } else {
+          serverMeltLost = [];
+        }
       }
 
       for (let i = 0; i < localInfer.length; i += 1) {
@@ -1203,10 +1210,16 @@
       syncForgeUi();
       const gains = getSmeltGainSummary(beforeStock, stock);
       const gainText = formatSmeltGainSummary(gains);
-      setFurnaceMsg(
-        gainText ? `${toMelt.length}개를 녹였습니다. 기초 재료: ${gainText}` : `${toMelt.length}개를 녹였습니다.`,
-      );
-      window.setTimeout(() => setFurnaceMsg(''), 3200);
+      let msg = gainText
+        ? `${toMelt.length}개를 녹였습니다. 기초 재료: ${gainText}`
+        : `${toMelt.length}개를 녹였습니다.`;
+      if (serverMeltLost.length > 0) {
+        const lostText = serverMeltLost.map((m) => `${m.emoji}${m.name}×${m.count}`).join(' ');
+        msg += ` ⚠️ 소실: ${lostText}`;
+      }
+      setFurnaceMsg(msg);
+      window.setTimeout(() => setFurnaceMsg(''), serverMeltLost.length > 0 ? 5000 : 3200);
+      serverMeltLost = [];
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
       window.setTimeout(() => setFurnaceMsg(''), 4200);
