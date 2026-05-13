@@ -1290,26 +1290,44 @@
 
   function showForgeCoinBonus(bonusCoins) {
     if (!forgeOverlayBonusEl || bonusCoins <= 0) return;
-    forgeOverlayBonusEl.textContent = `🪙 제련 보상 +${bonusCoins.toLocaleString()} 코인 적립!`;
+    // 첫 조합 축하 메시지 아래에 코인 정보를 추가
+    const prev = forgeOverlayBonusEl.textContent || '';
+    const coinLine = `🪙 +${bonusCoins.toLocaleString()} 코인 적립!`;
+    forgeOverlayBonusEl.textContent = prev.includes('조합') ? `${prev}  ${coinLine}` : coinLine;
     forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
   }
 
-  /** 20→0초 예상, 이후 예상시간 N초 초과로 증가 */
+  /** 경과 초 → 예상 코인 (서버와 동일 공식: 20초당 100코인, 최대 900) */
+  function calcForgeExpectedCoins(elapsedSec) {
+    return Math.min(900, Math.round((Math.min(elapsedSec, 180) / 20) * 100));
+  }
+
+  function updateForgeOverlayBonusEstimate(elapsedSec) {
+    if (!forgeOverlayBonusEl) return;
+    const coins = calcForgeExpectedCoins(elapsedSec);
+    forgeOverlayBonusEl.textContent = `🪙 제련 보상 예상: +${coins} 코인`;
+    forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
+  }
+
+  /** 20→0초 예상, 이후 예상시간 N초 초과로 증가 + 실시간 보상 예상 */
   function startForgeOverlayTimer() {
     stopForgeOverlayTimer();
     hideForgeOverlayScanBonus();
     if (!forgeOverlayTimerEl) return;
     let countdown = 20;
-    let exceed = 0;
+    let totalElapsed = 0;
     forgeOverlayTimerEl.textContent = `예상 시간 약 ${countdown}초`;
+    updateForgeOverlayBonusEstimate(totalElapsed);
     forgeOverlayCountdownId = window.setInterval(() => {
+      totalElapsed += 1;
       countdown -= 1;
       if (countdown >= 0) {
         forgeOverlayTimerEl.textContent = `예상 시간 약 ${countdown}초`;
       } else {
-        exceed += 1;
+        const exceed = -countdown;
         forgeOverlayTimerEl.textContent = `예상시간 ${exceed}초 초과`;
       }
+      updateForgeOverlayBonusEstimate(totalElapsed);
     }, 1000);
   }
 
@@ -2587,11 +2605,23 @@
 
       syncForgeUi();
       await refreshCraftedList();
-      // 성공 후 smelt 재고 동기화 (혹시 생긴 편차 보정)
       void syncSmeltFromServer();
+
+      // 첫 조합이면 오버레이에 발견 메시지 표시
+      if (data.firstDiscovery) {
+        stopForgeOverlayTimer();
+        if (forgeOverlayTimerEl) forgeOverlayTimerEl.textContent = '🎉 도감에 없는 첫 조합!';
+        if (forgeOverlayBonusEl) {
+          forgeOverlayBonusEl.textContent = '✨ 세계 최초 조합입니다! 축하합니다!';
+          forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
+        }
+        await new Promise((r) => window.setTimeout(r, 2000));
+      }
+
       // 실제 경과 시간으로 게임머니 지급
       const forgeBonus = await grantForgeBonus(Date.now() - forgeStartAt);
       if (forgeBonus > 0) showForgeCoinBonus(forgeBonus);
+
       showResultFromServer(serverEquipment, serverStats, data.nameSource, {
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
