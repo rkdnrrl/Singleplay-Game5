@@ -365,6 +365,29 @@ html.material-detail-open body {
   padding: 0 0.25rem;
 }
 
+.furnace-equip-warn {
+  margin: 0.25rem 0 0;
+  font-size: 0.68rem;
+  color: #ffb74d;
+  text-align: center;
+  line-height: 1.3;
+}
+.furnace-equip-warn.hidden { display: none; }
+
+.forge-topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.3rem 0.8rem 0;
+}
+
+.forge-coin-display {
+  font-family: Jua, sans-serif;
+  font-size: 0.82rem;
+  color: #ffd54f;
+  letter-spacing: 0.02em;
+}
+
 .smelt-stock-wrap {
   width: 100%;
   margin-top: 0.25rem;

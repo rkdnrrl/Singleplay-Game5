@@ -11,6 +11,8 @@
   let forgeInFlight = false;
   let smeltInFlight = false;
   let serverMeltLost = []; // 마지막 장비 녹임에서 소실된 재료 목록
+  let totalCoins = 0;
+  let forgeStartAt = 0; // 제련 시작 시각 (Date.now)
   /** 모루는 산출물(smelt)만 허용 — 최소 2개. */
   const MIN_SMELT_MATERIALS_FOR_FORGE = 2;
 
@@ -163,6 +165,8 @@
   const btnSmelt = document.getElementById('btnSmelt');
   const btnClearFurnace = document.getElementById('btnClearFurnace');
   const furnaceMsgEl = document.getElementById('furnaceMsg');
+  const furnaceEquipWarnEl = document.getElementById('furnaceEquipWarn');
+  const coinCountEl = document.getElementById('coinCount');
   const smeltStockListEl = document.getElementById('smeltStockList');
   const smeltCategoryFiltersEl = document.getElementById('smeltCategoryFilters');
   const materialDockFiltersEl = document.getElementById('materialDockFilters');
@@ -1002,6 +1006,40 @@
     if (furnaceMsgEl) furnaceMsgEl.textContent = msg || '';
   }
 
+  function updateCoinDisplay() {
+    if (!coinCountEl) return;
+    coinCountEl.textContent = totalCoins.toLocaleString();
+  }
+
+  async function loadCoins() {
+    if (!alpToken || !platformApi) return;
+    try {
+      const res = await fetch(`${platformApi}/api/coins`, {
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (typeof d.coins === 'number') { totalCoins = d.coins; updateCoinDisplay(); }
+      }
+    } catch { /* 비치명 */ }
+  }
+
+  async function grantForgeBonus(elapsedMs) {
+    if (!alpToken || !platformApi || elapsedMs <= 0) return 0;
+    try {
+      const res = await fetch(`${platformApi}/api/ai/fishing-scan-bonus`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+        body: JSON.stringify({ scanElapsedMs: elapsedMs }),
+      });
+      if (!res.ok) return 0;
+      const d = await res.json();
+      const bonus = Math.max(0, Math.floor(Number(d.bonusCoins) || 0));
+      if (typeof d.coins === 'number') { totalCoins = d.coins; updateCoinDisplay(); }
+      return bonus;
+    } catch { return 0; }
+  }
+
   function removeMaterialsAfterUse(used) {
     const uids = used.map((u) => u.uid);
     appendSpent(uids.filter((u) => !String(u).startsWith('eq-')));
@@ -1116,6 +1154,11 @@
       }
     }
     if (btnSmelt) btnSmelt.disabled = furnaceSelected.length === 0;
+    // 장비가 있으면 소실 경고 표시
+    if (furnaceEquipWarnEl) {
+      const hasEquip = furnaceSelected.some((m) => isEquipmentMaterial(m));
+      furnaceEquipWarnEl.classList.toggle('hidden', !hasEquip);
+    }
     renderSmeltStock();
   }
 
@@ -1218,8 +1261,9 @@
         msg += ` ⚠️ 소실: ${lostText}`;
       }
       setFurnaceMsg(msg);
-      window.setTimeout(() => setFurnaceMsg(''), serverMeltLost.length > 0 ? 5000 : 3200);
+      const msgDelay = serverMeltLost.length > 0 ? 2200 : 1400;
       serverMeltLost = [];
+      window.setTimeout(() => window.location.reload(), msgDelay);
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
       window.setTimeout(() => setFurnaceMsg(''), 4200);
@@ -1244,12 +1288,9 @@
     forgeOverlayBonusEl.textContent = '';
   }
 
-  /** 예상 시간 초과 시(제작 지연) 게임머니 보너스 안내 — UI만, 실제 지갑 연동은 게임 쪽에서 처리 */
-  function showForgeOverlayScanBonusOnce(exceedSeconds) {
-    if (forgeScanBonusToastShown || !forgeOverlayBonusEl) return;
-    forgeScanBonusToastShown = true;
-    const bonus = 100 + exceedSeconds * 40;
-    forgeOverlayBonusEl.textContent = `제작이 예상보다 길어졌어요. 게임머니 보너스 +${bonus}을 받았어요!`;
+  function showForgeCoinBonus(bonusCoins) {
+    if (!forgeOverlayBonusEl || bonusCoins <= 0) return;
+    forgeOverlayBonusEl.textContent = `🪙 제련 보상 +${bonusCoins.toLocaleString()} 코인 적립!`;
     forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
   }
 
@@ -1268,7 +1309,6 @@
       } else {
         exceed += 1;
         forgeOverlayTimerEl.textContent = `예상시간 ${exceed}초 초과`;
-        showForgeOverlayScanBonusOnce(exceed);
       }
     }, 1000);
   }
@@ -2474,6 +2514,7 @@
     );
 
     forgeInFlight = true;
+    forgeStartAt = Date.now();
     pendingSignatureCelebrateName = null;
     if (btnForge) {
       btnForge.disabled = true;
@@ -2548,6 +2589,9 @@
       await refreshCraftedList();
       // 성공 후 smelt 재고 동기화 (혹시 생긴 편차 보정)
       void syncSmeltFromServer();
+      // 실제 경과 시간으로 게임머니 지급
+      const forgeBonus = await grantForgeBonus(Date.now() - forgeStartAt);
+      if (forgeBonus > 0) showForgeCoinBonus(forgeBonus);
       showResultFromServer(serverEquipment, serverStats, data.nameSource, {
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
@@ -2814,6 +2858,7 @@
   syncFurnaceUi();
   syncForgeUi();
   void loadProficiency();
+  void loadCoins();
   void syncForgeMaterialsFromServer()
     .then(() => refreshCraftedList())
     .then(() => syncSmeltFromServer());
