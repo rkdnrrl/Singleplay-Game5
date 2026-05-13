@@ -519,6 +519,54 @@
     makeSmeltRule(entry.id, entry.name, entry.emoji, entry.keywords),
   );
 
+  // ─── 재료 강도 분류 ─────────────────────────────────────────
+  // 서버 craftResolveMaterials.js의 smeltTierForProductId 와 동일 기준 유지
+  const SMELT_LEGENDARY_IDS = new Set(['platinum', 'palladium', 'rhodium', 'iridium', 'uranium', 'diamond']);
+  const SMELT_EPIC_IDS      = new Set(['titanium', 'tungsten', 'rareearth', 'neodymium', 'graphene', 'ruby', 'sapphire', 'emerald']);
+  const SMELT_RARE_IDS      = new Set(['gold', 'silver', 'copper', 'iron', 'glass', 'circuit', 'battery']);
+
+  function smeltTierFromId(id) {
+    const sid = String(id || '').toLowerCase();
+    if (SMELT_LEGENDARY_IDS.has(sid)) return 'legendary';
+    if (SMELT_EPIC_IDS.has(sid))      return 'epic';
+    if (SMELT_RARE_IDS.has(sid))      return 'rare';
+    return 'common';
+  }
+
+  function strengthScoreFromTier(tier) {
+    const t = String(tier || 'common').toLowerCase();
+    if (t === 'legendary') return 4;
+    if (t === 'epic')      return 3;
+    if (t === 'rare')      return 2;
+    return 1;
+  }
+
+  /**
+   * 평균 강도 점수 → UI 레이블 + CSS 클래스
+   * @param {number} avgStr 1.0~4.0
+   */
+  function strengthLabelUi(avgStr) {
+    if (avgStr >= 3.5) return { label: '최강', cls: 'strength--legendary' };
+    if (avgStr >= 2.5) return { label: '강함', cls: 'strength--strong' };
+    if (avgStr >= 1.5) return { label: '보통', cls: 'strength--medium' };
+    return { label: '약함', cls: 'strength--weak' };
+  }
+
+  /**
+   * 선택된 smelt 재료들의 평균 강도 점수 계산
+   * @param {object[]} sel — selected 배열 (isSmeltMaterial 필터링은 호출자가)
+   * @returns {number}
+   */
+  function calcSelectedAvgStrength(sel) {
+    const smeltOnly = sel.filter(isSmeltMaterial);
+    if (smeltOnly.length === 0) return 1;
+    let total = 0;
+    for (const m of smeltOnly) {
+      total += strengthScoreFromTier(m.rarity || smeltTierFromId(m.smeltId));
+    }
+    return total / smeltOnly.length;
+  }
+
   const MAX_SMELT_YIELDS_PER_ITEM = 3;
 
   /** 녹일 때 이름·설명 끄트머리에 붙은 원소 힌트만 신뢰 (전체 문장 키워드 남발·고철 보너스 방지) */
@@ -894,13 +942,15 @@
       const onAnvil = countSelectedSmeltById(sid);
       const displayQty = Math.max(0, stockQty - onAnvil);
       const canAdd = displayQty > 0;
-      pill.className = `smelt-pill${canAdd ? ' smelt-pill--draggable' : ' smelt-pill--disabled'}`;
+      const pillTier = smeltTierFromId(sid);
+      const pillStrInfo = strengthLabelUi(strengthScoreFromTier(pillTier));
+      pill.className = `smelt-pill smelt-pill--tier-${pillTier}${canAdd ? ' smelt-pill--draggable' : ' smelt-pill--disabled'}`;
       pill.setAttribute('role', 'listitem');
       pill.draggable = canAdd;
       pill.title = canAdd
-        ? `남은 ${displayQty}개 · 모루로 끌어다 놓기 (모루에 ${onAnvil}개 올려 둠)`
+        ? `[${pillStrInfo.label}] 남은 ${displayQty}개 · 모루로 끌어다 놓기 (모루에 ${onAnvil}개 올려 둠)`
         : '모루에 모두 올려 두었습니다. 「선택 비우기」로 돌려 받을 수 있어요.';
-      pill.innerHTML = `<span aria-hidden="true">${entry.emoji || '◆'}</span> ${escapeHtml(entry.name || '')} <strong>${displayQty}</strong>`;
+      pill.innerHTML = `<span aria-hidden="true">${entry.emoji || '◆'}</span> ${escapeHtml(entry.name || '')} <span class="smelt-strength ${pillStrInfo.cls}">${pillStrInfo.label}</span> <strong>${displayQty}</strong>`;
 
       if (canAdd) {
         pill.addEventListener('dragstart', (ev) => {
@@ -1224,7 +1274,7 @@
       kind: 'smelt',
       smeltId: sid,
       name: stockEntry && stockEntry.name != null ? String(stockEntry.name) : sid,
-      rarity: 'rare',
+      rarity: smeltTierFromId(sid),
       pixelArt: null,
       serverId: null,
       equipmentId: null,
@@ -2119,6 +2169,7 @@
 
   function updateStatusMsg() {
     if (!statusMsgEl) return;
+    statusMsgEl.className = 'status-msg'; // 매번 초기화 후 조건부 강도 클래스 추가
     if (selected.length === 0) {
       statusMsgEl.textContent = '기초 재료(산출물)를 모루에 끌어다 놓으세요. 낚시·장비는 먼저 용광로에 녹이세요.';
       return;
@@ -2137,11 +2188,15 @@
       return;
     }
     if (selected.every((m) => isSmeltMaterial(m))) {
-      statusMsgEl.textContent = `기초 재료 ${selected.length}개 — 「⚒️ 제련하기」로 장비를 만들어요.`;
+      const avgStr = calcSelectedAvgStrength(selected);
+      const strInfo = strengthLabelUi(avgStr);
+      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · 재료 강도 [${strInfo.label}] — 「⚒️ 제련하기」로 장비를 만들어요.`;
+      statusMsgEl.className = `status-msg ${strInfo.cls}`;
       return;
     }
+    statusMsgEl.className = 'status-msg';
     statusMsgEl.textContent =
-      `기초 재료(산출물) ${selected.length}개 — 「⚒️ 제련하기」를 누르면 AI가 이름·능력치를 정해요.`;
+      `기초 재료(산출물) ${selected.length}개 — 「⚒️ 제련하기」를 눌러 장비를 만드세요.`;
   }
 
   function hideResultCard() {
@@ -2166,7 +2221,7 @@
     return map[r] || map.unknown;
   }
 
-  function showResultFromServer(eq, stats, nameSource, nameAiMeta) {
+  function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
     const tier = String(eq.tier || eq.rarity || 'rare').toLowerCase();
@@ -2187,7 +2242,8 @@
     } else if (nameSource === 'client_fallback') {
       aiLine = '이름 · 로컬 규칙(AI 응답 없음)\n';
     } else if (nameSource === 'smelt_procedural') {
-      aiLine = '이름 · 기초 재료 절차 생성\n';
+      const strBadge = materialStrengthLabel ? ` [재료 강도: ${materialStrengthLabel}]` : '';
+      aiLine = `이름 · 기초 재료 절차 생성${strBadge}\n`;
     }
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
@@ -2302,7 +2358,7 @@
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
         nameAiSkipReason: data.nameAiSkipReason,
-      });
+      }, data.materialStrengthLabel || null);
       if (data.nameSource === 'ai' && data.nameClass === 'signature') {
         pendingSignatureCelebrateName = String(serverEquipment.name || '').trim() || '장비';
       }

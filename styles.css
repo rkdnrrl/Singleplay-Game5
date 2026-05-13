@@ -471,6 +471,35 @@ html.material-detail-open body {
   font-weight: 400;
 }
 
+/* ── 재료 강도 배지 ─────────────────────────── */
+.smelt-strength {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: 3px;
+  line-height: 1.5;
+}
+.strength--weak      { background: rgba(120,120,130,0.28); color: #b0b0b8; border: 1px solid rgba(150,150,160,0.3); }
+.strength--medium    { background: rgba(100,160,255,0.18); color: #8ab4f8; border: 1px solid rgba(100,150,255,0.35); }
+.strength--strong    { background: rgba(255,120,0,0.2);   color: #ffaa55; border: 1px solid rgba(255,120,0,0.4); }
+.strength--legendary { background: rgba(255,215,0,0.22);  color: #ffd700; border: 1px solid rgba(255,215,0,0.5); }
+
+/* 상태 메시지에 강도 색상 */
+.status-msg.strength--weak      { color: #b0b0b8; }
+.status-msg.strength--medium    { color: #8ab4f8; }
+.status-msg.strength--strong    { color: #ffaa55; }
+.status-msg.strength--legendary { color: #ffd700; }
+
+/* 산출물 pill 등급별 좌측 보더 */
+.smelt-pill--tier-common    { border-left: 3px solid rgba(120,120,130,0.4); }
+.smelt-pill--tier-rare      { border-left: 3px solid rgba(100,160,255,0.6); }
+.smelt-pill--tier-epic      { border-left: 3px solid rgba(255,120,0,0.7); }
+.smelt-pill--tier-legendary { border-left: 3px solid rgba(255,215,0,0.85); }
+
 .refine-panel {
   flex: 1 1 0;
   min-width: 0;
