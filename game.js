@@ -569,9 +569,6 @@
 
   /**
    * 클라이언트 측 성공률 계산 (서버 calcSuccessRate 와 동일 공식)
-   * @param {number} prof 현재 숙련도
-   * @param {number} avgStr 재료 평균 강도
-   * @returns {number} 0~1
    */
   function clientSuccessRate(prof, avgStr) {
     const base = 0.65 + Math.sqrt(Math.max(0, prof)) * 0.06;
@@ -581,10 +578,43 @@
 
   /**
    * 숙련도 float → 스탯 배율 (서버 proficiencyMulFromValue 동일 공식)
-   * mul = 1.0 + ln(1 + n) × 0.30
    */
   function clientProfMul(prof) {
     return 1.0 + Math.log(1 + Math.max(0, prof)) * 0.30;
+  }
+
+  /**
+   * 조합 다양성 → 조합 품질 레이블 (서버 harmonyLabel 동일 공식)
+   */
+  function clientHarmonyLabel(uniqueTierCount) {
+    if (uniqueTierCount >= 4) return '최상 조합';
+    if (uniqueTierCount >= 3) return '좋은 조합';
+    if (uniqueTierCount >= 2) return '보통 조합';
+    return '단조로운 조합';
+  }
+
+  /**
+   * 클라이언트 측 craftHarmonyMul 계산 (서버 공식 동일)
+   */
+  function clientCraftHarmonyMul(sel) {
+    const smeltOnly = sel.filter(isSmeltMaterial);
+    if (!smeltOnly.length) return 0.40;
+    const scores = smeltOnly.map((m) => strengthScoreFromTier(m.rarity || smeltTierFromId(m.smeltId)));
+    const n = scores.length;
+    const avg = scores.reduce((a, b) => a + b, 0) / n;
+    const avgMul = 0.40 + (avg - 1.0) / 3.0 * 0.90;
+    const uniqueTierCount = new Set(scores).size;
+    const divBonus = (uniqueTierCount - 1) * 0.40;
+    const variance = scores.reduce((a, s) => a + (s - avg) ** 2, 0) / n;
+    const spreadBonus = Math.sqrt(variance) * 0.15;
+    return Math.max(0.10, avgMul + divBonus + spreadBonus);
+  }
+
+  /** 선택된 재료의 고유 강도 등급 수 */
+  function countUniqueStrengthTiers(sel) {
+    const smeltOnly = sel.filter(isSmeltMaterial);
+    const tiers = new Set(smeltOnly.map((m) => m.rarity || smeltTierFromId(m.smeltId)));
+    return tiers.size;
   }
 
   const MAX_SMELT_YIELDS_PER_ITEM = 3;
@@ -2208,10 +2238,17 @@
     }
     if (selected.every((m) => isSmeltMaterial(m))) {
       const avgStr = calcSelectedAvgStrength(selected);
-      const strInfo = strengthLabelUi(avgStr);
+      const uniqueTiers = countUniqueStrengthTiers(selected);
+      const harmLabel = clientHarmonyLabel(uniqueTiers);
       const successPct = Math.round(clientSuccessRate(smithingProficiency, avgStr) * 100);
-      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · 강도 [${strInfo.label}] · 성공률 약 ${successPct}% — 「⚒️ 제련하기」`;
-      statusMsgEl.className = `status-msg ${strInfo.cls}`;
+      // 조합 품질에 따라 색상 클래스
+      const harmCls = uniqueTiers >= 4 ? 'strength--legendary'
+        : uniqueTiers >= 3 ? 'strength--strong'
+        : uniqueTiers >= 2 ? 'strength--medium'
+        : 'strength--weak';
+      const hint = uniqueTiers < 4 ? `  ★ ${4 - uniqueTiers}종 더 추가하면 조합 강화!` : '  ★ 최고 조합!';
+      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${hint}`;
+      statusMsgEl.className = `status-msg ${harmCls}`;
       return;
     }
     statusMsgEl.className = 'status-msg';
@@ -2286,7 +2323,7 @@
     }, 5000);
   }
 
-  function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel) {
+  function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel, materialHarmonyLabel) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
     const tier = String(eq.tier || eq.rarity || 'rare').toLowerCase();
@@ -2307,8 +2344,8 @@
     } else if (nameSource === 'client_fallback') {
       aiLine = '이름 · 로컬 규칙(AI 응답 없음)\n';
     } else if (nameSource === 'smelt_procedural') {
-      const strBadge = materialStrengthLabel ? ` [재료 강도: ${materialStrengthLabel}]` : '';
-      aiLine = `이름 · 기초 재료 절차 생성${strBadge}\n`;
+      const harmBadge = materialHarmonyLabel || materialStrengthLabel || '';
+      aiLine = harmBadge ? `[${harmBadge}] 절차 생성\n` : '절차 생성\n';
     }
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
@@ -2440,7 +2477,7 @@
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
         nameAiSkipReason: data.nameAiSkipReason,
-      }, data.materialStrengthLabel || null);
+      }, data.materialStrengthLabel || null, data.materialHarmonyLabel || null);
       if (data.nameSource === 'ai' && data.nameClass === 'signature') {
         pendingSignatureCelebrateName = String(serverEquipment.name || '').trim() || '장비';
       }
