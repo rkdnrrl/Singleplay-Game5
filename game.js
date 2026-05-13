@@ -2241,15 +2241,6 @@
           : { kind: 'catch', id: String(m.serverId).trim() },
     );
 
-    const name = mergeEquipmentName(used);
-    const smeltForgeIds = used
-      .filter((m) => isSmeltMaterial(m))
-      .map((m) => String(m.smeltId || '').trim())
-      .filter(Boolean);
-    const smeltHintLine =
-      smeltForgeIds.length > 0 ? `\n#smelt:${smeltForgeIds.join(',')}` : '';
-    const description = `${mergeEquipmentDesc(used)}${smeltHintLine}`;
-
     forgeInFlight = true;
     pendingSignatureCelebrateName = null;
     if (btnForge) {
@@ -2266,9 +2257,6 @@
         },
         body: JSON.stringify({
           materials: materialsPayload,
-          name,
-          description,
-          generateNameWithAi: true,
         }),
       });
       const text = await res.text();
