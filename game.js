@@ -617,6 +617,51 @@
     return tiers.size;
   }
 
+  // ─── 클라이언트 시너지 규칙 (서버 SYNERGY_RULES 와 동일) ────
+  const CLIENT_SYNERGY_RULES = [
+    // 금속 합금
+    { id: 'steel',       name: '강철 합성',    requires: ['iron', 'carbon'],               bonusMul: 0.35 },
+    { id: 'stainless',   name: '스테인리스',   requires: ['iron', 'chromium'],             bonusMul: 0.25 },
+    { id: 'superalloy',  name: '초경합금',     requires: ['tungsten', 'cobalt'],           bonusMul: 0.40 },
+    { id: 'lightweight', name: '경량초강도',   requires: ['titanium', 'graphene'],         bonusMul: 0.45 },
+    { id: 'nicromel',    name: '니크롬합금',   requires: ['nickel', 'chromium'],           bonusMul: 0.28 },
+    { id: 'bronze',      name: '청동 합성',    requires: ['copper', 'tin'],                bonusMul: 0.18 },
+    { id: 'brass',       name: '황동 합성',    requires: ['copper', 'zinc'],               bonusMul: 0.18 },
+    { id: 'noble',       name: '귀금속 융합',  requires: ['platinum', 'palladium'],        bonusMul: 0.40 },
+    { id: 'mangsteel',   name: '망간강',       requires: ['iron', 'manganese'],            bonusMul: 0.22 },
+    // 전자/에너지
+    { id: 'electronic',  name: '전자 융합',    requires: ['circuit', 'battery'],           bonusMul: 0.28 },
+    { id: 'energy',      name: '에너지 폭발',  requires: ['plasma', 'battery'],            bonusMul: 0.35 },
+    { id: 'magneto',     name: '자기전자',     requires: ['neodymium', 'circuit'],         bonusMul: 0.32 },
+    { id: 'nanoelec',    name: '나노전자',     requires: ['graphene', 'circuit'],          bonusMul: 0.42 },
+    // 보석/탄소
+    { id: 'ultrahard',   name: '초경도 결합',  requires: ['diamond', 'graphene'],          bonusMul: 0.50 },
+    { id: 'gemforge',    name: '삼보석 융합',  requires: ['ruby', 'sapphire', 'emerald'],  bonusMul: 0.45 },
+    { id: 'divtitan',    name: '신성합금',     requires: ['diamond', 'titanium'],          bonusMul: 0.55 },
+    { id: 'carboniso',   name: '탄소동소체',   requires: ['carbon', 'graphene'],           bonusMul: 0.30 },
+    // 화학/특수
+    { id: 'inferno',     name: '초고온 단조',  requires: ['plasma', 'magma'],              bonusMul: 0.38 },
+    { id: 'cryohard',    name: '냉각강화',     requires: ['cryo', 'glass'],                bonusMul: 0.28 },
+    { id: 'ballistic',   name: '방탄섬유',     requires: ['kevlar', 'carbonfiber'],        bonusMul: 0.38 },
+    { id: 'thermoshock', name: '냉온충격',     requires: ['plasma', 'cryo'],               bonusMul: 0.45 },
+    { id: 'volcanic',    name: '화산냉각',     requires: ['magma', 'cryo'],                bonusMul: 0.35 },
+    { id: 'quench',      name: '담금질',       requires: ['iron', 'cryo'],                 bonusMul: 0.25 },
+    { id: 'bio',         name: '생체활성',     requires: ['protein', 'enzyme'],            bonusMul: 0.22 },
+  ];
+
+  /**
+   * 현재 선택 재료에서 발동되는 시너지 목록 반환.
+   * @param {object[]} sel — selected 배열
+   * @returns {{ id, name, bonusMul }[]}
+   */
+  function detectClientSynergies(sel) {
+    const smeltOnly = sel.filter(isSmeltMaterial);
+    const ids = new Set(smeltOnly.map((m) => String(m.smeltId || '').toLowerCase()));
+    return CLIENT_SYNERGY_RULES.filter((rule) =>
+      rule.requires.every((r) => ids.has(r)),
+    );
+  }
+
   const MAX_SMELT_YIELDS_PER_ITEM = 3;
 
   /** 녹일 때 이름·설명 끄트머리에 붙은 원소 힌트만 신뢰 (전체 문장 키워드 남발·고철 보너스 방지) */
@@ -997,9 +1042,14 @@
       pill.className = `smelt-pill smelt-pill--tier-${pillTier}${canAdd ? ' smelt-pill--draggable' : ' smelt-pill--disabled'}`;
       pill.setAttribute('role', 'listitem');
       pill.draggable = canAdd;
+      // 이 재료가 포함된 시너지 규칙 힌트
+      const synHints = CLIENT_SYNERGY_RULES
+        .filter((rule) => rule.requires.includes(sid))
+        .map((rule) => `⚡ ${rule.name} (${rule.requires.join(' + ')})`)
+        .join('\n');
       pill.title = canAdd
-        ? `[${pillStrInfo.label}] 남은 ${displayQty}개 · 모루로 끌어다 놓기 (모루에 ${onAnvil}개 올려 둠)`
-        : '모루에 모두 올려 두었습니다. 「선택 비우기」로 돌려 받을 수 있어요.';
+        ? `[${pillStrInfo.label}] 남은 ${displayQty}개 · 모루로 끌어다 놓기 (모루에 ${onAnvil}개 올려 둠)${synHints ? '\n시너지:\n' + synHints : ''}`
+        : `모루에 모두 올려 두었습니다. 「선택 비우기」로 돌려 받을 수 있어요.${synHints ? '\n시너지:\n' + synHints : ''}`;
       pill.innerHTML = `<span aria-hidden="true">${entry.emoji || '◆'}</span> ${escapeHtml(entry.name || '')} <span class="smelt-strength ${pillStrInfo.cls}">${pillStrInfo.label}</span> <strong>${displayQty}</strong>`;
 
       if (canAdd) {
@@ -2241,13 +2291,18 @@
       const uniqueTiers = countUniqueStrengthTiers(selected);
       const harmLabel = clientHarmonyLabel(uniqueTiers);
       const successPct = Math.round(clientSuccessRate(smithingProficiency, avgStr) * 100);
-      // 조합 품질에 따라 색상 클래스
-      const harmCls = uniqueTiers >= 4 ? 'strength--legendary'
+      const activeSyn = detectClientSynergies(selected);
+      // 조합 품질에 따라 색상 클래스 (시너지 발동 시 최상 색상 우선)
+      const harmCls = activeSyn.length > 0 ? 'strength--legendary'
+        : uniqueTiers >= 4 ? 'strength--legendary'
         : uniqueTiers >= 3 ? 'strength--strong'
         : uniqueTiers >= 2 ? 'strength--medium'
         : 'strength--weak';
       const hint = uniqueTiers < 4 ? `  ★ ${4 - uniqueTiers}종 더 추가하면 조합 강화!` : '  ★ 최고 조합!';
-      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${hint}`;
+      const synLine = activeSyn.length > 0
+        ? `  ⚡ ${activeSyn.map((s) => s.name).join(' · ')}`
+        : '';
+      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${synLine}${synLine ? '' : hint}`;
       statusMsgEl.className = `status-msg ${harmCls}`;
       return;
     }
@@ -2304,7 +2359,9 @@
     const gainStr = data.proficiencyGain != null
       ? `  (능력치 +${Number(data.proficiencyGain).toFixed(4)})`
       : '';
-    resultDesc.textContent = `성공률 ${data.successRatePct ?? '?'}% · 강도 [${data.materialStrengthLabel || '?'}]${gainStr}${returnLine}`;
+    const synArr = Array.isArray(data.activeSynergies) ? data.activeSynergies : [];
+    const synFailLine = synArr.length > 0 ? `\n시너지: ⚡ ${synArr.map((s) => s.name).join(' · ')}` : '';
+    resultDesc.textContent = `성공률 ${data.successRatePct ?? '?'}% · 강도 [${data.materialStrengthLabel || '?'}]${gainStr}${synFailLine}${returnLine}`;
 
     // 깨진 이모지
     resultSpriteHost.innerHTML = '<span style="font-size:2.5rem;line-height:1">💥</span>';
@@ -2323,7 +2380,7 @@
     }, 5000);
   }
 
-  function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel, materialHarmonyLabel) {
+  function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel, materialHarmonyLabel, activeSynergies) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
     const tier = String(eq.tier || eq.rarity || 'rare').toLowerCase();
@@ -2345,7 +2402,9 @@
       aiLine = '이름 · 로컬 규칙(AI 응답 없음)\n';
     } else if (nameSource === 'smelt_procedural') {
       const harmBadge = materialHarmonyLabel || materialStrengthLabel || '';
-      aiLine = harmBadge ? `[${harmBadge}] 절차 생성\n` : '절차 생성\n';
+      const synArr = Array.isArray(activeSynergies) ? activeSynergies : [];
+      const synText = synArr.length > 0 ? `  ⚡ ${synArr.map((s) => s.name).join(' · ')}` : '';
+      aiLine = harmBadge ? `[${harmBadge}]${synText} 절차 생성\n` : `절차 생성${synText}\n`;
     }
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
@@ -2477,7 +2536,7 @@
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
         nameAiSkipReason: data.nameAiSkipReason,
-      }, data.materialStrengthLabel || null, data.materialHarmonyLabel || null);
+      }, data.materialStrengthLabel || null, data.materialHarmonyLabel || null, data.activeSynergies || []);
       if (data.nameSource === 'ai' && data.nameClass === 'signature') {
         pendingSignatureCelebrateName = String(serverEquipment.name || '').trim() || '장비';
       }
