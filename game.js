@@ -2480,7 +2480,8 @@
           cell.appendChild(btn);
         } else {
           cell.className = 'forge-grid-cell forge-grid-cell--empty';
-          cell.innerHTML = `<span class="fgc-slot-num">${i + 1}</span>`;
+          const _slotNouns = SLOT_ITEM_NOUNS[forgeSlot] || SLOT_ITEM_NOUNS.weapon;
+          cell.innerHTML = `<span class="fgc-slot-noun">${_slotNouns[i] || (i + 1)}</span>`;
           const slotIdx = i;
           cell.addEventListener('dragover', (e) => {
             if (!readSmeltDragSid(e.dataTransfer) && !e.dataTransfer.types.includes('text/plain')) return;
@@ -3030,14 +3031,15 @@
     uranium:'우라늄',sodaash:'소다',phosphor:'인',phosphate:'인산염',
     chloride:'염화물',nitrate:'질산염',ammonia:'암모니아',lithiumsalt:'리튬염',
   };
-  const EQUIP_NOUNS_BY_SLOT = {
-    weapon:    ['검','대검','단검','도끼','창','활','지팡이','망치','낫','철퇴','쌍검','방패'],
-    head:      ['투구','헬멧','철모','두구','고깔','왕관','머리띠'],
-    chest:     ['갑옷','흉갑','로브','코트','망토','전투복','판금갑옷'],
-    pants:     ['각반','레깅스','하의','바지','전투복 하의'],
-    gloves:    ['장갑','건틀릿','철장갑','가죽장갑'],
-    boots:     ['장화','부츠','철화','그리브','발목갑옷'],
-    accessory: ['반지','목걸이','귀걸이','팔찌','부적','메달','브로치'],
+  // 슬롯 위치(0~8)별 고정 장비 명사 — 카테고리 × 9슬롯
+  const SLOT_ITEM_NOUNS = {
+    weapon:    ['검','도끼','창','활','방패','지팡이','망치','낫','단검'],
+    head:      ['투구','헬멧','철모','고깔','왕관','가면','두건','머리띠','철갓'],
+    chest:     ['갑옷','흉갑','로브','망토','전투복','판금갑옷','체인메일','가죽갑옷','코트'],
+    pants:     ['각반','레깅스','전투바지','기사바지','가죽바지','철제각반','사슬각반','강화각반','마법각반'],
+    gloves:    ['장갑','건틀릿','철장갑','가죽장갑','마법장갑','강철장갑','비단장갑','화염장갑','전투장갑'],
+    boots:     ['장화','부츠','철화','그리브','기사부츠','가죽장화','마법부츠','강화장화','전투화'],
+    accessory: ['반지','목걸이','귀걸이','팔찌','부적','메달','브로치','펜던트','뱃지'],
   };
 
   let pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
@@ -3045,14 +3047,13 @@
   let pixelColor = '#c0392b'; // 기본: 빨강 (null = 지우개)
   let pixelPainting = false;
 
-  function generateEquipName(mats, slot) {
+  function generateEquipName(mats, noun) {
     const ids = [...new Set(mats.filter(Boolean).map((m) => m.smeltId).filter(Boolean))];
     const words = ids.slice(0, 2).map((id) => SMELT_KO[id] || id);
-    const pool = EQUIP_NOUNS_BY_SLOT[slot] || EQUIP_NOUNS_BY_SLOT.weapon;
-    const noun = pool[Math.floor(Math.random() * pool.length)];
-    if (words.length === 0) return `강철 ${noun}`;
-    if (words.length === 1) return `${words[0]} ${noun}`;
-    return `${words[0]}·${words[1]} ${noun}`;
+    const n = noun || '검';
+    if (words.length === 0) return `강철 ${n}`;
+    if (words.length === 1) return `${words[0]} ${n}`;
+    return `${words[0]}·${words[1]} ${n}`;
   }
 
   // base64 PNG → pixelGrid (32×32) 변환 (64×64 이미지 2×2 블록 평균)
@@ -3629,11 +3630,15 @@
     if(popup) popup.classList.add('cpk-popup--hidden');
   }
 
-  function showCustomizeModal(mats) {
+  function showCustomizeModal(mats, slotIndices) {
     const modal = document.getElementById('equipCustomizeModal');
     const nameInput = document.getElementById('equipNameInput');
     if (!modal) return;
-    const initName = generateEquipName(mats, forgeSlot);
+    // 첫 번째 재료가 놓인 슬롯 위치에서 명사 결정 (슬롯마다 장비 종류 고정)
+    const nouns = SLOT_ITEM_NOUNS[forgeSlot] || SLOT_ITEM_NOUNS.weapon;
+    const primaryIdx = Array.isArray(slotIndices) && slotIndices.length > 0 ? slotIndices[0] : 0;
+    const fixedNoun = nouns[primaryIdx] || nouns[0];
+    const initName = generateEquipName(mats, fixedNoun);
     if (nameInput) nameInput.value = initName;
     pixelArtImageUrl = null;
     pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
@@ -3668,7 +3673,7 @@
     const clearBtn = document.getElementById('equipClearBtn');
     const doneBtn = document.getElementById('equipCustomizeDoneBtn');
     const backdrop = document.getElementById('equipCustomizeBackdrop');
-    if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats, forgeSlot); };
+    if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats, fixedNoun); };
     if (rndPixelBtn) rndPixelBtn.onclick = () => {
       pixelArtImageUrl = null;
       void _genPixelArtApi(mats, nameInput?.value || '');
@@ -3700,7 +3705,7 @@
       if (statusMsgEl) statusMsgEl.textContent = '모루에는 기초 재료(산출물)만 올릴 수 있어요.';
       return;
     }
-    showCustomizeModal(used);
+    showCustomizeModal(used, usedSlots.map(({ i }) => i));
   });
 
   const FORGE_SLOT_DEFS = [
