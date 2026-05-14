@@ -3032,179 +3032,273 @@
     return `${words[0]}·${words[1]} ${noun}`;
   }
 
-  // ── 픽셀 템플릿 헬퍼 ──────────────────────────────────────────
-  function _px(o,x,y,s){if(x>=0&&x<32&&y>=0&&y<32)o.push([x,y,s]);}
-  function _pxLine(o,x0,y0,x1,y1,s){
-    let dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,e=dx+dy;
-    for(;;){_px(o,x0,y0,s);if(x0===x1&&y0===y1)break;const e2=2*e;if(e2>=dy){e+=dy;x0+=sx;}if(e2<=dx){e+=dx;y0+=sy;}}
-  }
-  function _pxRect(o,x,y,w,h,s){for(let j=0;j<h;j++)for(let i=0;i<w;i++)_px(o,x+i,y+j,s);}
-  function _pxCircle(o,cx,cy,r,s,fill){
-    for(let y=cy-r;y<=cy+r;y++)for(let x=cx-r;x<=cx+r;x++){const d=Math.hypot(x-cx,y-cy);if(fill?d<=r:d>=r-0.9&&d<=r+0.5)_px(o,x,y,s);}
-  }
-
-  // shade: 0=어두운 외곽, 1=본체, 2=밝은 면, 3=하이라이트
-  function _buildTemplate(type) {
-    const p=[];
-    switch(type) {
-      case '검': case '대검': {
-        for(let i=0;i<21;i++){const x=27-i,y=1+i;_px(p,x+1,y,0);_px(p,x,y,3);_px(p,x-1,y,2);_px(p,x-2,y,1);_px(p,x-3,y,0);}
-        _px(p,28,0,3);_px(p,29,0,0);
-        _pxRect(p,5,21,22,3,1);_pxRect(p,5,21,22,1,0);_pxRect(p,5,23,22,1,0);_pxRect(p,6,22,20,1,2);
-        _pxRect(p,13,24,6,7,1);_pxRect(p,14,24,4,7,2);
-        _pxRect(p,11,31,10,1,1);_pxRect(p,12,31,8,1,2);
-        break;
-      }
-      case '단검': {
-        for(let i=0;i<13;i++){const x=24-i,y=4+i;_px(p,x+1,y,0);_px(p,x,y,3);_px(p,x-1,y,2);_px(p,x-2,y,0);}
-        _px(p,25,3,3);
-        _pxRect(p,8,17,16,2,1);_pxRect(p,8,17,16,1,0);_pxRect(p,8,18,16,1,0);_pxRect(p,9,18,14,1,2);
-        _pxRect(p,13,19,6,6,1);_pxRect(p,14,19,4,6,2);
-        _pxRect(p,11,25,10,2,1);_pxRect(p,12,25,8,1,2);
-        break;
-      }
-      case '도끼': {
-        _pxRect(p,14,11,4,20,1);_pxRect(p,15,11,2,20,2);_pxRect(p,13,11,1,20,0);_pxRect(p,18,11,1,20,0);
-        for(let y=2;y<=17;y++){const w=Math.round(10*(1-Math.abs(y-9.5)/8));_pxRect(p,18,y,w,1,1);if(w>0){_px(p,18+w,y,0);_px(p,18+w-1,y,3);}}
-        _pxRect(p,10,3,6,14,2);_pxRect(p,10,3,1,14,0);_pxRect(p,10,3,6,1,0);_pxRect(p,10,16,6,1,0);
-        break;
-      }
-      case '창': {
-        _pxRect(p,15,11,2,20,1);_pxRect(p,16,11,1,20,2);_pxRect(p,14,11,1,20,0);_pxRect(p,17,11,1,20,0);
-        for(let y=0;y<=12;y++){const h=Math.max(0,Math.round(4*Math.sin(y/12*Math.PI)));if(h>0){_pxRect(p,16-h,y,h*2,1,1);_px(p,16-h-1,y,0);_px(p,16+h,y,0);_px(p,16-h,y,2);}}
-        _px(p,15,0,3);_px(p,16,0,3);
-        break;
-      }
-      case '활': {
-        for(let t=0;t<=1;t+=0.02){const y=Math.round(1+t*30),x=Math.round(14-9*Math.sin(t*Math.PI));_px(p,x,y,1);_px(p,x-1,y,2);_px(p,x+1,y,0);}
-        for(let y=1;y<=31;y++)_px(p,21,y,y===16?3:0);
-        _pxLine(p,5,15,21,15,2);_pxLine(p,5,16,21,16,2);
-        _px(p,5,14,1);_px(p,4,15,1);_px(p,5,17,1);_px(p,4,16,1);
-        _px(p,20,14,3);_px(p,20,17,3);
-        break;
-      }
-      case '방패': {
-        for(let y=2;y<=30;y++){const h=y<=15?13:Math.round(13*(1-(y-15)/16));_pxRect(p,16-h,y,h*2,1,1);_px(p,16-h-1,y,0);_px(p,16+h,y,0);if(h>2)_px(p,16-h,y,2);}
-        _pxRect(p,3,2,26,1,0);
-        _pxRect(p,15,6,2,20,0);_pxRect(p,7,15,18,2,0);
-        _px(p,16,7,2);_pxRect(p,16,8,1,14,2);_pxRect(p,8,16,14,1,2);
-        break;
-      }
-      case '투구': {
-        for(let y=5;y<=16;y++){const h=Math.round(12*Math.sqrt(Math.max(0,1-((y-16)*(y-16))/144)));_pxRect(p,16-h,y,h*2,1,1);_px(p,16-h-1,y,0);_px(p,16+h,y,0);if(h>1)_px(p,16-h,y,2);}
-        _pxRect(p,8,16,16,4,0);_pxRect(p,9,17,14,2,3);
-        _pxRect(p,4,19,9,9,1);_pxRect(p,19,19,9,9,1);
-        _pxRect(p,4,19,1,9,0);_pxRect(p,12,19,1,9,0);_pxRect(p,19,19,1,9,0);_pxRect(p,27,19,1,9,0);
-        _pxRect(p,5,20,7,7,2);_pxRect(p,20,20,7,7,2);
-        for(let y=0;y<=5;y++){_px(p,16,y,2);_px(p,15,y,1);_px(p,17,y,1);}
-        break;
-      }
-      case '지팡이': {
-        for(let y=13;y<=31;y++){_px(p,15,y,0);_px(p,16,y,1);_px(p,17,y,2);_px(p,18,y,0);}
-        _pxCircle(p,15,8,7,0,false);_pxCircle(p,15,8,6,1,true);_pxCircle(p,15,8,3,2,true);_pxCircle(p,15,8,1,3,true);
-        _px(p,12,6,3);_px(p,13,5,3);
-        break;
-      }
-      case '망치': {
-        _pxRect(p,14,17,4,14,1);_pxRect(p,15,17,2,14,2);_pxRect(p,13,17,1,14,0);_pxRect(p,18,17,1,14,0);
-        _pxRect(p,5,4,22,14,1);
-        _pxRect(p,5,4,1,14,0);_pxRect(p,26,4,1,14,0);_pxRect(p,5,4,22,1,0);_pxRect(p,5,17,22,1,0);
-        _pxRect(p,6,5,20,12,2);_pxRect(p,6,5,6,12,3);
-        break;
-      }
-      case '낫': {
-        for(let i=0;i<20;i++){const x=4+i,y=12+i;_px(p,x-1,y,0);_px(p,x,y,1);_px(p,x+1,y,2);_px(p,x+2,y,0);}
-        for(let a=115;a<=225;a+=3){const r=a*Math.PI/180,cx=21,cy=9;
-          _px(p,Math.round(cx+13*Math.cos(r)),Math.round(cy+13*Math.sin(r)),0);
-          _px(p,Math.round(cx+11*Math.cos(r)),Math.round(cy+11*Math.sin(r)),3);
-          _px(p,Math.round(cx+9*Math.cos(r)),Math.round(cy+9*Math.sin(r)),1);}
-        break;
-      }
-      case '갑옷': {
-        _pxRect(p,8,13,16,16,1);_pxRect(p,8,13,16,1,0);_pxRect(p,8,28,16,1,0);_pxRect(p,8,13,1,16,0);_pxRect(p,23,13,1,16,0);
-        _pxRect(p,9,14,14,14,2);
-        _pxRect(p,12,7,8,6,1);_pxRect(p,12,7,1,6,0);_pxRect(p,19,7,1,6,0);_pxRect(p,13,8,6,4,2);
-        _pxRect(p,2,13,7,12,1);_pxRect(p,23,13,7,12,1);_pxRect(p,2,13,1,12,0);_pxRect(p,8,13,1,12,0);_pxRect(p,23,13,1,12,0);_pxRect(p,29,13,1,12,0);
-        _pxRect(p,3,14,5,10,2);_pxRect(p,24,14,5,10,2);
-        _pxRect(p,8,24,16,3,0);_pxRect(p,9,24,14,3,3);
-        break;
-      }
-      case '장갑': {
-        _pxRect(p,8,16,16,12,1);_pxRect(p,9,17,14,10,2);_pxRect(p,8,16,16,1,0);_pxRect(p,8,27,16,1,0);
-        for(let f=0;f<4;f++){const fx=9+f*4;_pxRect(p,fx,5,3,12,1);_pxRect(p,fx+1,6,1,10,2);_px(p,fx,5,0);_px(p,fx+2,5,0);_px(p,fx-1,5,0);_px(p,fx+3,5,0);}
-        _pxRect(p,4,13,5,7,1);_pxRect(p,5,14,3,5,2);_px(p,4,13,0);_px(p,8,13,0);
-        _pxRect(p,7,28,18,4,0);_pxRect(p,8,28,16,4,3);
-        break;
-      }
-      case '장화': {
-        _pxRect(p,3,2,11,20,1);_pxRect(p,3,2,1,20,0);_pxRect(p,13,2,1,20,0);_pxRect(p,3,2,11,1,0);_pxRect(p,4,3,9,18,2);
-        _pxRect(p,3,22,13,4,1);_pxRect(p,4,23,11,2,2);
-        _pxRect(p,1,26,14,3,0);_pxRect(p,2,26,12,2,1);
-        _pxRect(p,18,2,11,20,1);_pxRect(p,18,2,1,20,0);_pxRect(p,28,2,1,20,0);_pxRect(p,18,2,11,1,0);_pxRect(p,19,3,9,18,2);
-        _pxRect(p,18,22,11,4,1);_pxRect(p,19,23,9,2,2);
-        _pxRect(p,17,26,12,3,0);_pxRect(p,18,26,10,2,1);
-        break;
-      }
-      case '반지': {
-        _pxCircle(p,16,22,9,0,false);_pxCircle(p,16,22,8,1,false);_pxCircle(p,16,22,7,2,false);_pxCircle(p,16,22,6,0,false);
-        _pxRect(p,12,9,8,8,0);_pxRect(p,13,10,6,6,3);_pxRect(p,14,11,4,4,2);
-        _pxRect(p,14,16,4,6,1);_pxRect(p,15,16,2,6,2);
-        break;
-      }
-      case '목걸이': {
-        for(let a=195;a<=345;a+=5){const r=a*Math.PI/180,x=Math.round(16+12*Math.cos(r)),y=Math.round(7+6*Math.sin(r));_px(p,x,y,1);_px(p,x+1,y,0);}
-        _pxRect(p,15,12,2,7,0);_px(p,16,12,1);
-        _pxCircle(p,16,24,6,0,false);_pxCircle(p,16,24,5,3,true);_px(p,14,22,3);_px(p,13,23,3);
-        break;
-      }
-    }
-    return p;
-  }
-
+  // ── 픽셀 아트 생성 (마스크 기반 알고리즘) ─────────────────────
   function _detectItemType(name) {
-    if(!name) return null;
-    const checks=[['대검'],['단검'],['검'],['도끼'],['창'],['활'],['방패'],['갑옷'],['투구'],['지팡이'],['망치'],['낫'],['장갑'],['장화'],['반지'],['목걸이']];
-    for(const [k] of checks) if(name.includes(k)) return k;
+    if (!name) return null;
+    const checks = ['대검','단검','검','도끼','창','활','방패','갑옷','투구','지팡이','망치','낫','장갑','장화','반지','목걸이'];
+    for (const k of checks) if (name.includes(k)) return k;
     return null;
   }
 
   function generateRandomPixels(mats, name) {
-    const TIER_SHADES = {
-      legendary: ['#5a2800','#e8860a','#f8c060','#fff4c0'],
-      epic:      ['#2a0a46','#7d3ea0','#b07acc','#e0c8f0'],
-      rare:      ['#082040','#1e6fa0','#50a8d8','#b8dff5'],
-      common:    ['#111111','#5a5a5a','#9a9a9a','#d8d8d8'],
+    const TIER_PAL = {
+      legendary: ['#3d1a00','#c25b00','#f5a623','#fff3a0'],
+      epic:      ['#1e063a','#6b2f92','#a86cc1','#d4aef0'],
+      rare:      ['#051828','#1458a0','#4a9fd4','#9bd8f5'],
+      common:    ['#0d0d0d','#484848','#888888','#d0d0d0'],
     };
     const tiers = mats.filter(Boolean).map((m) => m.tier || 'common');
     const tier = tiers.includes('legendary') ? 'legendary' : tiers.includes('epic') ? 'epic' : tiers.includes('rare') ? 'rare' : 'common';
-    const shades = TIER_SHADES[tier];
-    const G = PIXEL_G;
-    const grid = Array(G * G).fill(null);
+    const pal = TIER_PAL[tier]; // [0]=darkest … [3]=lightest
+
+    const G = PIXEL_G; // 32
+    const MID = Math.floor(G / 2); // 16
+
+    // Seeded Xorshift32 RNG from item name (reproducible per name)
+    let _s = 0x811c9dc5 >>> 0;
+    for (let i = 0; i < (name || 'x').length; i++)
+      _s = (Math.imul(_s ^ (name || 'x').charCodeAt(i), 0x01000193)) >>> 0;
+    if (_s === 0) _s = 1;
+    const rng = () => { _s ^= _s << 13; _s ^= _s >>> 17; _s ^= _s << 5; return (_s >>> 0) / 0x100000000; };
+
+    // mask: 0=empty, 1=always-on (outline/structure), 2=random-fill (65% chance)
+    const mask = new Uint8Array(G * G);
+    const set = (x, y, v = 1) => { if (x >= 0 && x < G && y >= 0 && y < G) mask[y * G + x] = Math.max(mask[y * G + x], v); };
+    const fill = (x, y, w, h, v = 2) => { for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) set(x + dx, y + dy, v); };
 
     const type = _detectItemType(name);
-    const tplPixels = type ? _buildTemplate(type) : null;
-
-    if (tplPixels && tplPixels.length > 0) {
-      // 중복 좌표는 마지막 값으로 덮어씀
-      const map = new Map();
-      for (const [x, y, s] of tplPixels) {
-        if (x >= 0 && x < G && y >= 0 && y < G) map.set(y * G + x, s);
+    switch (type) {
+      case '대검': case '검': {
+        const bladeH = type === '대검' ? 20 : 16;
+        fill(MID - 1, 1, 3, bladeH, 2);
+        for (let y = 1; y < 1 + bladeH; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        set(MID, 0, 1);
+        const gy = 1 + bladeH, gw = type === '대검' ? 7 : 5;
+        fill(MID - gw, gy, gw * 2 + 1, 2, 2);
+        for (let dx = -gw; dx <= gw; dx++) { set(MID + dx, gy, 1); set(MID + dx, gy + 1, 1); }
+        set(MID - gw, gy, 1); set(MID + gw, gy, 1); set(MID - gw, gy + 1, 1); set(MID + gw, gy + 1, 1);
+        const hy = gy + 2, hLen = type === '대검' ? 8 : 6;
+        fill(MID - 1, hy, 3, hLen, 2);
+        for (let y = hy; y < hy + hLen; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        fill(MID - 2, hy + hLen, 5, 2, 1);
+        break;
       }
-      for (const [idx, s] of map) grid[idx] = shades[Math.max(0, Math.min(3, s))];
-    } else {
-      // 이름 불명: 재질 색상 랜덤 블롭
-      const pal = shades.slice(1);
-      for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
-        const dx=(x-G/2+0.5)/(G*0.28), dy=(y-G/2+0.5)/(G*0.42), r=dx*dx+dy*dy;
-        if (r < 1 && Math.random() > r * 0.55) grid[y*G+x] = pal[Math.floor(Math.random()*pal.length)];
+      case '단검': {
+        fill(MID - 1, 7, 3, 10, 2);
+        for (let y = 7; y < 17; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        set(MID, 6, 1);
+        fill(MID - 4, 17, 9, 2, 2);
+        for (let dx = -4; dx <= 4; dx++) { set(MID + dx, 17, 1); set(MID + dx, 18, 1); }
+        fill(MID - 1, 19, 3, 5, 2);
+        for (let y = 19; y < 24; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        fill(MID - 2, 24, 5, 2, 1);
+        break;
       }
-      const dark = shades[0];
-      for (let i = 0; i < G*G; i++) {
-        if (!grid[i]) continue;
-        const x=i%G, y=Math.floor(i/G);
-        if (!grid[i-1]||!grid[i+1]||!grid[i-G]||!grid[i+G]||x===0||x===G-1||y===0||y===G-1) grid[i]=dark;
+      case '도끼': {
+        fill(MID - 1, 7, 3, 22, 2);
+        for (let y = 7; y < 29; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        fill(MID - 1, 29, 3, 1, 1);
+        for (let y = 1; y <= 16; y++) {
+          const lOff = Math.round(9 * Math.sin((y - 1) / 15 * Math.PI));
+          if (lOff > 0) { fill(MID - 2 - lOff, y, lOff, 1, 2); set(MID - 2 - lOff, y, 1); }
+          const rOff = Math.round(3 * Math.sin((y - 1) / 15 * Math.PI));
+          if (rOff > 0) { fill(MID + 2, y, rOff, 1, 2); set(MID + 2 + rOff - 1, y, 1); }
+        }
+        break;
+      }
+      case '창': {
+        fill(MID - 1, 10, 3, 21, 2);
+        for (let y = 10; y < 31; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        fill(MID - 1, 31, 3, 1, 1);
+        for (let y = 0; y <= 10; y++) {
+          const hw = Math.min(y + 1, 10 - y, 4);
+          fill(MID - hw, y, hw * 2 + 1, 1, hw < 4 ? 1 : 2);
+          set(MID - hw, y, 1); set(MID + hw, y, 1);
+        }
+        break;
+      }
+      case '활': {
+        for (let y = 2; y <= 14; y++) {
+          const t = (y - 2) / 12, x = MID - 3 - Math.round(6 * Math.sin(t * Math.PI));
+          set(x, y, 1); set(x + 1, y, 2);
+        }
+        fill(MID - 10, 15, 7, 3, 2); set(MID - 10, 15, 1); set(MID - 10, 17, 1);
+        for (let y = 17; y <= 29; y++) {
+          const t = (29 - y) / 12, x = MID - 3 - Math.round(6 * Math.sin(t * Math.PI));
+          set(x, y, 1); set(x + 1, y, 2);
+        }
+        for (let y = 1; y <= 30; y++) set(MID + 4, y, 1);
+        set(MID - 5, 1, 1); set(MID - 4, 1, 1); set(MID - 5, 30, 1); set(MID - 4, 30, 1);
+        break;
+      }
+      case '방패': {
+        for (let y = 3; y <= 27; y++) {
+          const hw = y <= 15 ? Math.min(11, 2 + y) : Math.round(11 * (1 - (y - 15) / 13));
+          if (hw > 0) { fill(MID - hw, y, hw * 2 + 1, 1, 2); set(MID - hw, y, 1); set(MID + hw, y, 1); }
+        }
+        for (let dx = -9; dx <= 9; dx++) set(MID + dx, 3, 1);
+        set(MID, 27, 1);
+        fill(MID - 2, 12, 5, 6, 1);
+        break;
+      }
+      case '투구': {
+        for (let y = 4; y <= 17; y++) {
+          const hw = Math.round(11 * Math.sqrt(Math.max(0, 1 - ((y - 17) * (y - 17)) / 169)));
+          if (hw > 0) { fill(MID - hw, y, hw * 2 + 1, 1, 2); set(MID - hw, y, 1); set(MID + hw, y, 1); }
+        }
+        fill(MID - 12, 17, 25, 3, 2);
+        for (let dx = -12; dx <= 12; dx++) { set(MID + dx, 17, 1); set(MID + dx, 19, 1); }
+        set(MID - 12, 17, 1); set(MID - 12, 19, 1); set(MID + 12, 17, 1); set(MID + 12, 19, 1);
+        fill(MID - 10, 20, 8, 7, 2); fill(MID + 3, 20, 8, 7, 2);
+        fill(MID - 1, 17, 3, 10, 1);
+        for (let y = 1; y <= 4; y++) { set(MID, y, 1); set(MID - 1, y + 1, 2); set(MID + 1, y + 1, 2); }
+        break;
+      }
+      case '지팡이': {
+        fill(MID - 1, 13, 3, 18, 2);
+        for (let y = 13; y < 31; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        fill(MID - 1, 31, 3, 1, 1);
+        const oR = 8, oCX = MID, oCY = 7;
+        for (let oy = oCY - oR; oy <= oCY + oR; oy++) {
+          for (let ox = oCX - oR; ox <= oCX + oR; ox++) {
+            const d = Math.hypot(ox - oCX, oy - oCY);
+            if (d <= oR) set(ox, oy, d >= oR - 1.5 ? 1 : 2);
+          }
+        }
+        break;
+      }
+      case '망치': {
+        fill(MID - 1, 16, 3, 14, 2);
+        for (let y = 16; y < 30; y++) { set(MID - 1, y, 1); set(MID + 1, y, 1); }
+        fill(MID - 1, 30, 3, 1, 1);
+        fill(MID - 9, 3, 19, 13, 2);
+        for (let dx = -9; dx <= 9; dx++) { set(MID + dx, 3, 1); set(MID + dx, 15, 1); }
+        for (let dy = 3; dy <= 15; dy++) { set(MID - 9, dy, 1); set(MID + 9, dy, 1); }
+        break;
+      }
+      case '낫': {
+        for (let i = 0; i < 18; i++) {
+          const sx = MID - 6 + i, sy = 13 + i;
+          set(sx, sy, 2); set(sx - 1, sy, 1); set(sx + 1, sy, 1);
+        }
+        for (let a = 115; a <= 230; a += 5) {
+          const r = a * Math.PI / 180, cx = MID + 4, cy = 11;
+          set(Math.round(cx + 12 * Math.cos(r)), Math.round(cy + 12 * Math.sin(r)), 1);
+          set(Math.round(cx + 9 * Math.cos(r)), Math.round(cy + 9 * Math.sin(r)), 2);
+        }
+        break;
+      }
+      case '갑옷': {
+        fill(MID - 8, 12, 17, 15, 2);
+        for (let dx = -8; dx <= 8; dx++) { set(MID + dx, 12, 1); set(MID + dx, 26, 1); }
+        for (let dy = 12; dy <= 26; dy++) { set(MID - 8, dy, 1); set(MID + 8, dy, 1); }
+        fill(MID - 12, 12, 5, 9, 2); fill(MID + 8, 12, 5, 9, 2);
+        for (let dy = 12; dy < 21; dy++) { set(MID - 12, dy, 1); set(MID + 12, dy, 1); }
+        fill(MID - 3, 8, 7, 5, 1);
+        fill(MID - 8, 22, 17, 4, 1);
+        break;
+      }
+      case '장갑': {
+        fill(MID - 7, 16, 15, 11, 2);
+        for (let dx = -7; dx <= 7; dx++) { set(MID + dx, 16, 1); set(MID + dx, 26, 1); }
+        for (let dy = 16; dy <= 26; dy++) { set(MID - 7, dy, 1); set(MID + 7, dy, 1); }
+        for (let f = 0; f < 4; f++) {
+          const fx = MID - 6 + f * 4;
+          fill(fx, 6, 3, 11, 2);
+          for (let dy = 6; dy < 16; dy++) { set(fx, dy, 1); set(fx + 2, dy, 1); }
+          set(fx, 6, 1); set(fx + 1, 6, 1); set(fx + 2, 6, 1);
+        }
+        fill(MID + 6, 12, 4, 7, 2);
+        set(MID + 6, 12, 1); set(MID + 9, 12, 1);
+        fill(MID - 7, 26, 15, 4, 1);
+        break;
+      }
+      case '장화': {
+        fill(MID - 12, 2, 6, 19, 2);
+        for (let dy = 2; dy < 21; dy++) { set(MID - 12, dy, 1); set(MID - 7, dy, 1); }
+        set(MID - 12, 2, 1); set(MID - 7, 2, 1);
+        fill(MID - 13, 21, 9, 4, 2);
+        for (let dx = 0; dx < 9; dx++) { set(MID - 13 + dx, 21, 1); set(MID - 13 + dx, 24, 1); }
+        fill(MID - 14, 24, 11, 3, 1);
+        fill(MID + 6, 2, 6, 19, 2);
+        for (let dy = 2; dy < 21; dy++) { set(MID + 6, dy, 1); set(MID + 11, dy, 1); }
+        set(MID + 6, 2, 1); set(MID + 11, 2, 1);
+        fill(MID + 5, 21, 9, 4, 2);
+        for (let dx = 0; dx < 9; dx++) { set(MID + 5 + dx, 21, 1); set(MID + 5 + dx, 24, 1); }
+        fill(MID + 4, 24, 11, 3, 1);
+        break;
+      }
+      case '반지': {
+        const rCX = MID, rCY = 23, rR = 7;
+        for (let ry = rCY - rR; ry <= rCY + rR; ry++) {
+          for (let rx = rCX - rR; rx <= rCX + rR; rx++) {
+            const d = Math.hypot(rx - rCX, ry - rCY);
+            if (d >= rR - 2.5 && d <= rR) set(rx, ry, d >= rR - 0.7 ? 1 : 2);
+          }
+        }
+        fill(MID - 1, 16, 3, 7, 1);
+        fill(MID - 4, 7, 9, 10, 1);
+        fill(MID - 3, 8, 7, 8, 2);
+        break;
+      }
+      case '목걸이': {
+        for (let a = 200; a <= 340; a += 7) {
+          const r = a * Math.PI / 180;
+          set(Math.round(MID + 12 * Math.cos(r)), Math.round(8 + 6 * Math.sin(r)), 1);
+        }
+        fill(MID - 1, 13, 3, 5, 1);
+        for (let y = 17; y <= 29; y++) {
+          const hw = Math.round(5 * Math.sin((y - 17) / 12 * Math.PI));
+          if (hw > 0) { fill(MID - hw, y, hw * 2 + 1, 1, 2); set(MID - hw, y, 1); set(MID + hw, y, 1); }
+        }
+        set(MID, 29, 1);
+        break;
+      }
+      default: {
+        for (let y = 6; y <= 26; y++) for (let x = 6; x <= 26; x++) {
+          const dx = (x - MID) / (G * 0.28), dy = (y - G / 2) / (G * 0.38);
+          if (dx * dx + dy * dy < 1) set(x, y, 2);
+        }
+        break;
       }
     }
+
+    // Apply random fill (type-2 cells have 65% chance)
+    const grid = new Array(G * G).fill(null);
+    for (let i = 0; i < G * G; i++) {
+      if (mask[i] === 0) continue;
+      if (mask[i] === 2 && rng() > 0.65) continue;
+      grid[i] = true;
+    }
+
+    // 2-pass isolated pixel removal
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < G * G; i++) {
+        if (!grid[i]) continue;
+        const x = i % G, y = Math.floor(i / G);
+        const L = x > 0 && grid[i - 1], R = x < G - 1 && grid[i + 1];
+        const U = y > 0 && grid[i - G], D = y < G - 1 && grid[i + G];
+        if (!L && !R && !U && !D) grid[i] = null;
+      }
+    }
+
+    // Edge-based shading: light from upper-right
+    // sc = (exposed_right + exposed_top) - (exposed_left + exposed_bottom)
+    for (let i = 0; i < G * G; i++) {
+      if (!grid[i]) continue;
+      const x = i % G, y = Math.floor(i / G);
+      const eL = !(x > 0 && grid[i - 1]);
+      const eR = !(x < G - 1 && grid[i + 1]);
+      const eU = !(y > 0 && grid[i - G]);
+      const eD = !(y < G - 1 && grid[i + G]);
+      if (!eL && !eR && !eU && !eD) {
+        grid[i] = pal[2]; // interior → mid tone
+      } else {
+        const sc = (eR ? 1 : 0) + (eU ? 1 : 0) - (eL ? 1 : 0) - (eD ? 1 : 0);
+        grid[i] = pal[sc >= 1 ? 3 : sc <= -1 ? 0 : 1];
+      }
+    }
+
     return grid;
   }
 
