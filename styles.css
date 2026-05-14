@@ -2031,6 +2031,10 @@ body.forge-scroll-lock {
     box-shadow: none !important;
   }
 
+  /* 재료·기초재료 탭 버튼 숨김 */
+  .mobile-tab[data-tab="materials"],
+  .mobile-tab[data-tab="stock"] { display: none !important; }
+
   /* 사이드바 탭바 */
   .mobile-tabbar {
     display: flex;
