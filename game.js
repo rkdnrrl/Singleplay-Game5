@@ -3032,44 +3032,177 @@
     return `${words[0]}·${words[1]} ${noun}`;
   }
 
-  function generateRandomPixels(mats) {
-    const TIER_PAL = {
-      legendary: ['#f39c12','#f1c40f','#ffd23c','#e67e22','#a04000'],
-      epic:      ['#8e44ad','#9b59b6','#6c3483','#d7bde2','#4a235a'],
-      rare:      ['#2980b9','#3498db','#1a5276','#aed6f1','#154360'],
-      common:    ['#7f8c8d','#95a5a6','#5a5a5a','#bdc3c7','#2d2d2d'],
-    };
-    const tiers = mats.filter(Boolean).map((m) => m.tier || 'common');
-    const tier = tiers.includes('legendary') ? 'legendary'
-      : tiers.includes('epic') ? 'epic'
-      : tiers.includes('rare') ? 'rare' : 'common';
-    const pal = TIER_PAL[tier];
-    const G = PIXEL_G;
-    const grid = Array(G * G).fill(null);
-    // 세로로 약간 길쭉한 타원 형태로 랜덤 픽셀 생성
-    for (let y = 0; y < G; y++) {
-      for (let x = 0; x < G; x++) {
-        const dx = (x - G / 2 + 0.5) / (G * 0.28);
-        const dy = (y - G / 2 + 0.5) / (G * 0.42);
-        const r = dx * dx + dy * dy;
-        if (r < 1 && Math.random() > r * 0.55) {
-          grid[y * G + x] = pal[Math.floor(Math.random() * pal.length)];
-        }
+  // ── 픽셀 템플릿 헬퍼 ──────────────────────────────────────────
+  function _px(o,x,y,s){if(x>=0&&x<32&&y>=0&&y<32)o.push([x,y,s]);}
+  function _pxLine(o,x0,y0,x1,y1,s){
+    let dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,e=dx+dy;
+    for(;;){_px(o,x0,y0,s);if(x0===x1&&y0===y1)break;const e2=2*e;if(e2>=dy){e+=dy;x0+=sx;}if(e2<=dx){e+=dx;y0+=sy;}}
+  }
+  function _pxRect(o,x,y,w,h,s){for(let j=0;j<h;j++)for(let i=0;i<w;i++)_px(o,x+i,y+j,s);}
+  function _pxCircle(o,cx,cy,r,s,fill){
+    for(let y=cy-r;y<=cy+r;y++)for(let x=cx-r;x<=cx+r;x++){const d=Math.hypot(x-cx,y-cy);if(fill?d<=r:d>=r-0.9&&d<=r+0.5)_px(o,x,y,s);}
+  }
+
+  // shade: 0=어두운 외곽, 1=본체, 2=밝은 면, 3=하이라이트
+  function _buildTemplate(type) {
+    const p=[];
+    switch(type) {
+      case '검': case '대검': {
+        for(let i=0;i<21;i++){const x=27-i,y=1+i;_px(p,x+1,y,0);_px(p,x,y,3);_px(p,x-1,y,2);_px(p,x-2,y,1);_px(p,x-3,y,0);}
+        _px(p,28,0,3);_px(p,29,0,0);
+        _pxRect(p,5,21,22,3,1);_pxRect(p,5,21,22,1,0);_pxRect(p,5,23,22,1,0);_pxRect(p,6,22,20,1,2);
+        _pxRect(p,13,24,6,7,1);_pxRect(p,14,24,4,7,2);
+        _pxRect(p,11,31,10,1,1);_pxRect(p,12,31,8,1,2);
+        break;
+      }
+      case '단검': {
+        for(let i=0;i<13;i++){const x=24-i,y=4+i;_px(p,x+1,y,0);_px(p,x,y,3);_px(p,x-1,y,2);_px(p,x-2,y,0);}
+        _px(p,25,3,3);
+        _pxRect(p,8,17,16,2,1);_pxRect(p,8,17,16,1,0);_pxRect(p,8,18,16,1,0);_pxRect(p,9,18,14,1,2);
+        _pxRect(p,13,19,6,6,1);_pxRect(p,14,19,4,6,2);
+        _pxRect(p,11,25,10,2,1);_pxRect(p,12,25,8,1,2);
+        break;
+      }
+      case '도끼': {
+        _pxRect(p,14,11,4,20,1);_pxRect(p,15,11,2,20,2);_pxRect(p,13,11,1,20,0);_pxRect(p,18,11,1,20,0);
+        for(let y=2;y<=17;y++){const w=Math.round(10*(1-Math.abs(y-9.5)/8));_pxRect(p,18,y,w,1,1);if(w>0){_px(p,18+w,y,0);_px(p,18+w-1,y,3);}}
+        _pxRect(p,10,3,6,14,2);_pxRect(p,10,3,1,14,0);_pxRect(p,10,3,6,1,0);_pxRect(p,10,16,6,1,0);
+        break;
+      }
+      case '창': {
+        _pxRect(p,15,11,2,20,1);_pxRect(p,16,11,1,20,2);_pxRect(p,14,11,1,20,0);_pxRect(p,17,11,1,20,0);
+        for(let y=0;y<=12;y++){const h=Math.max(0,Math.round(4*Math.sin(y/12*Math.PI)));if(h>0){_pxRect(p,16-h,y,h*2,1,1);_px(p,16-h-1,y,0);_px(p,16+h,y,0);_px(p,16-h,y,2);}}
+        _px(p,15,0,3);_px(p,16,0,3);
+        break;
+      }
+      case '활': {
+        for(let t=0;t<=1;t+=0.02){const y=Math.round(1+t*30),x=Math.round(14-9*Math.sin(t*Math.PI));_px(p,x,y,1);_px(p,x-1,y,2);_px(p,x+1,y,0);}
+        for(let y=1;y<=31;y++)_px(p,21,y,y===16?3:0);
+        _pxLine(p,5,15,21,15,2);_pxLine(p,5,16,21,16,2);
+        _px(p,5,14,1);_px(p,4,15,1);_px(p,5,17,1);_px(p,4,16,1);
+        _px(p,20,14,3);_px(p,20,17,3);
+        break;
+      }
+      case '방패': {
+        for(let y=2;y<=30;y++){const h=y<=15?13:Math.round(13*(1-(y-15)/16));_pxRect(p,16-h,y,h*2,1,1);_px(p,16-h-1,y,0);_px(p,16+h,y,0);if(h>2)_px(p,16-h,y,2);}
+        _pxRect(p,3,2,26,1,0);
+        _pxRect(p,15,6,2,20,0);_pxRect(p,7,15,18,2,0);
+        _px(p,16,7,2);_pxRect(p,16,8,1,14,2);_pxRect(p,8,16,14,1,2);
+        break;
+      }
+      case '투구': {
+        for(let y=5;y<=16;y++){const h=Math.round(12*Math.sqrt(Math.max(0,1-((y-16)*(y-16))/144)));_pxRect(p,16-h,y,h*2,1,1);_px(p,16-h-1,y,0);_px(p,16+h,y,0);if(h>1)_px(p,16-h,y,2);}
+        _pxRect(p,8,16,16,4,0);_pxRect(p,9,17,14,2,3);
+        _pxRect(p,4,19,9,9,1);_pxRect(p,19,19,9,9,1);
+        _pxRect(p,4,19,1,9,0);_pxRect(p,12,19,1,9,0);_pxRect(p,19,19,1,9,0);_pxRect(p,27,19,1,9,0);
+        _pxRect(p,5,20,7,7,2);_pxRect(p,20,20,7,7,2);
+        for(let y=0;y<=5;y++){_px(p,16,y,2);_px(p,15,y,1);_px(p,17,y,1);}
+        break;
+      }
+      case '지팡이': {
+        for(let y=13;y<=31;y++){_px(p,15,y,0);_px(p,16,y,1);_px(p,17,y,2);_px(p,18,y,0);}
+        _pxCircle(p,15,8,7,0,false);_pxCircle(p,15,8,6,1,true);_pxCircle(p,15,8,3,2,true);_pxCircle(p,15,8,1,3,true);
+        _px(p,12,6,3);_px(p,13,5,3);
+        break;
+      }
+      case '망치': {
+        _pxRect(p,14,17,4,14,1);_pxRect(p,15,17,2,14,2);_pxRect(p,13,17,1,14,0);_pxRect(p,18,17,1,14,0);
+        _pxRect(p,5,4,22,14,1);
+        _pxRect(p,5,4,1,14,0);_pxRect(p,26,4,1,14,0);_pxRect(p,5,4,22,1,0);_pxRect(p,5,17,22,1,0);
+        _pxRect(p,6,5,20,12,2);_pxRect(p,6,5,6,12,3);
+        break;
+      }
+      case '낫': {
+        for(let i=0;i<20;i++){const x=4+i,y=12+i;_px(p,x-1,y,0);_px(p,x,y,1);_px(p,x+1,y,2);_px(p,x+2,y,0);}
+        for(let a=115;a<=225;a+=3){const r=a*Math.PI/180,cx=21,cy=9;
+          _px(p,Math.round(cx+13*Math.cos(r)),Math.round(cy+13*Math.sin(r)),0);
+          _px(p,Math.round(cx+11*Math.cos(r)),Math.round(cy+11*Math.sin(r)),3);
+          _px(p,Math.round(cx+9*Math.cos(r)),Math.round(cy+9*Math.sin(r)),1);}
+        break;
+      }
+      case '갑옷': {
+        _pxRect(p,8,13,16,16,1);_pxRect(p,8,13,16,1,0);_pxRect(p,8,28,16,1,0);_pxRect(p,8,13,1,16,0);_pxRect(p,23,13,1,16,0);
+        _pxRect(p,9,14,14,14,2);
+        _pxRect(p,12,7,8,6,1);_pxRect(p,12,7,1,6,0);_pxRect(p,19,7,1,6,0);_pxRect(p,13,8,6,4,2);
+        _pxRect(p,2,13,7,12,1);_pxRect(p,23,13,7,12,1);_pxRect(p,2,13,1,12,0);_pxRect(p,8,13,1,12,0);_pxRect(p,23,13,1,12,0);_pxRect(p,29,13,1,12,0);
+        _pxRect(p,3,14,5,10,2);_pxRect(p,24,14,5,10,2);
+        _pxRect(p,8,24,16,3,0);_pxRect(p,9,24,14,3,3);
+        break;
+      }
+      case '장갑': {
+        _pxRect(p,8,16,16,12,1);_pxRect(p,9,17,14,10,2);_pxRect(p,8,16,16,1,0);_pxRect(p,8,27,16,1,0);
+        for(let f=0;f<4;f++){const fx=9+f*4;_pxRect(p,fx,5,3,12,1);_pxRect(p,fx+1,6,1,10,2);_px(p,fx,5,0);_px(p,fx+2,5,0);_px(p,fx-1,5,0);_px(p,fx+3,5,0);}
+        _pxRect(p,4,13,5,7,1);_pxRect(p,5,14,3,5,2);_px(p,4,13,0);_px(p,8,13,0);
+        _pxRect(p,7,28,18,4,0);_pxRect(p,8,28,16,4,3);
+        break;
+      }
+      case '장화': {
+        _pxRect(p,3,2,11,20,1);_pxRect(p,3,2,1,20,0);_pxRect(p,13,2,1,20,0);_pxRect(p,3,2,11,1,0);_pxRect(p,4,3,9,18,2);
+        _pxRect(p,3,22,13,4,1);_pxRect(p,4,23,11,2,2);
+        _pxRect(p,1,26,14,3,0);_pxRect(p,2,26,12,2,1);
+        _pxRect(p,18,2,11,20,1);_pxRect(p,18,2,1,20,0);_pxRect(p,28,2,1,20,0);_pxRect(p,18,2,11,1,0);_pxRect(p,19,3,9,18,2);
+        _pxRect(p,18,22,11,4,1);_pxRect(p,19,23,9,2,2);
+        _pxRect(p,17,26,12,3,0);_pxRect(p,18,26,10,2,1);
+        break;
+      }
+      case '반지': {
+        _pxCircle(p,16,22,9,0,false);_pxCircle(p,16,22,8,1,false);_pxCircle(p,16,22,7,2,false);_pxCircle(p,16,22,6,0,false);
+        _pxRect(p,12,9,8,8,0);_pxRect(p,13,10,6,6,3);_pxRect(p,14,11,4,4,2);
+        _pxRect(p,14,16,4,6,1);_pxRect(p,15,16,2,6,2);
+        break;
+      }
+      case '목걸이': {
+        for(let a=195;a<=345;a+=5){const r=a*Math.PI/180,x=Math.round(16+12*Math.cos(r)),y=Math.round(7+6*Math.sin(r));_px(p,x,y,1);_px(p,x+1,y,0);}
+        _pxRect(p,15,12,2,7,0);_px(p,16,12,1);
+        _pxCircle(p,16,24,6,0,false);_pxCircle(p,16,24,5,3,true);_px(p,14,22,3);_px(p,13,23,3);
+        break;
       }
     }
-    // 외곽선: 가장자리 픽셀을 어둡게
-    const dark = '#1a1a1a';
-    for (let y = 0; y < G; y++) {
-      for (let x = 0; x < G; x++) {
-        const idx = y * G + x;
-        if (!grid[idx]) continue;
-        const isEdge = (
-          (x === 0 || !grid[idx - 1]) ||
-          (x === G - 1 || !grid[idx + 1]) ||
-          (y === 0 || !grid[(y - 1) * G + x]) ||
-          (y === G - 1 || !grid[(y + 1) * G + x])
-        );
-        if (isEdge) grid[idx] = dark;
+    return p;
+  }
+
+  function _detectItemType(name) {
+    if(!name) return null;
+    const checks=[['대검'],['단검'],['검'],['도끼'],['창'],['활'],['방패'],['갑옷'],['투구'],['지팡이'],['망치'],['낫'],['장갑'],['장화'],['반지'],['목걸이']];
+    for(const [k] of checks) if(name.includes(k)) return k;
+    return null;
+  }
+
+  function generateRandomPixels(mats, name) {
+    const TIER_SHADES = {
+      legendary: ['#5a2800','#e8860a','#f8c060','#fff4c0'],
+      epic:      ['#2a0a46','#7d3ea0','#b07acc','#e0c8f0'],
+      rare:      ['#082040','#1e6fa0','#50a8d8','#b8dff5'],
+      common:    ['#111111','#5a5a5a','#9a9a9a','#d8d8d8'],
+    };
+    const tiers = mats.filter(Boolean).map((m) => m.tier || 'common');
+    const tier = tiers.includes('legendary') ? 'legendary' : tiers.includes('epic') ? 'epic' : tiers.includes('rare') ? 'rare' : 'common';
+    const shades = TIER_SHADES[tier];
+    const G = PIXEL_G;
+    const grid = Array(G * G).fill(null);
+
+    const type = _detectItemType(name);
+    const tplPixels = type ? _buildTemplate(type) : null;
+
+    if (tplPixels && tplPixels.length > 0) {
+      // 중복 좌표는 마지막 값으로 덮어씀
+      const map = new Map();
+      for (const [x, y, s] of tplPixels) {
+        if (x >= 0 && x < G && y >= 0 && y < G) map.set(y * G + x, s);
+      }
+      for (const [idx, s] of map) grid[idx] = shades[Math.max(0, Math.min(3, s))];
+    } else {
+      // 이름 불명: 재질 색상 랜덤 블롭
+      const pal = shades.slice(1);
+      for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+        const dx=(x-G/2+0.5)/(G*0.28), dy=(y-G/2+0.5)/(G*0.42), r=dx*dx+dy*dy;
+        if (r < 1 && Math.random() > r * 0.55) grid[y*G+x] = pal[Math.floor(Math.random()*pal.length)];
+      }
+      const dark = shades[0];
+      for (let i = 0; i < G*G; i++) {
+        if (!grid[i]) continue;
+        const x=i%G, y=Math.floor(i/G);
+        if (!grid[i-1]||!grid[i+1]||!grid[i-G]||!grid[i+G]||x===0||x===G-1||y===0||y===G-1) grid[i]=dark;
       }
     }
     return grid;
@@ -3315,8 +3448,9 @@
     const modal = document.getElementById('equipCustomizeModal');
     const nameInput = document.getElementById('equipNameInput');
     if (!modal) return;
-    pixelGrid = generateRandomPixels(mats);
-    if (nameInput) nameInput.value = generateEquipName(mats);
+    const initName = generateEquipName(mats);
+    if (nameInput) nameInput.value = initName;
+    pixelGrid = generateRandomPixels(mats, initName);
     modal.classList.remove('equip-customize-modal--hidden');
     modal.setAttribute('aria-hidden', 'false');
     renderPixelCanvas();
@@ -3348,7 +3482,7 @@
     const doneBtn = document.getElementById('equipCustomizeDoneBtn');
     const backdrop = document.getElementById('equipCustomizeBackdrop');
     if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats); };
-    if (rndPixelBtn) rndPixelBtn.onclick = () => { pixelGrid = generateRandomPixels(mats); renderPixelCanvas(); };
+    if (rndPixelBtn) rndPixelBtn.onclick = () => { pixelGrid = generateRandomPixels(mats, nameInput?.value || ''); renderPixelCanvas(); };
     if (clearBtn) clearBtn.onclick = () => { pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null); renderPixelCanvas(); };
     if (doneBtn) doneBtn.onclick = () => {
       const name = (nameInput?.value || '').trim() || generateEquipName(mats);
