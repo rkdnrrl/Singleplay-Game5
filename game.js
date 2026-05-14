@@ -1825,7 +1825,13 @@
 
   function smeltProductMeta(id) {
     const entry = SMELT_CATALOG.find((e) => e.id === id);
-    return entry || { id, name: id, emoji: '🔩' };
+    if (entry) return entry;
+    const extras = {
+      slag:  { id: 'slag',  name: '고철',     emoji: '🔩' },
+      alloy: { id: 'alloy', name: '합금괴',    emoji: '🔧' },
+      ash:   { id: 'ash',   name: '재',        emoji: '🌫️' },
+    };
+    return extras[id] || { id, name: id, emoji: '🔩' };
   }
 
   function openCraftedEquipmentDetail(item, sourceMats) {
