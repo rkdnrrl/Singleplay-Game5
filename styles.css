@@ -1359,7 +1359,7 @@ html.material-detail-open body {
   left: 50%;
   transform: translateX(-50%);
   bottom: max(1rem, env(safe-area-inset-bottom));
-  z-index: 25;
+  z-index: 310;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -2223,6 +2223,10 @@ body.forge-scroll-lock {
 
 @media (max-width: 639px) {
   :root { --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px)); }
+
+  .result-card {
+    bottom: calc(var(--tabbar-h) + 0.5rem);
+  }
 
   .mobile-tabbar {
     display: flex;
