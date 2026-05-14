@@ -79,7 +79,7 @@
       <!-- 왼쪽: 수리 캔버스 영역 -->
       <div class="repair-canvas-area">
         <div class="repair-drop-zone" id="repairDropZone">
-          <p class="repair-drop-hint" id="repairDropHint">← 오른쪽 장비를 드래그해서<br>여기에 놓으세요</p>
+          <p class="repair-drop-hint" id="repairDropHint">← 오른쪽 장비를 클릭하거나<br>드래그해서 놓으세요</p>
           <canvas id="repairCanvas" class="repair-canvas hidden" width="320" height="400"></canvas>
         </div>
         <div class="repair-controls hidden" id="repairControls">
@@ -88,9 +88,8 @@
             <span class="repair-coin-info" id="repairCoinInfo">🪙 ---</span>
           </div>
           <div class="repair-hud-row">
-            <button class="repair-zoom-btn" id="repairZoomOut">🔍−</button>
-            <button class="repair-zoom-btn" id="repairZoomIn">🔍+</button>
-            <button class="repair-confirm-btn" id="repairConfirmBtn">✅ 수리 완료</button>
+            <span class="repair-guide-tip">링이 작아질 때 탭!</span>
+            <button class="repair-confirm-btn" id="repairConfirmBtn">✅ 저장</button>
           </div>
         </div>
       </div>

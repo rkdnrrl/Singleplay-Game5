@@ -3047,11 +3047,19 @@
 
   let repairItem = null;
   let repairMaxDur = 0, repairOrigDur = 0, repairDur = 0;
-  let repairCracks = null; // Set<"col,row">
-  let repairZoom = 1.0;
-  let repairImg = null;
-  let repairSpent = 0;
-  let repairDurPerCrack = 1; // 칸 하나당 회복 내구도
+  let repairCracks   = null;
+  let repairImg      = null;
+  let repairSpent    = 0;
+  let repairDurPerCrack = 1;
+  // 미니게임 상태
+  let repairTarget   = null;   // 현재 타겟 균열 key
+  let repairTargetTs = 0;      // 타겟 시작 타임스탬프
+  let repairTargetDur = 1700;  // 링 수축 시간(ms), 진행할수록 빨라짐
+  let repairRafId    = null;
+  let repairParticles = [];    // [{x,y,vx,vy,life,color,size}]
+  let repairGrades   = [];     // [{text,x,y,color,born}]
+  let repairCombo    = 0;
+  let repairRound    = 0;
 
   const $repairCanvas    = document.getElementById('repairCanvas');
   const $repairHint      = document.getElementById('repairDropHint');
@@ -3135,22 +3143,13 @@
     const eqId = item.equipmentId || item.id || '';
     repairItem = { ...item, _eqId: eqId };
     repairMaxDur = maxDur; repairOrigDur = curDur;
-    repairDur = curDur; repairSpent = 0; repairZoom = 1.0;
+    repairDur = curDur; repairSpent = 0;
     repairCracks = generateCracks(curDur, maxDur, eqId);
     $repairEquipList?.querySelectorAll('.repair-equip-item')
       .forEach(el => el.classList.toggle('is-selected', el.dataset.id === eqId));
     $repairHint?.classList.add('hidden');
     $repairCanvas?.classList.remove('hidden');
     $repairControls?.classList.remove('hidden');
-    repairImg = null;
-    const imgSrc = item.pixelArt?.imageDataUrl;
-    if (imgSrc) {
-      const img = new Image();
-      img.onload = () => { repairImg = img; drawRepairCanvas(); };
-      img.src = imgSrc;
-    } else { drawRepairCanvas(); }
-    updateRepairHud();
-
     // 캔버스 크기를 드롭존에 맞게 조정
     if ($repairCanvas) {
       const dz = document.getElementById('repairDropZone');
@@ -3160,10 +3159,18 @@
         repairCtx = $repairCanvas.getContext('2d');
       }
     }
-    drawRepairCanvas();
+    repairImg = null;
+    const imgSrc = item.pixelArt?.imageDataUrl;
+    if (imgSrc) {
+      const img = new Image();
+      img.onload = () => { repairImg = img; };
+      img.src = imgSrc;
+    }
+    updateRepairHud();
+    startRepairGame();
   }
 
-  function drawRepairCanvas() {
+  function drawRepairCanvas(ts) {
     if (!repairCtx || !repairItem || !repairCracks) return;
     const ctx = repairCtx;
     const cw = $repairCanvas.width, ch = $repairCanvas.height;
@@ -3265,36 +3272,197 @@
     ctx.strokeStyle='rgba(155,95,255,0.6)'; ctx.lineWidth=2;
     ctx.strokeRect(ox,oy,gridW,gridH);
     ctx.restore();
+
+    // ── 타겟 링 (수축 타이밍 인디케이터) ──
+    if (repairTarget && repairCracks.has(repairTarget)) {
+      const now = ts ?? performance.now();
+      const elapsed = now - repairTargetTs;
+      const ratio = Math.max(0, 1 - elapsed / repairTargetDur);
+      const [tx, ty] = repairCellCenter(repairTarget);
+      const outerR = Math.min(cellW, cellH) * 0.72;
+      const innerR = outerR * ratio;
+
+      // 타겟 셀 강조 (도려내진 구멍 위 빛)
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,220,50,0.7)'; ctx.shadowBlur = 18;
+      ctx.strokeStyle = 'rgba(255,200,40,0.55)'; ctx.lineWidth = 2.5;
+      const pulse = 1 + 0.06 * Math.sin(now * 0.009);
+      ctx.beginPath(); ctx.arc(tx, ty, outerR * pulse, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+
+      // 수축 링 (색이 바뀌며 타이밍 알림)
+      const ringColor = ratio < 0.12 ? '#ffffff'
+        : ratio < 0.30 ? '#4ade80'
+        : ratio < 0.55 ? '#fbbf24' : '#f87171';
+      ctx.save();
+      ctx.shadowColor = ringColor; ctx.shadowBlur = 20;
+      ctx.strokeStyle = ringColor; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(tx, ty, Math.max(3, innerR), 0, Math.PI * 2); ctx.stroke();
+      // 밝은 코어
+      ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(tx, ty, Math.max(3, innerR), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+
+      // 십자 조준점
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
+      const cs = 7;
+      ctx.beginPath(); ctx.moveTo(tx-cs,ty); ctx.lineTo(tx+cs,ty); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(tx,ty-cs); ctx.lineTo(tx,ty+cs); ctx.stroke();
+      ctx.restore();
+    }
+
+    // ── 파티클 ──
+    const now2 = ts ?? performance.now();
+    repairParticles = repairParticles.filter(p => p.life > 0);
+    for (const p of repairParticles) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.10; p.life -= 0.038;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // ── 등급 텍스트 ──
+    const gradeMs = 900;
+    repairGrades = repairGrades.filter(g => now2 - g.born < gradeMs);
+    for (const g of repairGrades) {
+      const t = (now2 - g.born) / gradeMs;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - t * 1.1);
+      ctx.font = `bold ${20 + (1-t)*4}px Jua, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = g.color; ctx.shadowColor = g.color; ctx.shadowBlur = 14;
+      ctx.fillText(g.text, g.x, g.y - t * 45);
+      ctx.restore();
+    }
+
+    // ── 콤보 ──
+    if (repairCombo >= 3) {
+      ctx.save();
+      ctx.font = `bold ${15 + Math.min(repairCombo * 0.4, 7)}px Jua, sans-serif`;
+      ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#fde68a'; ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 10;
+      ctx.fillText(`🔥 ${repairCombo}콤보`, cw - 8, 8);
+      ctx.restore();
+    }
+
+    // ── 완료 메시지 ──
+    if (!repairTarget && repairCracks.size === 0) {
+      ctx.save();
+      ctx.font = 'bold 28px Jua, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#4ade80'; ctx.shadowColor = '#22c55e'; ctx.shadowBlur = 20;
+      ctx.fillText('✅ 수리 완료!', cw/2, ch/2);
+      ctx.restore();
+    }
   }
 
-  function onRepairTapAt(clientX, clientY) {
-    if (!repairItem || !$repairCanvas || !repairCracks) return;
-    const rect = $repairCanvas.getBoundingClientRect();
-    const px = (clientX - rect.left) * ($repairCanvas.width / rect.width);
-    const py = (clientY - rect.top)  * ($repairCanvas.height / rect.height);
-    const cellW = ($repairCanvas.width  / REPAIR_COLS) * repairZoom;
-    const cellH = ($repairCanvas.height / REPAIR_ROWS) * repairZoom;
-    const ox = ($repairCanvas.width  - cellW * REPAIR_COLS) / 2;
-    const oy = ($repairCanvas.height - cellH * REPAIR_ROWS) / 2;
-    const col = Math.floor((px - ox) / cellW);
-    const row = Math.floor((py - oy) / cellH);
-    if (col < 0 || col >= REPAIR_COLS || row < 0 || row >= REPAIR_ROWS) return;
+  // ══════════════════════════════════════════════
+  //  수리 미니게임: 수축링 타이밍 게임
+  // ══════════════════════════════════════════════
+  function startRepairGame() {
+    repairCombo = 0; repairRound = 0;
+    repairParticles = []; repairGrades = [];
+    repairTargetDur = 1700; repairTarget = null;
+    if (repairRafId) cancelAnimationFrame(repairRafId);
+    repairRafId = requestAnimationFrame(repairGameLoop);
+  }
 
-    const key = `${col},${row}`;
-    const costPerTap = REPAIR_COST_TABLE[String(repairItem.tier || 'common').toLowerCase()] ?? 5;
+  function stopRepairGame() {
+    if (repairRafId) { cancelAnimationFrame(repairRafId); repairRafId = null; }
+    repairTarget = null;
+  }
 
-    if (repairCracks.has(key)) {
-      if (repairDur >= repairMaxDur) return;
-      const amount = Math.min(repairDurPerCrack, repairMaxDur - repairDur);
-      repairCracks.delete(key); repairDur += amount; repairSpent += costPerTap;
-      if (repairDur >= repairMaxDur) repairCracks.clear(); // 내구도 최대 → 잔여 균열 제거
-      showRepairCoinFx(clientX, clientY, `-${costPerTap}`, '#fbbf24');
-    } else {
-      if (repairDur <= 0) return;
-      repairCracks.add(key); repairDur -= repairDurPerCrack; repairSpent += costPerTap;
-      showRepairCoinFx(clientX, clientY, `-${costPerTap}`, '#f87171');
+  function repairGameLoop(ts) {
+    if (!repairItem || !repairCracks || !$repairCanvas) return;
+    // 모든 균열 수리 완료
+    if (repairCracks.size === 0 && repairTarget === null) {
+      drawRepairCanvas(ts);
+      return;
     }
-    drawRepairCanvas(); updateRepairHud();
+    // 새 타겟 선정
+    if (repairTarget === null && repairCracks.size > 0) {
+      const keys = [...repairCracks];
+      repairTarget = keys[Math.floor(Math.random() * keys.length)];
+      repairTargetTs = ts;
+      repairTargetDur = Math.max(650, 1700 - repairRound * 35);
+    }
+    // 타임아웃: 자동 MISS
+    if (repairTarget && ts - repairTargetTs > repairTargetDur + 500) {
+      const pos = repairCellCenter(repairTarget);
+      spawnRepairParticles(pos, '#f87171', 5);
+      pushRepairGrade('MISS', pos, '#f87171');
+      repairCombo = 0;
+      repairTarget = null; repairRound++;
+    }
+    drawRepairCanvas(ts);
+    repairRafId = requestAnimationFrame(repairGameLoop);
+  }
+
+  function repairCellCenter(key) {
+    const [c, r] = key.split(',').map(Number);
+    const cw = $repairCanvas.width, ch = $repairCanvas.height;
+    const cellW = cw / REPAIR_COLS, cellH = ch / REPAIR_ROWS;
+    const ox = (cw - cellW * REPAIR_COLS) / 2, oy = (ch - cellH * REPAIR_ROWS) / 2;
+    return [ox + (c + 0.5) * cellW, oy + (r + 0.5) * cellH];
+  }
+
+  function onRepairStrike() {
+    if (!repairTarget || !repairItem) return;
+    const ts = performance.now();
+    const elapsed = ts - repairTargetTs;
+    // ratio: 1=링 가득(처음), 0=링 사라짐(완벽)
+    const ratio = Math.max(0, 1 - elapsed / repairTargetDur);
+    const pos = repairCellCenter(repairTarget);
+    const cost = REPAIR_COST_TABLE[String(repairItem.tier || 'common').toLowerCase()] ?? 5;
+
+    let label, amount, color;
+    if      (ratio < 0.12) { label = 'PERFECT!!'; amount = repairDurPerCrack * 2; color = '#ffffff'; }
+    else if (ratio < 0.30) { label = 'GREAT!';    amount = repairDurPerCrack;     color = '#fde68a'; }
+    else if (ratio < 0.55) { label = 'OK';        amount = Math.max(1, Math.floor(repairDurPerCrack * 0.5)); color = '#86efac'; }
+    else                   { label = 'MISS';       amount = 0;                     color = '#f87171'; }
+
+    if (amount > 0) {
+      repairCracks.delete(repairTarget);
+      repairDur = Math.min(repairMaxDur, repairDur + Math.min(amount, repairMaxDur - repairDur));
+      if (repairDur >= repairMaxDur) repairCracks.clear();
+      repairCombo++;
+      spawnRepairParticles(pos, color, amount >= repairDurPerCrack * 2 ? 18 : 10);
+    } else {
+      repairCombo = 0;
+      spawnRepairParticles(pos, '#f87171', 4);
+    }
+    repairSpent += cost;
+    const comboSuffix = repairCombo >= 3 ? ` ×${repairCombo}콤보!` : '';
+    pushRepairGrade(label + comboSuffix, pos, color);
+    // 코인 FX (캔버스 좌표 → 화면 좌표)
+    const rect = $repairCanvas.getBoundingClientRect();
+    const sx = rect.left + pos[0] * (rect.width / $repairCanvas.width);
+    const sy = rect.top  + pos[1] * (rect.height / $repairCanvas.height);
+    showRepairCoinFx(sx + 28, sy - 10, `-${cost}`, '#fbbf24');
+    repairTarget = null; repairRound++;
+    updateRepairHud();
+    // 완료 자동 저장
+    if (repairCracks.size === 0 && repairDur >= repairMaxDur) {
+      stopRepairGame();
+      setTimeout(() => confirmRepairSession(), 600);
+    }
+  }
+
+  function spawnRepairParticles([cx, cy], color, count) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const spd = 1.8 + Math.random() * 3.5;
+      repairParticles.push({ x: cx, y: cy, vx: Math.cos(a)*spd, vy: Math.sin(a)*spd - 1,
+        life: 1, color, size: 2 + Math.random() * 3.5 });
+    }
+  }
+
+  function pushRepairGrade(text, pos, color) {
+    repairGrades.push({ text, x: pos[0], y: pos[1] - 20, color, born: performance.now() });
   }
 
   function showRepairCoinFx(x, y, text, color) {
@@ -3408,19 +3576,13 @@
         if (item) loadRepairItem(item);
       });
     }
-    $repairCanvas.addEventListener('click', e => onRepairTapAt(e.clientX, e.clientY));
+    $repairCanvas.addEventListener('click', onRepairStrike);
     $repairCanvas.addEventListener('touchend', e => {
-      e.preventDefault();
-      const t = e.changedTouches[0];
-      onRepairTapAt(t.clientX, t.clientY);
+      e.preventDefault(); onRepairStrike();
     }, { passive: false });
-    document.getElementById('repairZoomIn')?.addEventListener('click', () => {
-      repairZoom = Math.min(3, repairZoom + 0.25); drawRepairCanvas();
+    document.getElementById('repairConfirmBtn')?.addEventListener('click', () => {
+      stopRepairGame(); confirmRepairSession();
     });
-    document.getElementById('repairZoomOut')?.addEventListener('click', () => {
-      repairZoom = Math.max(0.3, repairZoom - 0.25); drawRepairCanvas();
-    });
-    document.getElementById('repairConfirmBtn')?.addEventListener('click', confirmRepairSession);
   }
 
   // ── 탭바 (모바일 하단 / PC 좌측 사이드바 공용) ──
@@ -3432,6 +3594,7 @@
         btn.classList.toggle('is-active', btn.dataset.tab === tab);
       });
       if (tab === 'repair') refreshRepairEquipList();
+      else stopRepairGame();
     }
     if (!document.body.dataset.tab) setMobileTab('furnace');
     mobileTabbarEl.addEventListener('click', (e) => {

@@ -2414,6 +2414,17 @@ body.forge-scroll-lock {
 }
 .repair-confirm-btn:hover { background: rgba(34,197,94,0.28); }
 .repair-confirm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.repair-guide-tip {
+  font-size: 0.72rem;
+  font-family: Jua, sans-serif;
+  color: rgba(255,220,100,0.7);
+  flex: 1;
+  animation: repair-tip-pulse 1.8s ease-in-out infinite;
+}
+@keyframes repair-tip-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
 /* 오른쪽: 장비 사이드바 */
 .repair-equip-sidebar {
   width: 130px;
