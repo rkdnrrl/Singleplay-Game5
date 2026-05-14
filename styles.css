@@ -2007,6 +2007,184 @@ body.forge-scroll-lock {
   }
 }
 
+/* ════════════════════════════════════════════════
+   PC 탭 사이드바 — 가로 레이아웃 (≥ 640px)
+   ════════════════════════════════════════════════ */
+@media (min-width: 640px) {
+  :root {
+    --sidebar-w: 76px;
+    --pc-left-w: min(400px, 38vw);
+    /* 기존 우측 레일 비활성화 */
+    --recipe-rail-w: 0px;
+  }
+
+  /* 기존 우측 레일 리셋 */
+  body { padding-right: 0 !important; }
+  .log-panel.forge-extra {
+    position: static !important;
+    right: auto !important; top: auto !important; bottom: auto !important;
+    width: auto !important; max-height: min(42vh, 320px) !important;
+    box-shadow: none !important;
+  }
+
+  /* 사이드바 탭바 */
+  .mobile-tabbar {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: var(--sidebar-w);
+    height: 100dvh;
+    z-index: 300;
+    background: rgba(5, 5, 18, 0.97);
+    border-right: 1px solid rgba(255, 255, 255, 0.10);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: none;
+    border-left: 3px solid transparent;
+    background: transparent;
+    color: rgba(232, 234, 246, 0.38);
+    padding: 6px 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: color 0.12s, background 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-tab-icon  { font-size: 1.35rem; line-height: 1; }
+  .mobile-tab-label { font-size: 0.58rem; font-family: Jua, sans-serif; line-height: 1.2; }
+  .mobile-tab.is-active {
+    color: var(--forge-accent);
+    border-left-color: var(--forge-accent);
+    background: rgba(255, 109, 0, 0.08);
+  }
+
+  /* 탭 공통: 기존 패널 숨김 + 우측 레일 padding 제거 */
+  body[data-tab] { padding-right: 0 !important; }
+  body[data-tab] .app                        { display: none !important; }
+  body[data-tab] .log-panel.inventory-dock,
+  body[data-tab] .log-panel.smelt-stock-dock,
+  body[data-tab] .log-panel.forge-extra      { display: none !important; }
+
+  /* 탭 패널 공통 기본 스타일 */
+  body[data-tab] .log-panel {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* ══ TAB: 재료 ══ */
+  body[data-tab="materials"] .log-panel.inventory-dock {
+    display: flex !important;
+    position: fixed !important;
+    left: var(--sidebar-w) !important; top: 0 !important;
+    right: 0 !important; bottom: 0 !important;
+    width: auto !important; max-width: none !important; max-height: none !important;
+    padding: max(1rem, env(safe-area-inset-top)) 1.5rem 1rem !important;
+    z-index: 50;
+  }
+  body[data-tab="materials"] .inventory-dock .inv-scroll-wrap {
+    max-height: none !important; flex: 1; min-height: 0;
+  }
+
+  /* ══ TAB: 용광로 — 좌: 재료 / 우: 용광로 ══ */
+  body[data-tab="furnace"] .log-panel.inventory-dock {
+    display: flex !important;
+    position: fixed !important;
+    left: var(--sidebar-w) !important; top: 0 !important; bottom: 0 !important;
+    width: var(--pc-left-w) !important; max-width: none !important; max-height: none !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.10) !important;
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem !important;
+    z-index: 50;
+  }
+  body[data-tab="furnace"] .inventory-dock .inv-scroll-wrap {
+    max-height: none !important; flex: 1; min-height: 0;
+  }
+  body[data-tab="furnace"] .app {
+    display: flex !important;
+    position: fixed !important;
+    left: calc(var(--sidebar-w) + var(--pc-left-w)) !important;
+    top: 0 !important; right: 0 !important; bottom: 0 !important;
+    padding: max(1rem, env(safe-area-inset-top)) 1.5rem 1rem !important;
+    overflow-y: auto; overscroll-behavior: contain;
+    min-height: 0 !important; max-width: none !important;
+  }
+  body[data-tab="furnace"] .forge-topbar { padding: 0 0 0.35rem; }
+  body[data-tab="furnace"] .forge-stage  { justify-content: flex-start !important; padding-bottom: 0; }
+  body[data-tab="furnace"] .forge-split  { flex-direction: column; align-items: stretch; margin-top: 0 !important; }
+  body[data-tab="furnace"] .furnace-panel { max-width: 100%; flex: none; border-radius: 12px; }
+  body[data-tab="furnace"] .refine-panel  { display: none !important; }
+
+  /* ══ TAB: 제련 — 좌: 기초재료 / 우: 모루 ══ */
+  body[data-tab="forge"] .log-panel.smelt-stock-dock {
+    display: flex !important;
+    position: fixed !important;
+    left: var(--sidebar-w) !important; top: 0 !important; bottom: 0 !important;
+    width: var(--pc-left-w) !important; max-width: none !important; max-height: none !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.10) !important;
+    padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem !important;
+    z-index: 50;
+  }
+  body[data-tab="forge"] .smelt-stock-dock .smelt-stock-list {
+    max-height: none !important; flex: 1; min-height: 0;
+    flex-wrap: wrap; align-content: flex-start; overflow-y: auto;
+  }
+  body[data-tab="forge"] .app {
+    display: flex !important;
+    position: fixed !important;
+    left: calc(var(--sidebar-w) + var(--pc-left-w)) !important;
+    top: 0 !important; right: 0 !important; bottom: 0 !important;
+    padding: max(1rem, env(safe-area-inset-top)) 1.5rem 1rem !important;
+    overflow-y: auto; overscroll-behavior: contain;
+    min-height: 0 !important; max-width: none !important;
+  }
+  body[data-tab="forge"] .forge-topbar { padding: 0 0 0.35rem; }
+  body[data-tab="forge"] .forge-stage  { justify-content: flex-start !important; padding-bottom: 0; }
+  body[data-tab="forge"] .forge-split  { flex-direction: column; align-items: stretch; margin-top: 0 !important; }
+  body[data-tab="forge"] .refine-panel  { max-width: 100%; flex: none; }
+  body[data-tab="forge"] .furnace-panel { display: none !important; }
+
+  /* ══ TAB: 기초재료 ══ */
+  body[data-tab="stock"] .log-panel.smelt-stock-dock {
+    display: flex !important;
+    position: fixed !important;
+    left: var(--sidebar-w) !important; top: 0 !important;
+    right: 0 !important; bottom: 0 !important;
+    width: auto !important; max-width: none !important; max-height: none !important;
+    padding: max(1rem, env(safe-area-inset-top)) 1.5rem 1rem !important;
+    z-index: 50;
+  }
+  body[data-tab="stock"] .smelt-stock-dock .smelt-stock-list {
+    max-height: none !important; flex: 1; min-height: 0;
+    flex-wrap: wrap; align-content: flex-start; overflow-y: auto;
+  }
+
+  /* ══ TAB: 장비 ══ */
+  body[data-tab="equipment"] .log-panel.forge-extra {
+    display: flex !important;
+    position: fixed !important;
+    left: var(--sidebar-w) !important; top: 0 !important;
+    right: 0 !important; bottom: 0 !important;
+    width: auto !important; max-width: none !important; max-height: none !important;
+    padding: max(1rem, env(safe-area-inset-top)) 1.5rem 1rem !important;
+    z-index: 50;
+  }
+  body[data-tab="equipment"] .log-panel.forge-extra .crafted-list {
+    max-height: none !important; flex: 1; min-height: 0; overflow-y: auto;
+  }
+}
+
 /* ── 숙련도 표시 바 ───────────────────────── */
 .proficiency-bar {
   display: flex;

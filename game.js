@@ -2954,7 +2954,7 @@
     .then(() => refreshCraftedList())
     .then(() => syncSmeltFromServer());
 
-  // ── 모바일 탭바 ──
+  // ── 탭바 (모바일 하단 / PC 좌측 사이드바 공용) ──
   const mobileTabbarEl = document.getElementById('mobileTabbar');
   if (mobileTabbarEl) {
     function setMobileTab(tab) {
@@ -2963,17 +2963,7 @@
         btn.classList.toggle('is-active', btn.dataset.tab === tab);
       });
     }
-    // 모바일(≤639px)에서만 탭 시스템 활성화
-    const mq = window.matchMedia('(max-width: 639px)');
-    function applyMobileTab() {
-      if (mq.matches) {
-        if (!document.body.dataset.tab) setMobileTab('furnace');
-      } else {
-        delete document.body.dataset.tab;
-      }
-    }
-    applyMobileTab();
-    mq.addEventListener('change', applyMobileTab);
+    if (!document.body.dataset.tab) setMobileTab('furnace');
     mobileTabbarEl.addEventListener('click', (e) => {
       const btn = e.target.closest('.mobile-tab');
       if (btn && btn.dataset.tab) setMobileTab(btn.dataset.tab);
