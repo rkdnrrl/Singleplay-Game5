@@ -263,6 +263,41 @@
     </div>
   </div>
 
+  <!-- 개조 탭 패널 -->
+  <section class="module-panel" id="modulePanel" aria-label="장비 개조">
+    <div class="module-layout">
+      <!-- 왼쪽: 장비 선택 -->
+      <div class="module-equip-sidebar">
+        <p class="module-section-title">🛡️ 장비 선택</p>
+        <div class="module-equip-list" id="moduleEquipList"></div>
+      </div>
+      <!-- 가운데: 선택된 장비의 모듈 슬롯 -->
+      <div class="module-slots-area" id="moduleSlotsArea">
+        <p class="module-section-title" id="moduleSlotTitle">장비를 선택하세요</p>
+        <div class="module-slot-grid" id="moduleSlotGrid"></div>
+        <div class="module-synergy-display" id="moduleSynergyDisplay"></div>
+      </div>
+      <!-- 오른쪽: 모듈 인벤토리 + 제작 -->
+      <div class="module-inventory-area">
+        <p class="module-section-title">🔩 보유 모듈</p>
+        <div class="module-inv-list" id="moduleInvList"></div>
+        <button type="button" class="module-craft-toggle-btn" id="moduleCraftToggleBtn">⚒️ 모듈 제작</button>
+      </div>
+    </div>
+    <!-- 제작 패널 -->
+    <div class="module-craft-panel" id="moduleCraftPanel" style="display:none">
+      <p class="module-section-title">⚒️ 모듈 제작</p>
+      <div class="module-craft-type-list" id="moduleCraftTypeList"></div>
+      <div class="module-craft-material-row">
+        <label class="module-craft-label">용광로 산출물 개수 (1-8)</label>
+        <input type="number" id="moduleCraftCount" min="1" max="8" value="1" class="module-craft-count-input" />
+      </div>
+      <div class="module-craft-tier-preview" id="moduleCraftTierPreview"></div>
+      <button type="button" class="module-craft-btn" id="moduleCraftBtn" disabled>✨ 제작</button>
+      <p class="module-craft-msg" id="moduleCraftMsg"></p>
+    </div>
+  </section>
+
   <!-- 강화 탭 패널 -->
   <section class="enhance-panel" id="enhancePanel" aria-label="장비 강화">
     <div class="enhance-layout">
@@ -310,6 +345,10 @@
     <button type="button" class="mobile-tab" data-tab="enhance">
       <span class="mobile-tab-icon">✨</span>
       <span class="mobile-tab-label">강화</span>
+    </button>
+    <button type="button" class="mobile-tab" data-tab="modules">
+      <span class="mobile-tab-icon">🔩</span>
+      <span class="mobile-tab-label">개조</span>
     </button>
   </nav>
 

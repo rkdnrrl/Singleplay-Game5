@@ -4582,6 +4582,451 @@
     });
   }
 
+  // ══ 개조 탭 ════════════════════════════════════════════════════
+
+  // Client-side module catalog (mirrors server lib/moduleCatalog.js)
+  const MODULE_CATALOG_CLIENT = {
+    barrel:        { label:'날/총열',   emoji:'⚔️',  equipSlots:['weapon'] },
+    scope:         { label:'조준기',    emoji:'🎯',  equipSlots:['weapon'] },
+    grip:          { label:'손잡이',    emoji:'✊',  equipSlots:['weapon','gloves'] },
+    muzzle:        { label:'날끝/총구', emoji:'💥',  equipSlots:['weapon'] },
+    padding:       { label:'내장재',    emoji:'🛡️', equipSlots:['head','chest','pants','gloves','boots'] },
+    reinforcement: { label:'보강재',    emoji:'⚙️', equipSlots:['chest'] },
+    visor:         { label:'바이저',    emoji:'👁️', equipSlots:['head'] },
+    lining:        { label:'라이닝',    emoji:'🧶',  equipSlots:['chest'] },
+    sole:          { label:'밑창',      emoji:'👟',  equipSlots:['boots'] },
+    gem:           { label:'보석',      emoji:'💎',  equipSlots:['accessory'] },
+    enchant:       { label:'각인',      emoji:'✨',  equipSlots:['accessory'] },
+  };
+  const EQUIP_MODULE_SLOTS_CLIENT = {
+    weapon:    ['barrel','scope','grip','muzzle'],
+    head:      ['padding','visor'],
+    chest:     ['padding','reinforcement','lining'],
+    pants:     ['padding'],
+    gloves:    ['grip','padding'],
+    boots:     ['sole','padding'],
+    accessory: ['gem','enchant'],
+  };
+  const TIER_LABEL = { common:'일반', rare:'희귀', epic:'에픽', legendary:'전설' };
+
+  // Client-side synergy calculation (mirrors server lib/moduleSynergy.js)
+  const BONUS_SYNERGIES_CLIENT = {
+    '화염':{ name:'화염 공명',  atkMul:1.20, defMul:0.90 },
+    '냉기':{ name:'빙결 공명',  spdAdd:0.15, atkMul:0.95 },
+    '번개':{ name:'번개 공명',  atkMul:1.25, durDecayMul:2.0 },
+    '독':  { name:'독성 공명',  defMul:1.10, spdAdd:-0.10 },
+    '신성':{ name:'신성 공명',  hpMul:1.30,  spdAdd:-0.05 },
+    '암흑':{ name:'암흑 공명',  atkMul:1.15, hpMul:0.90 },
+    '관통':{ name:'관통 공명',  atkMul:1.30, defMul:0.80 },
+    '방어':{ name:'방어 공명',  defMul:1.25, atkMul:0.90 },
+    '기민':{ name:'기민 공명',  spdAdd:0.20, atkMul:0.90 },
+    '강화':{ name:'강화 공명',  atkMul:1.15, defMul:1.10 },
+    '치유':{ name:'치유 공명',  hpMul:1.40,  atkMul:0.85 },
+    '저주':{ name:'저주 공명',  atkMul:1.15, defMul:1.15, spdAdd:0.05, hpMul:1.10, durDecayMul:1.5 },
+  };
+  const CONFLICT_PAIRS_CLIENT = [
+    { pair:['화염','냉기'], name:'증기 폭발'   },
+    { pair:['신성','암흑'], name:'존재 부정'   },
+    { pair:['관통','방어'], name:'모순 구조'   },
+    { pair:['기민','강화'], name:'무게 과부하' },
+    { pair:['독','치유'],   name:'약효 상쇄'   },
+    { pair:['번개','냉기'], name:'전도 방해'   },
+  ];
+
+  function calcSynergyClient(modules) {
+    const counts = {};
+    for (const m of modules) {
+      for (const kw of (m.keywords || [])) counts[kw] = (counts[kw] || 0) + 1;
+    }
+    const present = new Set(Object.keys(counts));
+    const bonuses = [], penalties = [];
+    for (const cp of CONFLICT_PAIRS_CLIENT) {
+      if (present.has(cp.pair[0]) && present.has(cp.pair[1])) penalties.push(cp.name);
+    }
+    for (const [kw, syn] of Object.entries(BONUS_SYNERGIES_CLIENT)) {
+      if ((counts[kw] || 0) >= 2) bonuses.push(syn.name);
+    }
+    return { bonuses, penalties };
+  }
+
+  let moduleAllList      = [];  // all user modules from server
+  let moduleSelectedEquip = null;  // currently selected equipment object
+  let moduleSelectedModId = null;  // module id awaiting attachment
+  let moduleSelectedSlot  = null;  // slot name awaiting attachment
+
+  const $moduleEquipList      = document.getElementById('moduleEquipList');
+  const $moduleSlotTitle      = document.getElementById('moduleSlotTitle');
+  const $moduleSlotGrid       = document.getElementById('moduleSlotGrid');
+  const $moduleSynergyDisplay = document.getElementById('moduleSynergyDisplay');
+  const $moduleInvList        = document.getElementById('moduleInvList');
+  const $moduleCraftPanel     = document.getElementById('moduleCraftPanel');
+  const $moduleCraftToggleBtn = document.getElementById('moduleCraftToggleBtn');
+  const $moduleCraftTypeList  = document.getElementById('moduleCraftTypeList');
+  const $moduleCraftCount     = document.getElementById('moduleCraftCount');
+  const $moduleCraftTierPreview = document.getElementById('moduleCraftTierPreview');
+  const $moduleCraftBtn       = document.getElementById('moduleCraftBtn');
+  const $moduleCraftMsg       = document.getElementById('moduleCraftMsg');
+
+  let moduleCraftSelectedType = null;
+
+  async function loadModuleTab() {
+    if (!$moduleEquipList) return;
+    try {
+      const [eqRes, modRes] = await Promise.all([
+        fetch(`${platformApi}/api/craft/equipment?limit=40`, {
+          headers: { Authorization: `Bearer ${alpToken}` },
+        }),
+        fetch(`${platformApi}/api/modules`, {
+          headers: { Authorization: `Bearer ${alpToken}` },
+        }),
+      ]);
+      const eqData  = eqRes.ok  ? await eqRes.json()  : {};
+      const modData = modRes.ok ? await modRes.json() : {};
+      const eqPool  = (eqData.equipment || []).filter(e => e && e.stats);
+      moduleAllList = modData.modules || [];
+      renderModuleEquipList(eqPool);
+      renderModuleInvList();
+      renderModuleCraftTypeList();
+    } catch (e) {
+      if ($moduleEquipList) $moduleEquipList.innerHTML = '<p style="color:rgba(200,180,240,0.4);font-size:0.78rem;padding:0.5rem">불러오기 실패</p>';
+    }
+  }
+
+  function renderModuleEquipList(pool) {
+    if (!$moduleEquipList) return;
+    $moduleEquipList.innerHTML = '';
+    if (!pool || pool.length === 0) {
+      $moduleEquipList.innerHTML = '<p style="color:rgba(200,180,240,0.4);font-size:0.78rem;padding:0.5rem">장비가 없습니다</p>';
+      return;
+    }
+    pool.forEach(eq => {
+      const equipSlot = eq.stats?.equipSlot || 'weapon';
+      const slots = EQUIP_MODULE_SLOTS_CLIENT[equipSlot] || [];
+      const id = eq.equipmentId || eq.id;
+      const attached = moduleAllList.filter(m => m.equippedTo === id).length;
+      const item = document.createElement('div');
+      item.className = 'module-equip-item' +
+        (moduleSelectedEquip && (moduleSelectedEquip.equipmentId || moduleSelectedEquip.id) === id ? ' is-selected' : '');
+      const pa = eq.pixelArt;
+      const thumb = pa?.imageDataUrl
+        ? `<img src="${pa.imageDataUrl}" alt="" decoding="async">`
+        : `<span>${eq.itemEmoji || '⚒️'}</span>`;
+      item.innerHTML = `
+        <div class="module-equip-thumb">${thumb}</div>
+        <div class="module-equip-meta">
+          <span class="module-equip-name">${escHtmlModule(eq.name || '장비')}</span>
+          <span class="module-equip-slot-count">${attached}/${slots.length} 슬롯</span>
+        </div>`;
+      item.addEventListener('click', () => {
+        moduleSelectedEquip = eq;
+        moduleSelectedModId = null;
+        moduleSelectedSlot  = null;
+        renderModuleEquipList(pool);
+        renderModuleSlots(eq);
+        renderModuleInvList();
+      });
+      $moduleEquipList.appendChild(item);
+    });
+  }
+
+  function renderModuleSlots(eq) {
+    if (!$moduleSlotGrid || !eq) return;
+    $moduleSlotTitle.textContent = eq.name || '장비';
+    $moduleSlotGrid.innerHTML = '';
+    const equipSlot = eq.stats?.equipSlot || 'weapon';
+    const slots = EQUIP_MODULE_SLOTS_CLIENT[equipSlot] || [];
+    const equipId = eq.equipmentId || eq.id;
+    const attachedMods = moduleAllList.filter(m => m.equippedTo === equipId);
+
+    slots.forEach(slotName => {
+      const catalogEntry = MODULE_CATALOG_CLIENT[slotName];
+      const filled = attachedMods.find(m => m.equippedSlot === slotName);
+      const item = document.createElement('div');
+      const isHighlight = !filled && moduleSelectedModId !== null && moduleSelectedSlot === null;
+      item.className = 'module-slot-item' +
+        (filled ? ' is-filled' : '') +
+        (isHighlight ? ' is-highlight' : '');
+
+      if (filled) {
+        const kws = (filled.keywords || []).join(', ');
+        const durPct = filled.durabilityMax > 0 ? Math.round(filled.durability / filled.durabilityMax * 100) : 0;
+        item.innerHTML = `
+          <span class="module-slot-label">${catalogEntry?.emoji || ''} ${slotName}</span>
+          <div class="module-slot-content">
+            <span class="module-slot-filled-name">${escHtmlModule(filled.name)}</span>
+            <span class="module-slot-filled-meta">${escHtmlModule(kws)} · 내구 ${filled.durability}/${filled.durabilityMax} (${durPct}%)</span>
+          </div>
+          <button class="module-slot-detach-btn" data-modid="${escHtmlModule(filled.id)}">분리</button>`;
+        item.querySelector('.module-slot-detach-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          detachModule(filled.id);
+        });
+      } else {
+        item.innerHTML = `
+          <span class="module-slot-label">${catalogEntry?.emoji || ''} ${slotName}</span>
+          <div class="module-slot-content">
+            <span class="module-slot-empty-hint">빈 슬롯 — 모듈을 선택 후 탭</span>
+          </div>`;
+        item.addEventListener('click', () => {
+          if (moduleSelectedModId) {
+            // Attach selected module to this slot
+            attachModule(moduleSelectedModId, equipId, slotName);
+          }
+        });
+      }
+      $moduleSlotGrid.appendChild(item);
+    });
+
+    // Synergy display
+    if ($moduleSynergyDisplay) {
+      const { bonuses, penalties } = calcSynergyClient(attachedMods);
+      let html = '';
+      if (penalties.length) html += `<span class="module-synergy-penalty">⚡ 충돌: ${penalties.join(', ')}</span> `;
+      if (bonuses.length)   html += `<span class="module-synergy-bonus">✨ 시너지: ${bonuses.join(', ')}</span>`;
+      if (!html) html = '<span style="color:rgba(200,190,240,0.35)">시너지 없음</span>';
+      $moduleSynergyDisplay.innerHTML = html;
+    }
+  }
+
+  function renderModuleInvList() {
+    if (!$moduleInvList) return;
+    $moduleInvList.innerHTML = '';
+    const unequipped = moduleAllList.filter(m => !m.equippedTo);
+    const equipped   = moduleAllList.filter(m => m.equippedTo);
+    const allSorted  = [...unequipped, ...equipped];
+    if (allSorted.length === 0) {
+      $moduleInvList.innerHTML = '<p style="color:rgba(200,180,240,0.35);font-size:0.75rem;padding:0.4rem">모듈 없음 — 아래에서 제작하세요</p>';
+      return;
+    }
+    allSorted.forEach(mod => {
+      const isEquipped = !!mod.equippedTo;
+      const isSelected = mod.id === moduleSelectedModId;
+      const durPct = mod.durabilityMax > 0 ? Math.round(mod.durability / mod.durabilityMax * 100) : 0;
+      const durLow = durPct < 30;
+      const tierLabel = TIER_LABEL[mod.tier] || mod.tier;
+      const tierClass = `tier-${mod.tier}`;
+      const kws = (mod.keywords || []).join(', ');
+      const item = document.createElement('div');
+      item.className = 'module-inv-item' +
+        (isEquipped ? ' is-equipped' : '') +
+        (isSelected ? ' is-selected' : '');
+
+      const statsStr = _moduleStatsStr(mod.stats);
+
+      let html = `
+        <div class="module-inv-name">
+          <span class="${tierClass}">${escHtmlModule(mod.name)}</span>
+          <span style="font-size:0.68rem;color:rgba(200,190,240,0.4)">[${escHtmlModule(tierLabel)}]</span>
+        </div>
+        <div class="module-inv-meta">${escHtmlModule(kws)} · ${escHtmlModule(statsStr)}</div>
+        <div class="module-inv-dur ${durLow ? 'is-low' : 'is-ok'}">내구 ${mod.durability}/${mod.durabilityMax} (${durPct}%)</div>`;
+      if (isEquipped) {
+        html += `<div style="font-size:0.68rem;color:rgba(200,190,240,0.4)">장착됨 · 슬롯 ${escHtmlModule(mod.equippedSlot || '')}</div>`;
+      }
+      if (!isEquipped && durPct < 100) {
+        html += `<button class="module-inv-repair-btn" data-modid="${escHtmlModule(mod.id)}">🔧 수리</button>`;
+      }
+      item.innerHTML = html;
+
+      if (!isEquipped) {
+        item.addEventListener('click', (e) => {
+          if (e.target.classList.contains('module-inv-repair-btn')) return;
+          moduleSelectedModId = isSelected ? null : mod.id;
+          renderModuleInvList();
+          if (moduleSelectedEquip) renderModuleSlots(moduleSelectedEquip);
+        });
+        const repBtn = item.querySelector('.module-inv-repair-btn');
+        if (repBtn) {
+          repBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            repairModule(mod.id);
+          });
+        }
+      }
+      $moduleInvList.appendChild(item);
+    });
+  }
+
+  function _moduleStatsStr(stats) {
+    if (!stats || typeof stats !== 'object') return '';
+    const parts = [];
+    if (stats.attackBonus)  parts.push(`공격${stats.attackBonus > 0 ? '+' : ''}${stats.attackBonus}`);
+    if (stats.defenseBonus) parts.push(`방어${stats.defenseBonus > 0 ? '+' : ''}${stats.defenseBonus}`);
+    if (stats.speedBonus)   parts.push(`이속+${Math.round((stats.speedBonus || 0) * 100)}%`);
+    if (stats.hpBonus)      parts.push(`HP${stats.hpBonus > 0 ? '+' : ''}${stats.hpBonus}`);
+    return parts.join(' ');
+  }
+
+  async function attachModule(modId, equipId, slot) {
+    try {
+      const resp = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/attach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+        body: JSON.stringify({ equipmentId: equipId, slot }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        alert(json?.error?.message || '장착 실패');
+        return;
+      }
+      // Update local list
+      const idx = moduleAllList.findIndex(m => m.id === modId);
+      if (idx !== -1) moduleAllList[idx] = json.module;
+      moduleSelectedModId = null;
+      renderModuleSlots(moduleSelectedEquip);
+      renderModuleInvList();
+    } catch (e) {
+      alert('오류가 발생했습니다.');
+    }
+  }
+
+  async function detachModule(modId) {
+    try {
+      const resp = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/detach`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      const json = await resp.json();
+      if (!resp.ok) { alert(json?.error?.message || '분리 실패'); return; }
+      const idx = moduleAllList.findIndex(m => m.id === modId);
+      if (idx !== -1) moduleAllList[idx] = json.module;
+      renderModuleSlots(moduleSelectedEquip);
+      renderModuleInvList();
+    } catch (e) {
+      alert('오류가 발생했습니다.');
+    }
+  }
+
+  async function repairModule(modId) {
+    try {
+      const resp = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/repair`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      const json = await resp.json();
+      if (!resp.ok) { alert(json?.error?.message || '수리 실패'); return; }
+      const idx = moduleAllList.findIndex(m => m.id === modId);
+      if (idx !== -1) moduleAllList[idx] = json.module;
+      if (json.cost != null) {
+        // Refresh coin display
+        fetch(`${platformApi}/api/coins`, { headers: { Authorization: `Bearer ${alpToken}` } })
+          .then(r => r.json())
+          .then(d => { if ($coinCount) $coinCount.textContent = (d.coins ?? d.balance ?? 0).toLocaleString(); })
+          .catch(() => {});
+      }
+      renderModuleSlots(moduleSelectedEquip);
+      renderModuleInvList();
+    } catch (e) {
+      alert('오류가 발생했습니다.');
+    }
+  }
+
+  function renderModuleCraftTypeList() {
+    if (!$moduleCraftTypeList) return;
+    $moduleCraftTypeList.innerHTML = '';
+    Object.entries(MODULE_CATALOG_CLIENT).forEach(([typeId, meta]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'module-craft-type-btn' + (moduleCraftSelectedType === typeId ? ' is-selected' : '');
+      btn.textContent = `${meta.emoji} ${meta.label}`;
+      btn.addEventListener('click', () => {
+        moduleCraftSelectedType = typeId;
+        renderModuleCraftTypeList();
+        updateModuleCraftBtn();
+      });
+      $moduleCraftTypeList.appendChild(btn);
+    });
+  }
+
+  function updateModuleCraftBtn() {
+    if (!$moduleCraftBtn) return;
+    const cnt = parseInt($moduleCraftCount?.value || '1', 10);
+    let tierLabel = '일반';
+    if (cnt >= 5) tierLabel = '전설';
+    else if (cnt >= 3) tierLabel = '에픽';
+    else if (cnt >= 2) tierLabel = '희귀';
+    if ($moduleCraftTierPreview) {
+      $moduleCraftTierPreview.textContent = `예상 등급: ${tierLabel} (재료 ${cnt}개)`;
+    }
+    $moduleCraftBtn.disabled = !moduleCraftSelectedType;
+  }
+
+  if ($moduleCraftCount) {
+    $moduleCraftCount.addEventListener('input', updateModuleCraftBtn);
+  }
+
+  if ($moduleCraftToggleBtn) {
+    $moduleCraftToggleBtn.addEventListener('click', () => {
+      const shown = $moduleCraftPanel && $moduleCraftPanel.style.display !== 'none';
+      if ($moduleCraftPanel) $moduleCraftPanel.style.display = shown ? 'none' : 'block';
+      $moduleCraftToggleBtn.textContent = shown ? '⚒️ 모듈 제작' : '✕ 닫기';
+    });
+  }
+
+  if ($moduleCraftBtn) {
+    $moduleCraftBtn.addEventListener('click', async () => {
+      if (!moduleCraftSelectedType || $moduleCraftBtn.disabled) return;
+      const cnt = Math.max(1, Math.min(8, parseInt($moduleCraftCount?.value || '1', 10)));
+      if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '제작 중…'; $moduleCraftMsg.style.color = 'rgba(200,190,240,0.6)'; }
+      $moduleCraftBtn.disabled = true;
+
+      // Use the first available smelt product as material (simplified: just use whatever is in stock)
+      // Get smelt stock first
+      try {
+        const stockRes = await fetch(`${platformApi}/api/smelt/stock`, {
+          headers: { Authorization: `Bearer ${alpToken}` },
+        });
+        const stockData = stockRes.ok ? await stockRes.json() : {};
+        // stock is { productId: { id, name, emoji, count } }
+        const stockObj = stockData.stock || {};
+        const stock = Object.values(stockObj).filter(s => (s.count || 0) > 0);
+        if (stock.length === 0) {
+          if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '용광로 산출물이 없습니다.'; $moduleCraftMsg.style.color = '#fca5a5'; }
+          $moduleCraftBtn.disabled = false;
+          return;
+        }
+
+        // Build smeltMaterials: consume cnt items from available stock
+        let remaining = cnt;
+        const smeltMaterials = [];
+        for (const s of stock) {
+          if (remaining <= 0) break;
+          const use = Math.min(remaining, s.count);
+          smeltMaterials.push({ productId: s.id || s.productId, count: use });
+          remaining -= use;
+        }
+        if (remaining > 0) {
+          if ($moduleCraftMsg) { $moduleCraftMsg.textContent = `재료가 부족합니다 (${cnt - remaining}/${cnt}개 확보).`; $moduleCraftMsg.style.color = '#fca5a5'; }
+          $moduleCraftBtn.disabled = false;
+          return;
+        }
+
+        const resp = await fetch(`${platformApi}/api/modules/craft`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+          body: JSON.stringify({ moduleType: moduleCraftSelectedType, smeltMaterials }),
+        });
+        const json = await resp.json();
+        if (!resp.ok) {
+          if ($moduleCraftMsg) { $moduleCraftMsg.textContent = json?.error?.message || '제작 실패'; $moduleCraftMsg.style.color = '#fca5a5'; }
+          $moduleCraftBtn.disabled = false;
+          return;
+        }
+        moduleAllList.push(json.module);
+        if ($moduleCraftMsg) { $moduleCraftMsg.textContent = `✅ ${json.module.name} 제작 완료!`; $moduleCraftMsg.style.color = '#6ee7b7'; }
+        renderModuleInvList();
+        $moduleCraftBtn.disabled = false;
+      } catch (e) {
+        if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '오류가 발생했습니다.'; $moduleCraftMsg.style.color = '#fca5a5'; }
+        $moduleCraftBtn.disabled = false;
+      }
+    });
+  }
+
+  function escHtmlModule(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
   // ── 탭바 (모바일 하단 / PC 좌측 사이드바 공용) ──
   const mobileTabbarEl = document.getElementById('mobileTabbar');
   if (mobileTabbarEl) {
@@ -4593,6 +5038,7 @@
       if (tab === 'repair') refreshRepairEquipList();
       else stopRepairHammer();
       if (tab === 'enhance') loadEnhancementTab();
+      if (tab === 'modules') loadModuleTab();
     }
     if (!document.body.dataset.tab) setMobileTab('furnace');
     mobileTabbarEl.addEventListener('click', (e) => {

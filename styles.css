@@ -3249,3 +3249,319 @@ body.forge-scroll-lock {
   .result-size            { font-size: 0.88rem; }
   .result-added           { font-size: 0.82rem; }
 }
+
+/* ════════════════════════════════════════════════════════════
+   개조 (모듈) 탭
+   ════════════════════════════════════════════════════════════ */
+.module-panel {
+  display: none;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.module-layout {
+  display: flex;
+  flex: 1;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.module-section-title {
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 0.82rem;
+  color: rgba(200,190,240,0.7);
+  padding: 0.5rem 0.6rem 0.3rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Left sidebar: equipment list */
+.module-equip-sidebar {
+  width: 34%;
+  max-width: 160px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+.module-equip-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.3rem 0;
+}
+.module-equip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.12s;
+}
+.module-equip-item:hover { background: rgba(255,255,255,0.05); }
+.module-equip-item.is-selected { background: rgba(100,80,200,0.25); }
+.module-equip-thumb {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; flex-shrink: 0;
+}
+.module-equip-thumb img { width: 28px; height: 28px; image-rendering: pixelated; }
+.module-equip-meta { overflow: hidden; }
+.module-equip-name {
+  display: block; font-size: 0.78rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--text);
+}
+.module-equip-slot-count {
+  display: block; font-size: 0.7rem;
+  color: rgba(200,190,240,0.5);
+}
+
+/* Center: slot grid */
+.module-slots-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid rgba(255,255,255,0.07);
+}
+.module-slot-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.module-slot-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.module-slot-item:hover { background: rgba(255,255,255,0.07); }
+.module-slot-item.is-highlight { border-color: rgba(100,200,255,0.5); background: rgba(60,120,200,0.15); }
+.module-slot-item.is-filled { border-color: rgba(120,200,100,0.4); }
+.module-slot-label {
+  font-size: 0.72rem;
+  color: rgba(200,190,240,0.5);
+  flex-shrink: 0;
+  width: 48px;
+}
+.module-slot-content {
+  flex: 1;
+  overflow: hidden;
+}
+.module-slot-filled-name {
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.module-slot-filled-meta {
+  font-size: 0.68rem;
+  color: rgba(200,190,240,0.5);
+}
+.module-slot-empty-hint {
+  font-size: 0.75rem;
+  color: rgba(200,190,240,0.3);
+}
+.module-slot-detach-btn {
+  font-size: 0.68rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(255,100,100,0.3);
+  background: rgba(180,60,60,0.2);
+  color: rgba(255,160,160,0.8);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.module-slot-detach-btn:hover { background: rgba(180,60,60,0.4); }
+
+/* Synergy display */
+.module-synergy-display {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+  min-height: 2rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.module-synergy-bonus { color: #6ee7b7; }
+.module-synergy-penalty { color: #fca5a5; }
+
+/* Right: module inventory */
+.module-inventory-area {
+  width: 38%;
+  max-width: 180px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.module-inv-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.3rem 0;
+}
+.module-inv-item {
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.12s;
+}
+.module-inv-item:hover { background: rgba(255,255,255,0.05); }
+.module-inv-item.is-selected { background: rgba(100,80,200,0.3); }
+.module-inv-item.is-equipped { opacity: 0.45; cursor: default; }
+.module-inv-name {
+  display: flex; align-items: center; gap: 0.25rem;
+  font-size: 0.8rem; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.module-inv-meta {
+  font-size: 0.68rem;
+  color: rgba(200,190,240,0.5);
+}
+.module-inv-dur {
+  font-size: 0.68rem;
+}
+.module-inv-dur.is-low { color: #fca5a5; }
+.module-inv-dur.is-ok  { color: rgba(200,190,240,0.5); }
+.module-inv-repair-btn {
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(80,180,255,0.3);
+  background: rgba(40,100,200,0.2);
+  color: rgba(140,200,255,0.8);
+  cursor: pointer;
+}
+.module-inv-repair-btn:hover { background: rgba(40,100,200,0.4); }
+
+.module-craft-toggle-btn {
+  margin: 0.4rem 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(160,140,220,0.35);
+  background: rgba(70,50,150,0.25);
+  color: #c8c0f0;
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.module-craft-toggle-btn:hover { background: rgba(90,70,180,0.4); }
+
+/* Craft panel (full-width overlay within module-panel) */
+.module-craft-panel {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 0.5rem;
+  background: rgba(0,0,0,0.35);
+  flex-shrink: 0;
+  overflow-y: auto;
+  max-height: 55%;
+}
+.module-craft-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+.module-craft-type-btn {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.module-craft-type-btn:hover { background: rgba(255,255,255,0.1); }
+.module-craft-type-btn.is-selected { border-color: rgba(100,180,255,0.5); background: rgba(60,120,220,0.25); }
+.module-craft-material-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.module-craft-label {
+  font-size: 0.75rem;
+  color: rgba(200,190,240,0.6);
+  flex: 1;
+}
+.module-craft-count-input {
+  width: 56px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0.3rem;
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 0.2rem 0.35rem;
+  text-align: center;
+}
+.module-craft-tier-preview {
+  font-size: 0.75rem;
+  color: rgba(200,190,240,0.6);
+  margin-bottom: 0.4rem;
+  min-height: 1rem;
+}
+.module-craft-btn {
+  width: 100%;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(160,140,220,0.4);
+  background: rgba(80,60,180,0.3);
+  color: #d0c8f0;
+  font-family: Jua, system-ui, sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.module-craft-btn:hover:not(:disabled) { background: rgba(100,80,210,0.5); }
+.module-craft-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.module-craft-msg {
+  font-size: 0.75rem;
+  text-align: center;
+  min-height: 1.2rem;
+  padding-top: 0.3rem;
+  color: rgba(200,190,240,0.7);
+}
+
+/* Tier color helpers */
+.tier-common    { color: var(--common); }
+.tier-rare      { color: var(--rare); }
+.tier-epic      { color: var(--epic); }
+.tier-legendary { color: var(--legendary); }
+
+/* ─ 모바일 탭 활성화 ─ */
+@media (max-width: 639px) {
+  body[data-tab="modules"] .module-panel {
+    display: flex !important;
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0; right: 0;
+    bottom: var(--tabbar-h);
+    height: auto !important;
+    z-index: 50;
+  }
+}
+/* ─ PC 탭 활성화 ─ */
+@media (min-width: 640px) {
+  body[data-tab="modules"] .module-panel {
+    display: flex !important;
+    position: fixed !important;
+    left: var(--sidebar-w) !important; top: 0 !important;
+    right: 0 !important; bottom: 0 !important;
+    height: auto !important;
+    z-index: 50;
+  }
+}
