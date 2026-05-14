@@ -263,6 +263,25 @@
     </div>
   </div>
 
+  <!-- 강화 탭 패널 -->
+  <section class="enhance-panel" id="enhancePanel" aria-label="장비 강화">
+    <div class="enhance-layout">
+      <div class="enhance-stones-area">
+        <p class="enhance-area-title">🗃️ 보유 강화 아이템</p>
+        <div class="enhance-stone-grid" id="enhanceStoneGrid"></div>
+      </div>
+      <div class="enhance-equip-area">
+        <p class="enhance-area-title">🛡️ 강화할 장비 선택</p>
+        <div class="enhance-equip-list" id="enhanceEquipList"></div>
+      </div>
+    </div>
+    <div class="enhance-action-bar">
+      <p class="enhance-hint" id="enhanceHint">강화 아이템과 장비를 선택하세요</p>
+      <button type="button" class="enhance-btn" id="enhanceBtn" disabled>✨ 강화하기</button>
+    </div>
+    <div class="enhance-result" id="enhanceResult"></div>
+  </section>
+
   <nav class="mobile-tabbar" id="mobileTabbar" aria-label="메뉴">
     <button type="button" class="mobile-tab" data-tab="materials">
       <span class="mobile-tab-icon">📦</span>
@@ -287,6 +306,10 @@
     <button type="button" class="mobile-tab" data-tab="repair">
       <span class="mobile-tab-icon">🔨</span>
       <span class="mobile-tab-label">수리</span>
+    </button>
+    <button type="button" class="mobile-tab" data-tab="enhance">
+      <span class="mobile-tab-icon">✨</span>
+      <span class="mobile-tab-label">강화</span>
     </button>
   </nav>
 

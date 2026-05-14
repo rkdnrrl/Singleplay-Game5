@@ -4419,6 +4419,169 @@
     });
   }
 
+  // ══ 강화 탭 ════════════════════════════════════════════════════
+
+  const ENHANCE_STONE_META = {
+    stone_common:  { name: '일반 강화석', emoji: '🪨', rate: '60%', desc: '공격 또는 방어 +1' },
+    stone_rare:    { name: '희귀 강화석', emoji: '💎', rate: '70%', desc: '공격 또는 방어 +2' },
+    crystal_magic: { name: '마법 수정',   emoji: '🔮', rate: '80%', desc: '공/방 +1, 이속 +2%, 체력 +5' },
+    shard_legend:  { name: '전설 파편',   emoji: '✨', rate: '85%', desc: '공/방 +3, 이속 +5%, 체력 +10' },
+  };
+
+  let enhanceStock = {};            // itemType → count
+  let enhanceSelectedStone = null;  // itemType string
+  let enhanceSelectedEquip = null;  // equipment object
+
+  const $enhanceStoneGrid = document.getElementById('enhanceStoneGrid');
+  const $enhanceEquipList = document.getElementById('enhanceEquipList');
+  const $enhanceBtn       = document.getElementById('enhanceBtn');
+  const $enhanceHint      = document.getElementById('enhanceHint');
+  const $enhanceResult    = document.getElementById('enhanceResult');
+
+  function renderEnhanceStones() {
+    if (!$enhanceStoneGrid) return;
+    $enhanceStoneGrid.innerHTML = '';
+    Object.entries(ENHANCE_STONE_META).forEach(([type, meta]) => {
+      const count = enhanceStock[type] || 0;
+      const item = document.createElement('div');
+      item.className = 'enhance-stone-item' +
+        (count === 0 ? ' is-empty' : '') +
+        (enhanceSelectedStone === type ? ' is-selected' : '');
+      item.dataset.type = type;
+      item.innerHTML = `
+        <span class="enhance-stone-emoji">${meta.emoji}</span>
+        <span class="enhance-stone-info">
+          <span class="enhance-stone-name">${meta.name}</span>
+          <span class="enhance-stone-count">보유 ${count}개</span>
+          <span class="enhance-stone-rate">성공 ${meta.rate} · ${meta.desc}</span>
+        </span>`;
+      if (count > 0) {
+        item.addEventListener('click', () => {
+          enhanceSelectedStone = enhanceSelectedStone === type ? null : type;
+          renderEnhanceStones();
+          updateEnhanceBtn();
+        });
+      }
+      $enhanceStoneGrid.appendChild(item);
+    });
+  }
+
+  function renderEnhanceEquipList() {
+    if (!$enhanceEquipList) return;
+    $enhanceEquipList.innerHTML = '';
+    const pool = (typeof serverEquipmentForgePool !== 'undefined' ? serverEquipmentForgePool : []);
+    if (pool.length === 0) {
+      $enhanceEquipList.innerHTML = '<p style="color:rgba(200,190,240,0.4);font-size:0.8rem;padding:0.5rem">제작된 장비가 없습니다</p>';
+      return;
+    }
+    pool.forEach((eq) => {
+      const id    = eq.equipmentId || eq.id;
+      const stats = eq.stats || {};
+      const parts = [];
+      if (stats.attackBonus)  parts.push(`공격 +${stats.attackBonus}`);
+      if (stats.defenseBonus) parts.push(`방어 +${stats.defenseBonus}`);
+      if (stats.speedBonus)   parts.push(`이속 +${Math.round(stats.speedBonus * 100)}%`);
+      if (stats.hpBonus)      parts.push(`체력 +${stats.hpBonus}`);
+
+      const item = document.createElement('div');
+      item.className = 'enhance-equip-item' +
+        (enhanceSelectedEquip && (enhanceSelectedEquip.equipmentId || enhanceSelectedEquip.id) === id ? ' is-selected' : '');
+      item.innerHTML = `
+        <div class="enhance-equip-thumb">${_renderEnhanceThumb(eq)}</div>
+        <div class="enhance-equip-meta">
+          <span class="enhance-equip-name">${eq.name || '이름 없음'}</span>
+          <span class="enhance-equip-stats">${parts.join(' · ') || '스탯 없음'}</span>
+        </div>`;
+      item.addEventListener('click', () => {
+        enhanceSelectedEquip = enhanceSelectedEquip && (enhanceSelectedEquip.equipmentId || enhanceSelectedEquip.id) === id ? null : eq;
+        renderEnhanceEquipList();
+        updateEnhanceBtn();
+      });
+      $enhanceEquipList.appendChild(item);
+    });
+  }
+
+  function _renderEnhanceThumb(eq) {
+    const pa = eq.pixelArt;
+    if (pa && typeof pa === 'object' && typeof pa.imageDataUrl === 'string' && pa.imageDataUrl.startsWith('data:image/')) {
+      return `<img src="${pa.imageDataUrl}" alt="" decoding="async" loading="lazy">`;
+    }
+    return `<span aria-hidden="true">${eq.itemEmoji || eq.emoji || '⚒️'}</span>`;
+  }
+
+  function updateEnhanceBtn() {
+    const ready = !!enhanceSelectedStone && !!enhanceSelectedEquip;
+    if ($enhanceBtn) $enhanceBtn.disabled = !ready;
+    if ($enhanceHint) {
+      if (ready) {
+        const smeta = ENHANCE_STONE_META[enhanceSelectedStone];
+        $enhanceHint.textContent = `${smeta.emoji} ${smeta.name}로 [${enhanceSelectedEquip.name}] 강화`;
+      } else if (!enhanceSelectedStone && !enhanceSelectedEquip) {
+        $enhanceHint.textContent = '강화 아이템과 장비를 선택하세요';
+      } else if (!enhanceSelectedStone) {
+        $enhanceHint.textContent = '강화 아이템을 선택하세요';
+      } else {
+        $enhanceHint.textContent = '강화할 장비를 선택하세요';
+      }
+    }
+  }
+
+  async function loadEnhancementTab() {
+    if (!$enhanceStoneGrid) return;
+    try {
+      const resp = await fetch(`${platformApi}/api/craft/enhancement-stock`, {
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        enhanceStock = json.stock || {};
+      }
+    } catch (e) { /* non-fatal */ }
+    renderEnhanceStones();
+    renderEnhanceEquipList();
+    updateEnhanceBtn();
+  }
+
+  if ($enhanceBtn) {
+    $enhanceBtn.addEventListener('click', async () => {
+      if (!enhanceSelectedStone || !enhanceSelectedEquip || $enhanceBtn.disabled) return;
+      const equipId = enhanceSelectedEquip.equipmentId || enhanceSelectedEquip.id;
+      $enhanceBtn.disabled = true;
+      if ($enhanceResult) { $enhanceResult.textContent = '강화 중…'; $enhanceResult.className = 'enhance-result'; }
+      try {
+        const resp = await fetch(`${platformApi}/api/craft/equipment/${equipId}/enhance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+          body: JSON.stringify({ itemType: enhanceSelectedStone }),
+        });
+        const json = await resp.json();
+        if (!resp.ok) {
+          if ($enhanceResult) { $enhanceResult.textContent = json?.error?.message || '강화 실패'; $enhanceResult.className = 'enhance-result enhance-result--fail'; }
+          $enhanceBtn.disabled = false;
+          return;
+        }
+        // 소모 처리
+        enhanceStock[enhanceSelectedStone] = Math.max(0, (enhanceStock[enhanceSelectedStone] || 1) - 1);
+
+        if (json.success) {
+          // 풀에서 스탯 업데이트
+          const pool = (typeof serverEquipmentForgePool !== 'undefined' ? serverEquipmentForgePool : []);
+          const poolItem = pool.find(e => (e.equipmentId || e.id) === equipId);
+          if (poolItem && json.stats) { poolItem.stats = json.stats; enhanceSelectedEquip = poolItem; }
+          if ($enhanceResult) { $enhanceResult.textContent = '✅ 강화 성공!'; $enhanceResult.className = 'enhance-result enhance-result--success'; }
+        } else {
+          if ($enhanceResult) { $enhanceResult.textContent = '💔 강화 실패… 아이템만 소모됐습니다.'; $enhanceResult.className = 'enhance-result enhance-result--fail'; }
+        }
+        renderEnhanceStones();
+        renderEnhanceEquipList();
+        updateEnhanceBtn();
+      } catch (e) {
+        if ($enhanceResult) { $enhanceResult.textContent = '오류가 발생했습니다.'; $enhanceResult.className = 'enhance-result enhance-result--fail'; }
+        $enhanceBtn.disabled = false;
+      }
+    });
+  }
+
   // ── 탭바 (모바일 하단 / PC 좌측 사이드바 공용) ──
   const mobileTabbarEl = document.getElementById('mobileTabbar');
   if (mobileTabbarEl) {
@@ -4429,6 +4592,7 @@
       });
       if (tab === 'repair') refreshRepairEquipList();
       else stopRepairHammer();
+      if (tab === 'enhance') loadEnhancementTab();
     }
     if (!document.body.dataset.tab) setMobileTab('furnace');
     mobileTabbarEl.addEventListener('click', (e) => {
