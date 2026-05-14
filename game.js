@@ -3827,6 +3827,7 @@
   const REPAIR_COLS = 6, REPAIR_ROWS = 8;
   const REPAIR_COST_TABLE = { common: 5, rare: 12, epic: 30, legendary: 70 };
   let repairItem = null;
+  let repairModulePool = [];  // 수리 탭용 모듈 캐시
   let repairMaxDur = 0, repairOrigDur = 0, repairDur = 0;
   let repairCracks      = null;
   let repairImg         = null;
@@ -4407,6 +4408,8 @@
       const damaged = (modData.modules || []).filter(m => m.equippedTo == null && m.durability < m.durabilityMax);
       if (damaged.length === 0) return;
 
+      repairModulePool = damaged;
+
       const sep = document.createElement('p');
       sep.className = 'repair-module-section-title';
       sep.textContent = '🔩 모듈';
@@ -4417,6 +4420,8 @@
         const el = document.createElement('div');
         el.className = 'repair-equip-item';
         el.title = mod.name;
+        el.draggable = true;
+        el.dataset.moduleId = mod.id;
 
         const thumb = document.createElement('div');
         thumb.className = 'repair-equip-thumb';
@@ -4433,6 +4438,7 @@
         durEl.innerHTML = `<span style="color:#f87171">${mod.durability}/${mod.durabilityMax}</span>`;
         info.appendChild(nameEl); info.appendChild(durEl);
         el.appendChild(thumb); el.appendChild(info);
+        el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', 'module:' + mod.id));
         el.addEventListener('click', () => loadRepairModule(mod));
         $repairEquipList.appendChild(el);
       }
@@ -4509,10 +4515,16 @@
       dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
       dropZone.addEventListener('drop', e => {
         e.preventDefault(); dropZone.classList.remove('drag-over');
-        const id = e.dataTransfer.getData('text/plain');
-        const pool = (typeof serverEquipmentForgePool !== 'undefined') ? serverEquipmentForgePool : [];
-        const item = pool.find(i => String(i.equipmentId || i.id) === id);
-        if (item) loadRepairItem(item);
+        const raw = e.dataTransfer.getData('text/plain');
+        if (raw.startsWith('module:')) {
+          const modId = raw.slice(7);
+          const mod = repairModulePool.find(m => m.id === modId);
+          if (mod) loadRepairModule(mod);
+        } else {
+          const pool = (typeof serverEquipmentForgePool !== 'undefined') ? serverEquipmentForgePool : [];
+          const item = pool.find(i => String(i.equipmentId || i.id) === raw);
+          if (item) loadRepairItem(item);
+        }
       });
     }
     $repairCanvas.addEventListener('click', onRepairClick);
