@@ -3183,8 +3183,8 @@
     bg.addColorStop(0, '#130920'); bg.addColorStop(1, '#04020a');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, cw, ch);
 
-    const cellW = (cw / REPAIR_COLS) * repairZoom;
-    const cellH = (ch / REPAIR_ROWS) * repairZoom;
+    const cellW = cw / REPAIR_COLS;
+    const cellH = ch / REPAIR_ROWS;
     const ox = (cw - cellW * REPAIR_COLS) / 2;
     const oy = (ch - cellH * REPAIR_ROWS) / 2;
     const gridW = cellW * REPAIR_COLS, gridH = cellH * REPAIR_ROWS;
