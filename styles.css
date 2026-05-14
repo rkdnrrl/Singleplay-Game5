@@ -1835,6 +1835,152 @@ body.forge-scroll-lock {
   transform: translateY(1px);
 }
 
+/* ════════════════════════════════════════════════
+   모바일 탭바
+   ════════════════════════════════════════════════ */
+.mobile-tabbar { display: none; }
+
+@media (max-width: 639px) {
+  :root { --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px)); }
+
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 300;
+    height: var(--tabbar-h);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(5, 5, 18, 0.97);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: none;
+    background: transparent;
+    color: rgba(232, 234, 246, 0.38);
+    padding: 5px 2px 3px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-tab-icon  { font-size: 1.3rem; line-height: 1; }
+  .mobile-tab-label { font-size: 0.55rem; font-family: Jua, sans-serif; line-height: 1.1; }
+  .mobile-tab.is-active { color: var(--forge-accent); }
+
+  /* ── 탭 시스템 활성 시 기존 패널·앱 숨김 ── */
+  body[data-tab] .app { display: none; }
+
+  body[data-tab] .log-panel.inventory-dock,
+  body[data-tab] .log-panel.smelt-stock-dock,
+  body[data-tab] .log-panel.forge-extra {
+    display: none !important;
+    position: fixed;
+    left: 0; right: 0;
+    max-width: 100%; width: 100%;
+    max-height: none;
+    box-shadow: none;
+    border-radius: 0;
+    border-left: none; border-right: none;
+    z-index: 50;
+  }
+
+  /* 전체 패딩 보정 (탭 시스템 사용 시 기존 portrait padding-top 무효화) */
+  body[data-tab] .app { padding-top: max(0.5rem, env(safe-area-inset-top)); }
+
+  /* ══ TAB: 재료 ══ */
+  body[data-tab="materials"] .log-panel.inventory-dock {
+    display: flex !important;
+    top: 0; bottom: var(--tabbar-h);
+    padding: max(0.9rem, env(safe-area-inset-top)) 1rem 0.75rem;
+    border-top: none; border-bottom: none;
+  }
+  body[data-tab="materials"] .inventory-dock .inv-scroll-wrap {
+    max-height: none; flex: 1; min-height: 0;
+  }
+
+  /* ══ TAB: 용광로 ══ */
+  body[data-tab="furnace"] .log-panel.inventory-dock {
+    display: flex !important;
+    top: 0; height: min(38vh, 240px);
+    padding: max(0.6rem, env(safe-area-inset-top)) 1rem 0.4rem;
+    border-top: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  body[data-tab="furnace"] .inventory-dock .inv-scroll-wrap {
+    max-height: none; flex: 1; min-height: 0;
+  }
+  body[data-tab="furnace"] .app {
+    display: flex;
+    position: fixed;
+    top: min(38vh, 240px); left: 0; right: 0; bottom: var(--tabbar-h);
+    padding: 0.45rem 0.75rem 0.5rem;
+    overflow-y: auto; overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  body[data-tab="furnace"] .forge-topbar { padding: 0 0 0.15rem; }
+  body[data-tab="furnace"] .forge-stage  { justify-content: flex-start; }
+  body[data-tab="furnace"] .forge-split  { flex-direction: column; align-items: stretch; }
+  body[data-tab="furnace"] .furnace-panel { max-width: 100%; flex: none; border-radius: 12px; }
+  body[data-tab="furnace"] .refine-panel  { display: none !important; }
+
+  /* ══ TAB: 제련 ══ */
+  body[data-tab="forge"] .log-panel.smelt-stock-dock {
+    display: flex !important;
+    top: 0; height: min(38vh, 240px);
+    padding: max(0.6rem, env(safe-area-inset-top)) 1rem 0.4rem;
+    border-top: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  body[data-tab="forge"] .smelt-stock-dock .smelt-stock-list {
+    max-height: none; flex: 1; min-height: 0;
+  }
+  body[data-tab="forge"] .app {
+    display: flex;
+    position: fixed;
+    top: min(38vh, 240px); left: 0; right: 0; bottom: var(--tabbar-h);
+    padding: 0.45rem 0.75rem 0.5rem;
+    overflow-y: auto; overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  body[data-tab="forge"] .forge-topbar  { padding: 0 0 0.15rem; }
+  body[data-tab="forge"] .forge-stage   { justify-content: flex-start; }
+  body[data-tab="forge"] .forge-split   { flex-direction: column; align-items: stretch; }
+  body[data-tab="forge"] .refine-panel  { max-width: 100%; flex: none; }
+  body[data-tab="forge"] .furnace-panel { display: none !important; }
+
+  /* ══ TAB: 기초재료 ══ */
+  body[data-tab="stock"] .log-panel.smelt-stock-dock {
+    display: flex !important;
+    top: 0; bottom: var(--tabbar-h);
+    padding: max(0.9rem, env(safe-area-inset-top)) 1rem 0.75rem;
+    border-top: none; border-bottom: none;
+  }
+  body[data-tab="stock"] .smelt-stock-dock .smelt-stock-list {
+    max-height: none; flex: 1; min-height: 0;
+    flex-wrap: wrap; align-content: flex-start;
+  }
+
+  /* ══ TAB: 장비 ══ */
+  body[data-tab="equipment"] .log-panel.forge-extra {
+    display: flex !important;
+    top: 0; bottom: var(--tabbar-h);
+    padding: max(0.9rem, env(safe-area-inset-top)) 1rem 0.75rem;
+    border-top: none; border-bottom: none;
+  }
+  body[data-tab="equipment"] .log-panel.forge-extra .crafted-list {
+    max-height: none; flex: 1; min-height: 0;
+  }
+}
+
 /* ── 숙련도 표시 바 ───────────────────────── */
 .proficiency-bar {
   display: flex;
