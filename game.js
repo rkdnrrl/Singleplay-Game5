@@ -2479,16 +2479,14 @@
         cell.setAttribute('data-slot', String(i));
 
         if (m) {
-          const isCorrect = preferredSlotFromId(m.smeltId) === i;
-          cell.className = `forge-grid-cell forge-grid-cell--filled${isCorrect ? ' forge-grid-cell--fit' : ' forge-grid-cell--misfit'}`;
+          cell.className = 'forge-grid-cell forge-grid-cell--filled';
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'fgc-remove-btn';
           const label = m.name.length > 5 ? m.name.slice(0, 4) + '…' : m.name;
-          btn.title = `${m.name} — ${isCorrect ? '✓ 선호 슬롯' : '✗ 비선호 슬롯 (스탯↓)'}  클릭하여 빼기`;
+          btn.title = `${m.name}  클릭하여 빼기`;
           btn.innerHTML = `<span class="fgc-emoji">${escapeHtml(m.emoji || '◆')}</span>`
-            + `<span class="fgc-name">${escapeHtml(label)}</span>`
-            + `<span class="fgc-fit-badge">${isCorrect ? '✓' : '✗'}</span>`;
+            + `<span class="fgc-name">${escapeHtml(label)}</span>`;
           btn.addEventListener('click', () => removeSelectedUid(m.uid));
           cell.appendChild(btn);
         } else {
@@ -2549,7 +2547,6 @@
       const harmLabel = clientHarmonyLabel(uniqueTiers);
       const successPct = Math.round(clientSuccessRate(smithingProficiency, avgStr) * 100);
       const activeSyn = detectClientSynergies(items);
-      const correctFit = selected.filter((m, i) => m && isSmeltMaterial(m) && preferredSlotFromId(m.smeltId) === i).length;
       const harmCls = activeSyn.length > 0 ? 'strength--legendary'
         : uniqueTiers >= 4 ? 'strength--legendary'
         : uniqueTiers >= 3 ? 'strength--strong'
@@ -2558,8 +2555,7 @@
       const synLine = activeSyn.length > 0
         ? `  ⚡ ${activeSyn.map((s) => s.name).join(' · ')}`
         : '';
-      const fitLine = `  · 적합 ${correctFit}/${items.length}`;
-      statusMsgEl.textContent = `재료 ${items.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${fitLine}${synLine}`;
+      statusMsgEl.textContent = `재료 ${items.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${synLine}`;
       statusMsgEl.className = `status-msg ${harmCls}`;
       return;
     }
@@ -2645,9 +2641,7 @@
     resultRarity.textContent = tierLabel(tier);
     resultName.textContent = eq.name || eq.displayName || '장비';
     const baseDesc = eq.description || eq.desc || '';
-    const fitLine = fitScore
-      ? `적합 슬롯 ${fitScore.correct}/${fitScore.total}${fitScore.correct === fitScore.total ? ' 🌟 완벽!' : ''}\n`
-      : '';
+    const fitLine = '';
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
       const dur =
