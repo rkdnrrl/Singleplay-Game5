@@ -3119,6 +3119,198 @@
     renderPixelCanvas();
   }
 
+  // ── 유니티 스타일 컬러 피커 ──────────────────────────────────
+  const CPK_W = 220, CPK_CX = 110, CPK_CY = 110;
+  const CPK_OR = 100, CPK_IR = 72, CPK_SH = 46; // outer/inner radius, SV half-side
+
+  const _cpk = { h: 0, s: 1, v: 0.75 };
+  let _cpkDragZone = null;
+
+  function _hsvToRgb(h, s, v) {
+    const i = Math.floor(h / 60) % 6, f = h / 60 - Math.floor(h / 60);
+    const p = v*(1-s), q = v*(1-f*s), t = v*(1-(1-f)*s);
+    const m = [[v,t,p,p,q,v],[q,v,v,t,p,p],[p,p,q,v,v,t]];
+    return { r: Math.round(m[0][i]*255), g: Math.round(m[1][i]*255), b: Math.round(m[2][i]*255) };
+  }
+  function _rgbToHsv(r, g, b) {
+    r/=255; g/=255; b/=255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+    let h=0;
+    if (d>0) {
+      if (max===r) h=((g-b)/d)%6;
+      else if (max===g) h=(b-r)/d+2;
+      else h=(r-g)/d+4;
+      h=((h*60)+360)%360;
+    }
+    return { h, s: max===0?0:d/max, v: max };
+  }
+  function _hexToRgb(hex) {
+    const h=(hex||'').replace('#','');
+    if (h.length!==6) return null;
+    const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+    return (isNaN(r)||isNaN(g)||isNaN(b))?null:{r,g,b};
+  }
+  function _toHex(r,g,b) { return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''); }
+
+  function _cpkCurrentHex() { const {r,g,b}=_hsvToRgb(_cpk.h,_cpk.s,_cpk.v); return _toHex(r,g,b); }
+
+  function _cpkRender() {
+    const canvas = document.getElementById('cpkRingCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    ctx.clearRect(0,0,W,W);
+
+    // 색상환 링 (ImageData)
+    const img = ctx.createImageData(W, W);
+    const d = img.data;
+    for (let y=0; y<W; y++) {
+      for (let x=0; x<W; x++) {
+        const dx=x-CPK_CX, dy=y-CPK_CY, dist=Math.hypot(dx,dy);
+        if (dist<CPK_IR||dist>CPK_OR) continue;
+        const angle=((Math.atan2(dy,dx)*180/Math.PI)+90+360)%360;
+        const {r,g,b}=_hsvToRgb(angle,1,1);
+        const idx=(y*W+x)*4;
+        d[idx]=r; d[idx+1]=g; d[idx+2]=b; d[idx+3]=255;
+      }
+    }
+    ctx.putImageData(img,0,0);
+
+    // SV 사각형
+    const sx=CPK_CX-CPK_SH, sy=CPK_CY-CPK_SH, sw=CPK_SH*2, sh=CPK_SH*2;
+    const {r,g,b}=_hsvToRgb(_cpk.h,1,1);
+    const gH=ctx.createLinearGradient(sx,sy,sx+sw,sy);
+    gH.addColorStop(0,'#fff'); gH.addColorStop(1,`rgb(${r},${g},${b})`);
+    ctx.fillStyle=gH; ctx.fillRect(sx,sy,sw,sh);
+    const gV=ctx.createLinearGradient(sx,sy,sx,sy+sh);
+    gV.addColorStop(0,'rgba(0,0,0,0)'); gV.addColorStop(1,'#000');
+    ctx.fillStyle=gV; ctx.fillRect(sx,sy,sw,sh);
+
+    // 색상환 커서 (링 위의 원)
+    const hRad=(_cpk.h-90)*Math.PI/180;
+    const cr=(CPK_IR+CPK_OR)/2;
+    const hcx=CPK_CX+Math.cos(hRad)*cr, hcy=CPK_CY+Math.sin(hRad)*cr;
+    ctx.beginPath(); ctx.arc(hcx,hcy,9,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=3; ctx.stroke();
+    ctx.beginPath(); ctx.arc(hcx,hcy,9,0,Math.PI*2);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+
+    // SV 커서
+    const scx=sx+_cpk.s*sw, scy=sy+(1-_cpk.v)*sh;
+    ctx.beginPath(); ctx.arc(scx,scy,7,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=3; ctx.stroke();
+    ctx.beginPath(); ctx.arc(scx,scy,7,0,Math.PI*2);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+
+    // 입력 동기화
+    const hex=_cpkCurrentHex();
+    const {r:rr,g:gg,b:bb}=_hsvToRgb(_cpk.h,_cpk.s,_cpk.v);
+    const hexEl=document.getElementById('cpkHex');
+    const rEl=document.getElementById('cpkR'), gEl=document.getElementById('cpkG'), bEl=document.getElementById('cpkB');
+    const preview=document.getElementById('cpkPreview');
+    const swatch=document.getElementById('equipColorSwatch');
+    const eraserBtn=document.getElementById('equipEraserBtn');
+    if (hexEl&&document.activeElement!==hexEl) hexEl.value=hex.slice(1);
+    if (rEl&&document.activeElement!==rEl) rEl.value=rr;
+    if (gEl&&document.activeElement!==gEl) gEl.value=gg;
+    if (bEl&&document.activeElement!==bEl) bEl.value=bb;
+    if (preview) preview.style.background=hex;
+    if (swatch) swatch.style.background=hex;
+    if (eraserBtn) eraserBtn.classList.remove('is-active');
+    pixelColor=hex;
+  }
+
+  function _cpkHitTest(x, y) {
+    const dx=x-CPK_CX, dy=y-CPK_CY, dist=Math.hypot(dx,dy);
+    if (dist>=CPK_IR-4&&dist<=CPK_OR+4) return 'ring';
+    const sx=CPK_CX-CPK_SH, sy=CPK_CY-CPK_SH, sw=CPK_SH*2, sh=CPK_SH*2;
+    if (x>=sx&&x<=sx+sw&&y>=sy&&y<=sy+sh) return 'sv';
+    return null;
+  }
+
+  function _cpkApplyEvent(e, canvas) {
+    const rect=canvas.getBoundingClientRect();
+    const scale=CPK_W/rect.width;
+    const x=(e.clientX-rect.left)*scale, y=(e.clientY-rect.top)*scale;
+    const dx=x-CPK_CX, dy=y-CPK_CY;
+    if (_cpkDragZone==='ring') {
+      _cpk.h=((Math.atan2(dy,dx)*180/Math.PI)+90+360)%360;
+    } else if (_cpkDragZone==='sv') {
+      const sx=CPK_CX-CPK_SH, sy=CPK_CY-CPK_SH;
+      _cpk.s=Math.max(0,Math.min(1,(x-sx)/(CPK_SH*2)));
+      _cpk.v=Math.max(0,Math.min(1,1-(y-sy)/(CPK_SH*2)));
+    }
+    _cpkRender();
+  }
+
+  function cpkOpen(initialColor) {
+    const popup=document.getElementById('colorPickerPopup');
+    if (!popup) return;
+    if (initialColor) {
+      const rgb=_hexToRgb(initialColor);
+      if (rgb) Object.assign(_cpk, _rgbToHsv(rgb.r,rgb.g,rgb.b));
+    }
+    popup.classList.remove('cpk-popup--hidden');
+    _cpkRender();
+
+    const canvas=document.getElementById('cpkRingCanvas');
+    if (canvas) {
+      let painting=false;
+      canvas.onpointerdown=(e)=>{
+        e.preventDefault(); painting=true; canvas.setPointerCapture(e.pointerId);
+        const rect=canvas.getBoundingClientRect(), scale=CPK_W/rect.width;
+        const x=(e.clientX-rect.left)*scale, y=(e.clientY-rect.top)*scale;
+        _cpkDragZone=_cpkHitTest(x,y);
+        _cpkApplyEvent(e,canvas);
+      };
+      canvas.onpointermove=(e)=>{ if(painting){e.preventDefault();_cpkApplyEvent(e,canvas);} };
+      canvas.onpointerup=canvas.onpointercancel=()=>{ painting=false; _cpkDragZone=null; };
+    }
+
+    const hexEl=document.getElementById('cpkHex');
+    if (hexEl) hexEl.oninput=()=>{
+      const rgb=_hexToRgb(hexEl.value);
+      if(rgb){Object.assign(_cpk,_rgbToHsv(rgb.r,rgb.g,rgb.b));_cpkRender();}
+    };
+    ['R','G','B'].forEach(ch=>{
+      const el=document.getElementById('cpk'+ch);
+      if(!el) return;
+      el.oninput=()=>{
+        const r=parseInt(document.getElementById('cpkR')?.value||0,10);
+        const g=parseInt(document.getElementById('cpkG')?.value||0,10);
+        const b=parseInt(document.getElementById('cpkB')?.value||0,10);
+        if([r,g,b].some(isNaN)) return;
+        Object.assign(_cpk,_rgbToHsv(
+          Math.max(0,Math.min(255,r)),
+          Math.max(0,Math.min(255,g)),
+          Math.max(0,Math.min(255,b))
+        ));
+        _cpkRender();
+      };
+    });
+
+    const eyeBtn=document.getElementById('cpkEyedropper');
+    if (eyeBtn) {
+      eyeBtn.disabled=!window.EyeDropper;
+      eyeBtn.onclick=async()=>{
+        if(!window.EyeDropper) return;
+        try {
+          const res=await new EyeDropper().open();
+          const rgb=_hexToRgb(res.sRGBHex);
+          if(rgb){Object.assign(_cpk,_rgbToHsv(rgb.r,rgb.g,rgb.b));_cpkRender();}
+        } catch{}
+      };
+    }
+
+    document.getElementById('cpkClose').onclick=cpkClose;
+    document.getElementById('cpkBackdrop').onclick=cpkClose;
+  }
+
+  function cpkClose() {
+    const popup=document.getElementById('colorPickerPopup');
+    if(popup) popup.classList.add('cpk-popup--hidden');
+  }
+
   function showCustomizeModal(mats) {
     const modal = document.getElementById('equipCustomizeModal');
     const nameInput = document.getElementById('equipNameInput');
@@ -3137,20 +3329,16 @@
       canvas.onpointerup = canvas.onpointerleave = canvas.onpointercancel = () => { pixelPainting = false; };
     }
 
-    const colorPicker = document.getElementById('equipColorPicker');
     const eraserBtn = document.getElementById('equipEraserBtn');
-    if (colorPicker) {
-      colorPicker.value = pixelColor || '#c0392b';
-      colorPicker.oninput = () => {
-        pixelColor = colorPicker.value;
-        eraserBtn && eraserBtn.classList.remove('is-active');
-      };
-    }
+    const colorBtn = document.getElementById('equipColorBtn');
+    if (colorBtn) colorBtn.onclick = () => cpkOpen(pixelColor || '#c0392b');
     if (eraserBtn) {
       eraserBtn.classList.toggle('is-active', pixelColor === null);
       eraserBtn.onclick = () => {
         pixelColor = null;
         eraserBtn.classList.add('is-active');
+        const sw = document.getElementById('equipColorSwatch');
+        if (sw) sw.style.background = 'repeating-conic-gradient(#555 0% 25%,#333 0% 50%) 0 0/10px 10px';
       };
     }
 

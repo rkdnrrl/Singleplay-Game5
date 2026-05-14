@@ -215,10 +215,10 @@
       <div class="equip-customize-body">
         <canvas id="equipPixelCanvas" class="equip-pixel-canvas" width="320" height="320"></canvas>
         <div class="equip-palette-wrap">
-          <label class="equip-color-label">
-            <span class="equip-color-label-text">색상</span>
-            <input type="color" id="equipColorPicker" class="equip-color-picker" value="#c0392b" />
-          </label>
+          <button type="button" id="equipColorBtn" class="equip-color-btn">
+            <span id="equipColorSwatch" class="equip-color-swatch"></span>
+            <span class="equip-color-btn-text">색상</span>
+          </button>
           <button type="button" id="equipEraserBtn" class="equip-eraser-btn">지우개</button>
           <button type="button" id="equipClearBtn" class="equip-clear-btn">전체 지우기</button>
         </div>
@@ -226,6 +226,31 @@
       <div class="equip-customize-actions">
         <button type="button" id="equipRandomPixelBtn" class="equip-rand-pixel-btn">🎲 랜덤 도안</button>
         <button type="button" id="equipCustomizeDoneBtn" class="equip-done-btn">✅ 완성하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 유니티 스타일 컬러 피커 팝업 -->
+  <div id="colorPickerPopup" class="cpk-popup cpk-popup--hidden" role="dialog" aria-modal="true" aria-label="색상 선택">
+    <div class="cpk-backdrop" id="cpkBackdrop"></div>
+    <div class="cpk-card">
+      <div class="cpk-header">
+        <span class="cpk-title">색상 선택</span>
+        <button type="button" class="cpk-close" id="cpkClose">✕</button>
+      </div>
+      <canvas id="cpkRingCanvas" class="cpk-ring-canvas" width="220" height="220"></canvas>
+      <div class="cpk-preview-row">
+        <div class="cpk-preview" id="cpkPreview"></div>
+        <div class="cpk-hex-wrap">
+          <span class="cpk-hash">#</span>
+          <input id="cpkHex" class="cpk-hex-input" type="text" maxlength="6" spellcheck="false" autocomplete="off" placeholder="rrggbb" />
+        </div>
+        <button type="button" id="cpkEyedropper" class="cpk-eyedropper-btn" title="스포이드">💉</button>
+      </div>
+      <div class="cpk-rgb-row">
+        <label class="cpk-rgb-label">R<input id="cpkR" type="number" min="0" max="255" class="cpk-rgb-input" /></label>
+        <label class="cpk-rgb-label">G<input id="cpkG" type="number" min="0" max="255" class="cpk-rgb-input" /></label>
+        <label class="cpk-rgb-label">B<input id="cpkB" type="number" min="0" max="255" class="cpk-rgb-input" /></label>
       </div>
     </div>
   </div>
