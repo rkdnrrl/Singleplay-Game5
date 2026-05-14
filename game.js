@@ -1198,20 +1198,20 @@
     const equipItems = furnaceSelected.filter((m) => isEquipmentMaterial(m));
     if (furnaceEquipWarnEl) furnaceEquipWarnEl.classList.toggle('hidden', equipItems.length === 0);
     if (furnacePreviewEl) {
-      if (equipItems.length > 0) {
-        const previewParts = [];
+      const catchItems = furnaceSelected.filter((m) => !isEquipmentMaterial(m));
+      if (furnaceSelected.length === 0) {
+        furnacePreviewEl.textContent = '';
+      } else {
+        const parts = [];
         for (const m of equipItems) {
           const mats = equipSourceMatsMap.get(String(m.equipmentId)) || [];
           for (const sm of mats.filter((x) => x.kind === 'smelt')) {
             const meta = smeltProductMeta(sm.id);
-            previewParts.push(`${meta.emoji} ${meta.name}`);
+            parts.push(`${meta.emoji} ${meta.name}`);
           }
         }
-        furnacePreviewEl.textContent = previewParts.length > 0
-          ? `예상 산출물: ${previewParts.join(', ')}`
-          : '';
-      } else {
-        furnacePreviewEl.textContent = '';
+        if (catchItems.length > 0) parts.push('?');
+        furnacePreviewEl.textContent = parts.length > 0 ? `예상: ${parts.join(', ')}` : '🎲 무엇이 나올지 알 수 없어요';
       }
     }
     renderSmeltStock();

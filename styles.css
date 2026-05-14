@@ -367,10 +367,12 @@ html.material-detail-open body {
 
 .furnace-preview {
   font-size: 0.68rem;
-  color: #b0bec5;
+  color: #7e57c2;
   text-align: center;
   min-height: 1.2em;
   padding: 0 0.25rem;
+  font-style: italic;
+  opacity: 0.85;
 }
 
 .furnace-result {
