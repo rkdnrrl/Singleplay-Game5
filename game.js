@@ -2643,15 +2643,23 @@
     }
     if (resultSpriteHost) {
       resultSpriteHost.innerHTML = '';
-      if (Array.isArray(eq.pixelArt) && eq.pixelArt.length === 1024) {
+      const pa = eq.pixelArt;
+      if (pa && typeof pa === 'object' && !Array.isArray(pa) && pa.imageDataUrl) {
+        const im = document.createElement('img');
+        im.src = pa.imageDataUrl;
+        im.alt = '';
+        im.decoding = 'async';
+        im.style.cssText = 'width:88px;height:88px;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:4px;object-fit:contain';
+        resultSpriteHost.appendChild(im);
+      } else if (Array.isArray(pa) && pa.length === 1024) {
         const cv = document.createElement('canvas');
         cv.width = 128; cv.height = 128;
         cv.style.cssText = 'width:88px;height:88px;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:4px';
         const ctx = cv.getContext('2d');
-        const cell = 4; // 128/32
+        const cell = 4;
         for (let i = 0; i < 1024; i++) {
-          if (!eq.pixelArt[i]) continue;
-          ctx.fillStyle = eq.pixelArt[i];
+          if (!pa[i]) continue;
+          ctx.fillStyle = pa[i];
           ctx.fillRect((i % 32) * cell, Math.floor(i / 32) * cell, cell, cell);
         }
         resultSpriteHost.appendChild(cv);
@@ -2661,7 +2669,7 @@
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
 
-  async function forge(customName, pixelArtData) {
+  async function forge(customName, pixelArtData, pixelArtUrl) {
     if (forgeInFlight) return;
     const usedSlots = selected.map((m, i) => m ? { m, i } : null).filter(Boolean);
     if (usedSlots.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
@@ -2699,7 +2707,12 @@
           'Content-Type': 'application/json',
           Authorization: `Bearer ${alpToken}`,
         },
-        body: JSON.stringify({ materials: materialsPayload, customName: customName || undefined, pixelArtData: pixelArtData || undefined }),
+        body: JSON.stringify({
+          materials: materialsPayload,
+          customName: customName || undefined,
+          pixelArtUrl: pixelArtUrl || undefined,
+          pixelArtData: (!pixelArtUrl && Array.isArray(pixelArtData) && pixelArtData.some(Boolean)) ? pixelArtData : undefined,
+        }),
       });
       const text = await res.text();
       let data = null;
@@ -3020,6 +3033,7 @@
   const EQUIP_NOUNS = ['검','도끼','창','활','단검','대검','방패','갑옷','투구','장갑','장화','반지','목걸이','지팡이','망치','낫'];
 
   let pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
+  let pixelArtImageUrl = null; // PixelLab 생성 이미지 URL (base64)
   let pixelColor = '#c0392b'; // 기본: 빨강 (null = 지우개)
   let pixelPainting = false;
 
@@ -3030,6 +3044,74 @@
     if (words.length === 0) return `강철 ${noun}`;
     if (words.length === 1) return `${words[0]} ${noun}`;
     return `${words[0]}·${words[1]} ${noun}`;
+  }
+
+  // base64 PNG → pixelGrid (32×32) 변환 (64×64 이미지 2×2 블록 평균)
+  function _imageUrlToPixelGrid(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const ofc = document.createElement('canvas');
+        ofc.width = 64; ofc.height = 64;
+        const octx = ofc.getContext('2d');
+        octx.drawImage(img, 0, 0, 64, 64);
+        const G = PIXEL_G; // 32
+        const scale = 2; // 64 / 32
+        const idata = octx.getImageData(0, 0, 64, 64).data;
+        const grid = new Array(G * G).fill(null);
+        for (let gy = 0; gy < G; gy++) {
+          for (let gx = 0; gx < G; gx++) {
+            let r = 0, g = 0, b = 0, a = 0;
+            for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++) {
+              const px = ((gy * scale + dy) * 64 + (gx * scale + dx)) * 4;
+              r += idata[px]; g += idata[px + 1]; b += idata[px + 2]; a += idata[px + 3];
+            }
+            if (a / 4 < 80) continue; // 투명
+            const hr = Math.round(r / 4).toString(16).padStart(2, '0');
+            const hg = Math.round(g / 4).toString(16).padStart(2, '0');
+            const hb = Math.round(b / 4).toString(16).padStart(2, '0');
+            grid[gy * G + gx] = `#${hr}${hg}${hb}`;
+          }
+        }
+        pixelGrid = grid;
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = url;
+    });
+  }
+
+  // PixelLab API로 픽셀아트 생성 (캐시 있으면 즉시 반환)
+  async function _genPixelArtApi(mats, name) {
+    const btn = document.getElementById('equipRandomPixelBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '생성중…'; }
+    try {
+      if (!alpToken || !platformApi) throw new Error('no-token');
+      const tiers = mats.filter(Boolean).map((m) => m.tier || 'common');
+      const tier = tiers.includes('legendary') ? 'legendary' : tiers.includes('epic') ? 'epic' : tiers.includes('rare') ? 'rare' : 'common';
+      const res = await fetch(`${platformApi}/api/craft/generate-pixel-art`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+        body: JSON.stringify({ name, tier }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = await res.json();
+      if (data.imageDataUrl) {
+        pixelArtImageUrl = data.imageDataUrl;
+        await _imageUrlToPixelGrid(data.imageDataUrl);
+        renderPixelCanvas();
+        return;
+      }
+      throw new Error('no imageDataUrl');
+    } catch (e) {
+      console.warn('[pixel-art] PixelLab 실패, 로컬 생성으로 대체:', e?.message || e);
+      // 폴백: 로컬 마스크 기반 생성
+      pixelArtImageUrl = null;
+      pixelGrid = generateRandomPixels(mats, name);
+      renderPixelCanvas();
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '랜덤도안'; }
+    }
   }
 
   // ── 픽셀 아트 생성 (마스크 기반 알고리즘) ─────────────────────
@@ -3544,11 +3626,13 @@
     if (!modal) return;
     const initName = generateEquipName(mats);
     if (nameInput) nameInput.value = initName;
-    pixelGrid = generateRandomPixels(mats, initName);
+    pixelArtImageUrl = null;
+    pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
     modal.classList.remove('equip-customize-modal--hidden');
     modal.setAttribute('aria-hidden', 'false');
     renderPixelCanvas();
     nameInput && nameInput.focus();
+    void _genPixelArtApi(mats, initName);
 
     const canvas = document.getElementById('equipPixelCanvas');
     if (canvas) {
@@ -3576,12 +3660,17 @@
     const doneBtn = document.getElementById('equipCustomizeDoneBtn');
     const backdrop = document.getElementById('equipCustomizeBackdrop');
     if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats); };
-    if (rndPixelBtn) rndPixelBtn.onclick = () => { pixelGrid = generateRandomPixels(mats, nameInput?.value || ''); renderPixelCanvas(); };
-    if (clearBtn) clearBtn.onclick = () => { pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null); renderPixelCanvas(); };
+    if (rndPixelBtn) rndPixelBtn.onclick = () => {
+      pixelArtImageUrl = null;
+      void _genPixelArtApi(mats, nameInput?.value || '');
+    };
+    if (clearBtn) clearBtn.onclick = () => { pixelArtImageUrl = null; pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null); renderPixelCanvas(); };
     if (doneBtn) doneBtn.onclick = () => {
       const name = (nameInput?.value || '').trim() || generateEquipName(mats);
+      const gridCopy = [...pixelGrid];
+      const urlCopy = pixelArtImageUrl;
       hideCustomizeModal();
-      void forge(name, [...pixelGrid]);
+      void forge(name, gridCopy, urlCopy);
     };
     if (backdrop) backdrop.onclick = () => { hideCustomizeModal(); };
   }
