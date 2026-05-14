@@ -1264,7 +1264,8 @@
       }
       setFurnaceMsg(msg);
       serverMeltLost = [];
-      window.location.reload();
+      renderSmeltStock();
+      window.setTimeout(() => setFurnaceMsg(''), 4200);
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
       window.setTimeout(() => setFurnaceMsg(''), 4200);
