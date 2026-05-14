@@ -2648,9 +2648,9 @@
       btnForge.disabled = true;
       btnForge.textContent = '제련 중…';
     }
-    setForgeOverlay(true);
 
-    // 오버레이 뜨는 즉시 recipe-check → 첫 조합이면 배너 즉시 표시
+    // recipe-check 먼저 → 새 조합이면 오버레이, 기존 조합이면 바로 제작
+    let isNewRecipe = false;
     {
       const smeltIds = materialsPayload
         .filter((m) => m.kind === 'smelt')
@@ -2658,18 +2658,22 @@
         .sort()
         .join(',');
       if (smeltIds) {
-        fetch(
-          `${platformApi}/api/craft/recipe-check?slot=${encodeURIComponent(forgeSlot)}&ids=${encodeURIComponent(smeltIds)}`,
-          { headers: { Authorization: `Bearer ${alpToken}` } },
-        )
-          .then((r) => r.json())
-          .then((d) => {
-            if (d.isNew && forgeDiscoveryBannerEl) {
-              forgeDiscoveryBannerEl.textContent = '✨ 도감에 없는 조합입니다! 축하합니다!';
-              forgeDiscoveryBannerEl.classList.remove('forge-discovery-banner--hidden');
-            }
-          })
-          .catch(() => {});
+        try {
+          const rr = await fetch(
+            `${platformApi}/api/craft/recipe-check?slot=${encodeURIComponent(forgeSlot)}&ids=${encodeURIComponent(smeltIds)}`,
+            { headers: { Authorization: `Bearer ${alpToken}` } },
+          );
+          const dd = await rr.json();
+          isNewRecipe = !!dd.isNew;
+        } catch {}
+      }
+    }
+    if (isNewRecipe) {
+      setForgeOverlay(true);
+      if (forgeOverlayTitleEl) forgeOverlayTitleEl.textContent = '새로운 조합 발견!';
+      if (forgeDiscoveryBannerEl) {
+        forgeDiscoveryBannerEl.textContent = '✨ 축하드립니다! 도감에 없는 새 조합이에요.';
+        forgeDiscoveryBannerEl.classList.remove('forge-discovery-banner--hidden');
       }
     }
 
