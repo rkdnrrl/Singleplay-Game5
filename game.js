@@ -3827,6 +3827,7 @@
   const REPAIR_COLS = 6, REPAIR_ROWS = 8;
   const REPAIR_COST_TABLE = { common: 5, rare: 12, epic: 30, legendary: 70 };
   let repairItem = null;
+  let repairItemIsModule = false;  // true면 모듈 수리
   let repairModulePool = [];  // 수리 탭용 모듈 캐시
   let repairMaxDur = 0, repairOrigDur = 0, repairDur = 0;
   let repairCracks      = null;
@@ -3926,6 +3927,7 @@
     if (maxDur <= 0) { repairMsg('내구도가 없는 장비입니다.'); return; }
     const curDur = stats.durability != null ? Number(stats.durability) : maxDur;
     const eqId = item.equipmentId || item.id || '';
+    repairItemIsModule = false;
     repairItem = { ...item, _eqId: eqId };
     repairMaxDur = maxDur; repairOrigDur = curDur;
     repairDur = curDur; repairSpent = 0;
@@ -4332,21 +4334,31 @@
     const btn = document.getElementById('repairConfirmBtn');
     if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
     try {
-      const res = await fetch(`${platformApi}/api/craft/equipment/${encodeURIComponent(repairItem._eqId)}/repair`, {
+      let url, body;
+      if (repairItemIsModule) {
+        url  = `${platformApi}/api/modules/${encodeURIComponent(repairItem._eqId)}/repair`;
+        body = JSON.stringify({ amount: netRepair });
+      } else {
+        url  = `${platformApi}/api/craft/equipment/${encodeURIComponent(repairItem._eqId)}/repair`;
+        body = JSON.stringify({ amount: netRepair });
+      }
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
-        body: JSON.stringify({ amount: netRepair }),
+        body,
       });
       const d = await res.json();
       if (!res.ok) { repairMsg(d?.error?.message || '수리에 실패했습니다.'); return; }
       totalCoins = Math.max(0, totalCoins - (d.costPaid || 0));
       updateCoinDisplay();
       repairMsg(`✅ 수리 완료! 🪙-${d.costPaid}`);
+      const wasModule = repairItemIsModule;
       repairItem = null;
+      repairItemIsModule = false;
       $repairCanvas?.classList.add('hidden');
       $repairControls?.classList.add('hidden');
       $repairHint?.classList.remove('hidden');
-      await refreshCraftedList();
+      if (!wasModule) await refreshCraftedList();
       refreshRepairEquipList();
     } catch { repairMsg('수리 중 오류가 발생했습니다.'); }
     finally {
@@ -4446,65 +4458,47 @@
   }
 
   function loadRepairModule(mod) {
-    // 해머 미니게임 숨기고 모듈 수리 카드 표시
+    if (!mod || mod.durability >= mod.durabilityMax) { repairMsg('내구도가 최대입니다.'); return; }
+
+    repairItemIsModule = true;
+    repairItem = { tier: mod.tier, name: mod.name, emoji: '🔩', _eqId: mod.id };
+    repairMaxDur = mod.durabilityMax;
+    repairOrigDur = mod.durability;
+    repairDur = mod.durability;
+    repairSpent = 0;
+    repairCracks = generateCracks(mod.durability, mod.durabilityMax, mod.id);
+
+    const dm = {
+      common:    [0.0011, 0.0038, 0.30, 0.12],
+      rare:      [0.0014, 0.0046, 0.26, 0.10],
+      epic:      [0.0018, 0.0054, 0.22, 0.08],
+      legendary: [0.0024, 0.0064, 0.18, 0.07],
+    };
+    const d = dm[String(mod.tier || 'common').toLowerCase()] || dm.common;
+    repairHammerSpeed = d[0]; repairHammerSpeedMax = d[1];
+    repairStrikeThresh = d[2]; repairStrikeThreshMin = d[3];
+    repairHammerT = Math.PI * 0.5;
+    repairCombo = 0; repairFlash = null; repairParticles = []; repairLastTs = 0;
+    repairTargetCrack = repairCracks.size > 0
+      ? [...repairCracks][Math.floor(Math.random() * repairCracks.size)] : null;
+    repairImg = null;  // 모듈은 이미지 없음 — 이모지로 표시
+
+    $repairEquipList?.querySelectorAll('[data-module-id]')
+      .forEach(el => el.classList.toggle('is-selected', el.dataset.moduleId === mod.id));
     $repairHint?.classList.add('hidden');
-    $repairCanvas?.classList.add('hidden');
-    $repairControls?.classList.add('hidden');
-
-    const dropZone = document.getElementById('repairDropZone');
-    if (!dropZone) return;
-
+    $repairCanvas?.classList.remove('hidden');
+    $repairControls?.classList.remove('hidden');
     document.getElementById('repairModuleCard')?.remove();
-
-    const TIER_COLOR  = { common: '#9ca3af', rare: '#60a5fa', epic: '#c084fc', legendary: '#fbbf24' };
-    const TIER_LABEL  = { common: '일반', rare: '희귀', epic: '에픽', legendary: '전설' };
-    const COST_PER_DUR = { common: 3, rare: 8, epic: 20, legendary: 50 };
-    const need = mod.durabilityMax - mod.durability;
-    const cost = Math.ceil(need * (COST_PER_DUR[mod.tier] || 3));
-
-    const card = document.createElement('div');
-    card.id = 'repairModuleCard';
-    card.className = 'repair-module-card';
-    card.innerHTML = `
-      <div class="rmc-name" style="color:${TIER_COLOR[mod.tier] || '#fff'}">🔩 ${mod.name}</div>
-      <div class="rmc-tier">${TIER_LABEL[mod.tier] || mod.tier}</div>
-      <div class="rmc-dur-bar-wrap">
-        <div class="rmc-dur-bar" style="width:${Math.round(mod.durability / mod.durabilityMax * 100)}%"></div>
-      </div>
-      <div class="rmc-dur-text">${mod.durability} / ${mod.durabilityMax}</div>
-      <div class="rmc-cost">수리 비용: 🪙 ${cost}</div>
-      <button class="rmc-btn" id="repairModuleBtn">🔧 수리하기</button>
-      <div class="rmc-msg" id="repairModuleMsg"></div>
-    `;
-    dropZone.appendChild(card);
-
-    document.getElementById('repairModuleBtn').addEventListener('click', () => confirmModuleRepair(mod.id, cost, card));
-  }
-
-  async function confirmModuleRepair(modId, cost, card) {
-    const btn = document.getElementById('repairModuleBtn');
-    const msg = document.getElementById('repairModuleMsg');
-    if (btn) { btn.disabled = true; btn.textContent = '수리 중...'; }
-    try {
-      const res = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/repair`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${alpToken}`, 'Content-Type': 'application/json' },
-      });
-      const d = await res.json();
-      if (!res.ok) {
-        if (msg) msg.textContent = d?.error?.message || '수리 실패';
-        if (btn) { btn.disabled = false; btn.textContent = '🔧 수리하기'; }
-        return;
+    if ($repairCanvas) {
+      const dz = document.getElementById('repairDropZone');
+      if (dz) {
+        $repairCanvas.width  = dz.clientWidth  || 320;
+        $repairCanvas.height = dz.clientHeight || 400;
+        repairCtx = $repairCanvas.getContext('2d');
       }
-      totalCoins = Math.max(0, totalCoins - (d.cost || cost));
-      updateCoinDisplay();
-      card?.remove();
-      $repairHint?.classList.remove('hidden');
-      refreshRepairEquipList();
-    } catch {
-      if (msg) msg.textContent = '오류가 발생했습니다.';
-      if (btn) { btn.disabled = false; btn.textContent = '🔧 수리하기'; }
     }
+    updateRepairHud();
+    startRepairHammer();
   }
 
   // 수리 탭 이벤트 바인딩
