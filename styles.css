@@ -2599,6 +2599,7 @@ body.forge-scroll-lock {
   /* ══ TAB: 수리 (모바일) ══ */
   body[data-tab="repair"] .repair-panel {
     display: flex !important;
+    flex-direction: column !important;
     position: fixed;
     top: env(safe-area-inset-top, 0px);
     left: 0; right: 0;
@@ -2606,6 +2607,14 @@ body.forge-scroll-lock {
     height: auto !important;
     z-index: 50;
     overflow: hidden;
+  }
+  body[data-tab="repair"] .repair-layout {
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  body[data-tab="repair"] .repair-canvas-area {
+    min-height: 0 !important;
   }
 }
 
@@ -2792,11 +2801,28 @@ body.forge-scroll-lock {
   /* ══ TAB: 수리 (PC) ══ */
   body[data-tab="repair"] .repair-panel {
     display: flex !important;
+    flex-direction: column !important;
     position: fixed !important;
     left: var(--sidebar-w) !important; top: 0 !important;
     right: 0 !important; bottom: 0 !important;
     height: auto !important;
     z-index: 50;
+    overflow: hidden;
+  }
+  body[data-tab="repair"] .repair-layout {
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+  body[data-tab="repair"] .repair-canvas-area {
+    min-height: 0 !important;
+  }
+  body[data-tab="repair"] .repair-equip-sidebar {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    width: 200px !important;
   }
 }
 
@@ -2848,6 +2874,7 @@ body.forge-scroll-lock {
 .repair-layout {
   display: flex;
   width: 100%; height: 100%;
+  min-height: 0;
   gap: 0;
 }
 /* 왼쪽: 캔버스 영역 */
@@ -3034,7 +3061,7 @@ body.forge-scroll-lock {
 /* PC 사이드바 너비 늘리기 */
 @media (min-width: 640px) {
   .repair-equip-sidebar { width: 180px; }
-  .repair-equip-name { max-width: 112px; }
+  .repair-equip-name { max-width: 130px; }
 }
 
 /* ══════════════════════════════════════════════════════════════
