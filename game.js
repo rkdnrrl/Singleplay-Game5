@@ -4353,7 +4353,7 @@
     }
   }
 
-  function refreshRepairEquipList() {
+  async function refreshRepairEquipList() {
     if (!$repairEquipList) return;
     $repairEquipList.innerHTML = '';
     const pool = (typeof serverEquipmentForgePool !== 'undefined') ? serverEquipmentForgePool : [];
@@ -4395,6 +4395,109 @@
         el.addEventListener('click', () => loadRepairItem(item));
       }
       $repairEquipList.appendChild(el);
+    }
+
+    // 모듈 섹션
+    try {
+      const modRes = await fetch(`${platformApi}/api/modules`, {
+        headers: { Authorization: `Bearer ${alpToken}` },
+      });
+      if (!modRes.ok) return;
+      const modData = await modRes.json();
+      const damaged = (modData.modules || []).filter(m => m.equippedTo == null && m.durability < m.durabilityMax);
+      if (damaged.length === 0) return;
+
+      const sep = document.createElement('p');
+      sep.className = 'repair-module-section-title';
+      sep.textContent = '🔩 모듈';
+      $repairEquipList.appendChild(sep);
+
+      const TIER_COLOR = { common: '#9ca3af', rare: '#60a5fa', epic: '#c084fc', legendary: '#fbbf24' };
+      for (const mod of damaged) {
+        const el = document.createElement('div');
+        el.className = 'repair-equip-item';
+        el.title = mod.name;
+
+        const thumb = document.createElement('div');
+        thumb.className = 'repair-equip-thumb';
+        thumb.textContent = '🔩';
+
+        const info = document.createElement('div');
+        info.className = 'repair-equip-info';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'repair-equip-name';
+        nameEl.textContent = mod.name;
+        nameEl.style.color = TIER_COLOR[mod.tier] || '#fff';
+        const durEl = document.createElement('div');
+        durEl.className = 'repair-equip-dur';
+        durEl.innerHTML = `<span style="color:#f87171">${mod.durability}/${mod.durabilityMax}</span>`;
+        info.appendChild(nameEl); info.appendChild(durEl);
+        el.appendChild(thumb); el.appendChild(info);
+        el.addEventListener('click', () => loadRepairModule(mod));
+        $repairEquipList.appendChild(el);
+      }
+    } catch { /* 모듈 로딩 실패 무시 */ }
+  }
+
+  function loadRepairModule(mod) {
+    // 해머 미니게임 숨기고 모듈 수리 카드 표시
+    $repairHint?.classList.add('hidden');
+    $repairCanvas?.classList.add('hidden');
+    $repairControls?.classList.add('hidden');
+
+    const dropZone = document.getElementById('repairDropZone');
+    if (!dropZone) return;
+
+    document.getElementById('repairModuleCard')?.remove();
+
+    const TIER_COLOR  = { common: '#9ca3af', rare: '#60a5fa', epic: '#c084fc', legendary: '#fbbf24' };
+    const TIER_LABEL  = { common: '일반', rare: '희귀', epic: '에픽', legendary: '전설' };
+    const COST_PER_DUR = { common: 3, rare: 8, epic: 20, legendary: 50 };
+    const need = mod.durabilityMax - mod.durability;
+    const cost = Math.ceil(need * (COST_PER_DUR[mod.tier] || 3));
+
+    const card = document.createElement('div');
+    card.id = 'repairModuleCard';
+    card.className = 'repair-module-card';
+    card.innerHTML = `
+      <div class="rmc-name" style="color:${TIER_COLOR[mod.tier] || '#fff'}">🔩 ${mod.name}</div>
+      <div class="rmc-tier">${TIER_LABEL[mod.tier] || mod.tier}</div>
+      <div class="rmc-dur-bar-wrap">
+        <div class="rmc-dur-bar" style="width:${Math.round(mod.durability / mod.durabilityMax * 100)}%"></div>
+      </div>
+      <div class="rmc-dur-text">${mod.durability} / ${mod.durabilityMax}</div>
+      <div class="rmc-cost">수리 비용: 🪙 ${cost}</div>
+      <button class="rmc-btn" id="repairModuleBtn">🔧 수리하기</button>
+      <div class="rmc-msg" id="repairModuleMsg"></div>
+    `;
+    dropZone.appendChild(card);
+
+    document.getElementById('repairModuleBtn').addEventListener('click', () => confirmModuleRepair(mod.id, cost, card));
+  }
+
+  async function confirmModuleRepair(modId, cost, card) {
+    const btn = document.getElementById('repairModuleBtn');
+    const msg = document.getElementById('repairModuleMsg');
+    if (btn) { btn.disabled = true; btn.textContent = '수리 중...'; }
+    try {
+      const res = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/repair`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${alpToken}`, 'Content-Type': 'application/json' },
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        if (msg) msg.textContent = d?.error?.message || '수리 실패';
+        if (btn) { btn.disabled = false; btn.textContent = '🔧 수리하기'; }
+        return;
+      }
+      totalCoins = Math.max(0, totalCoins - (d.cost || cost));
+      updateCoinDisplay();
+      card?.remove();
+      $repairHint?.classList.remove('hidden');
+      refreshRepairEquipList();
+    } catch {
+      if (msg) msg.textContent = '오류가 발생했습니다.';
+      if (btn) { btn.disabled = false; btn.textContent = '🔧 수리하기'; }
     }
   }
 

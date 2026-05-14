@@ -3041,6 +3041,71 @@ body.forge-scroll-lock {
   font-size: 0.62rem;
   color: rgba(200,190,240,0.55);
 }
+/* 모듈 수리 사이드바 구분선 */
+.repair-module-section-title {
+  font-size: 0.68rem;
+  font-family: Jua, sans-serif;
+  color: rgba(180,160,230,0.6);
+  padding: 0.35rem 0.4rem 0.15rem;
+  margin: 0;
+  border-top: 1px solid rgba(160,140,220,0.18);
+  margin-top: 0.3rem;
+}
+
+/* 모듈 수리 카드 (드롭존 내부) */
+.repair-module-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0.55rem;
+  padding: 1.2rem 1rem;
+  width: 100%; max-width: 280px;
+  margin: auto;
+}
+.rmc-name {
+  font-family: Jua, sans-serif;
+  font-size: 1rem;
+  text-align: center;
+}
+.rmc-tier {
+  font-size: 0.72rem;
+  color: rgba(200,190,240,0.55);
+}
+.rmc-dur-bar-wrap {
+  width: 100%; height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px; overflow: hidden;
+}
+.rmc-dur-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #f87171, #fb923c);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.rmc-dur-text {
+  font-size: 0.78rem;
+  color: rgba(232,230,255,0.7);
+}
+.rmc-cost {
+  font-size: 0.85rem;
+  color: #fbbf24;
+  font-family: Jua, sans-serif;
+}
+.rmc-btn {
+  padding: 0.45rem 1.2rem;
+  border: none; border-radius: 0.5rem;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+  font-family: Jua, sans-serif; font-size: 0.9rem;
+  cursor: pointer;
+}
+.rmc-btn:hover { filter: brightness(1.15); }
+.rmc-btn:disabled { opacity: 0.5; cursor: default; }
+.rmc-msg {
+  font-size: 0.78rem;
+  color: #f87171;
+  text-align: center;
+  min-height: 1em;
+}
+
 /* 코인 차감 플로팅 텍스트 */
 .repair-fx-coin {
   position: fixed;
