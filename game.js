@@ -1142,21 +1142,10 @@
           ev.dataTransfer.setData('text/plain', `forge-smelt:${sid}`);
           ev.dataTransfer.effectAllowed = 'copyMove';
           pill.classList.add('smelt-pill--dragging');
-          // 선호 슬롯 하이라이트
-          const pref = preferredSlotFromId(sid);
-          if (selectedSlotsEl) {
-            const prefCell = selectedSlotsEl.querySelector(`[data-slot="${pref}"]`);
-            if (prefCell && prefCell.classList.contains('forge-grid-cell--empty')) {
-              prefCell.classList.add('forge-grid-cell--preferred-target');
-            }
-          }
         });
         pill.addEventListener('dragend', () => {
           pill.classList.remove('smelt-pill--dragging');
           clearForgeDnDHover();
-          document.querySelectorAll('.forge-grid-cell--preferred-target').forEach((el) => {
-            el.classList.remove('forge-grid-cell--preferred-target');
-          });
         });
 
         pill.addEventListener(
@@ -2652,12 +2641,27 @@
     } else {
       resultDesc.textContent = `${fitLine}${baseDesc}`;
     }
-    if (resultSpriteHost) resultSpriteHost.innerHTML = '';
+    if (resultSpriteHost) {
+      resultSpriteHost.innerHTML = '';
+      if (Array.isArray(eq.pixelArt) && eq.pixelArt.length === 1024) {
+        const cv = document.createElement('canvas');
+        cv.width = 128; cv.height = 128;
+        cv.style.cssText = 'width:88px;height:88px;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:4px';
+        const ctx = cv.getContext('2d');
+        const cell = 4; // 128/32
+        for (let i = 0; i < 1024; i++) {
+          if (!eq.pixelArt[i]) continue;
+          ctx.fillStyle = eq.pixelArt[i];
+          ctx.fillRect((i % 32) * cell, Math.floor(i / 32) * cell, cell, cell);
+        }
+        resultSpriteHost.appendChild(cv);
+      }
+    }
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
 
-  async function forge() {
+  async function forge(customName, pixelArtData) {
     if (forgeInFlight) return;
     const usedSlots = selected.map((m, i) => m ? { m, i } : null).filter(Boolean);
     if (usedSlots.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
@@ -2695,7 +2699,7 @@
           'Content-Type': 'application/json',
           Authorization: `Bearer ${alpToken}`,
         },
-        body: JSON.stringify({ materials: materialsPayload }),
+        body: JSON.stringify({ materials: materialsPayload, customName: customName || undefined, pixelArtData: pixelArtData || undefined }),
       });
       const text = await res.text();
       let data = null;
@@ -2984,7 +2988,217 @@
       });
     });
   }
-  if (btnForge) btnForge.addEventListener('click', () => void forge());
+  // ── 픽셀 에디터 / 장비 커스터마이즈 ───────────────────────────
+  const PIXEL_G = 32; // 32×32 격자
+  const PIXEL_PALETTE = [
+    null,       // 지우개
+    '#1a1a2e', '#2d2d2d', '#5a5a5a', '#9e9e9e', '#f5f5f5',
+    '#5c2300', '#a0522d', '#c0392b', '#e67e22', '#f1c40f',
+    '#f0d060', '#27ae60', '#2980b9', '#3498db', '#8e44ad',
+    '#e91e8c', '#ffffff',
+  ];
+  const SMELT_KO = {
+    iron:'철',copper:'구리',gold:'금',silver:'은',aluminum:'알루미늄',
+    nickel:'니켈',zinc:'아연',tin:'주석',lead:'납',manganese:'망간',
+    chromium:'크롬',titanium:'티타늄',cobalt:'코발트',tungsten:'텅스텐',
+    platinum:'백금',palladium:'팔라듐',rhodium:'로듐',iridium:'이리듐',
+    vanadium:'바나듐',niobium:'니오브',molybdenum:'몰리브덴',
+    magnesium:'마그네슘',lithium:'리튬',bismuth:'비스무트',antimony:'안티몬',
+    hafnium:'하프늄',tantalum:'탄탈럼',zirconium:'지르코늄',
+    gallium:'갈륨',germanium:'게르마늄',indium:'인듐',selenium:'셀레늄',
+    tellurium:'텔루륨',rareearth:'희토류',neodymium:'네오디뮴',
+    lanthanum:'란탄',cerium:'세륨',samarium:'사마륨',yttrium:'이트륨',
+    rubber:'고무',plastic:'플라스틱',resin:'수지',fiber:'섬유',
+    textile:'직물',leather:'가죽',kevlar:'케블라',carbonfiber:'탄소섬유',
+    glass:'유리',ceramic:'세라믹',silicon:'실리콘',silica:'실리카',
+    carbon:'탄소',graphite:'흑연',graphene:'그래핀',diamond:'다이아몬드',
+    circuit:'회로',wafer:'웨이퍼',battery:'배터리',
+    salt:'소금',sulfur:'황',petro:'석유',biofuel:'바이오연료',
+    sand:'모래',concrete:'콘크리트',cement:'시멘트',asphalt:'아스팔트',
+    limestone:'석회석',granite:'화강암',basalt:'현무암',
+    protein:'단백질',chitin:'키틴',keratin:'케라틴',enzyme:'효소',
+    hydrogen:'수소',oxygen:'산소',nitrogen:'질소',helium:'헬륨',
+    argon:'아르곤',plasma:'플라즈마',magma:'마그마',cryo:'크리오',
+    pearl:'진주',opal:'오팔',topaz:'토파즈',garnet:'가닛',
+    amethyst:'자수정',emerald:'에메랄드',sapphire:'사파이어',ruby:'루비',
+    uranium:'우라늄',sodaash:'소다',phosphor:'인',phosphate:'인산염',
+    chloride:'염화물',nitrate:'질산염',ammonia:'암모니아',lithiumsalt:'리튬염',
+  };
+  const EQUIP_NOUNS = ['검','도끼','창','활','단검','대검','방패','갑옷','투구','장갑','장화','반지','목걸이','지팡이','망치','낫'];
+
+  let pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
+  let pixelColor = PIXEL_PALETTE[8]; // 기본: 빨강
+  let pixelPainting = false;
+
+  function generateEquipName(mats) {
+    const ids = [...new Set(mats.filter(Boolean).map((m) => m.smeltId).filter(Boolean))];
+    const words = ids.slice(0, 2).map((id) => SMELT_KO[id] || id);
+    const noun = EQUIP_NOUNS[Math.floor(Math.random() * EQUIP_NOUNS.length)];
+    if (words.length === 0) return `강철 ${noun}`;
+    if (words.length === 1) return `${words[0]} ${noun}`;
+    return `${words[0]}·${words[1]} ${noun}`;
+  }
+
+  function generateRandomPixels(mats) {
+    const TIER_PAL = {
+      legendary: ['#f39c12','#f1c40f','#ffd23c','#e67e22','#a04000'],
+      epic:      ['#8e44ad','#9b59b6','#6c3483','#d7bde2','#4a235a'],
+      rare:      ['#2980b9','#3498db','#1a5276','#aed6f1','#154360'],
+      common:    ['#7f8c8d','#95a5a6','#5a5a5a','#bdc3c7','#2d2d2d'],
+    };
+    const tiers = mats.filter(Boolean).map((m) => m.tier || 'common');
+    const tier = tiers.includes('legendary') ? 'legendary'
+      : tiers.includes('epic') ? 'epic'
+      : tiers.includes('rare') ? 'rare' : 'common';
+    const pal = TIER_PAL[tier];
+    const G = PIXEL_G;
+    const grid = Array(G * G).fill(null);
+    // 세로로 약간 길쭉한 타원 형태로 랜덤 픽셀 생성
+    for (let y = 0; y < G; y++) {
+      for (let x = 0; x < G; x++) {
+        const dx = (x - G / 2 + 0.5) / (G * 0.28);
+        const dy = (y - G / 2 + 0.5) / (G * 0.42);
+        const r = dx * dx + dy * dy;
+        if (r < 1 && Math.random() > r * 0.55) {
+          grid[y * G + x] = pal[Math.floor(Math.random() * pal.length)];
+        }
+      }
+    }
+    // 외곽선: 가장자리 픽셀을 어둡게
+    const dark = '#1a1a1a';
+    for (let y = 0; y < G; y++) {
+      for (let x = 0; x < G; x++) {
+        const idx = y * G + x;
+        if (!grid[idx]) continue;
+        const isEdge = (
+          (x === 0 || !grid[idx - 1]) ||
+          (x === G - 1 || !grid[idx + 1]) ||
+          (y === 0 || !grid[(y - 1) * G + x]) ||
+          (y === G - 1 || !grid[(y + 1) * G + x])
+        );
+        if (isEdge) grid[idx] = dark;
+      }
+    }
+    return grid;
+  }
+
+  function renderPixelCanvas() {
+    const canvas = document.getElementById('equipPixelCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const cell = W / PIXEL_G;
+    // 배경 (투명 체크무늬)
+    ctx.clearRect(0, 0, W, W);
+    for (let y = 0; y < PIXEL_G; y++) {
+      for (let x = 0; x < PIXEL_G; x++) {
+        const even = (x + y) % 2 === 0;
+        ctx.fillStyle = even ? '#2a2a3a' : '#1e1e2e';
+        ctx.fillRect(x * cell, y * cell, cell, cell);
+      }
+    }
+    // 픽셀 색상
+    for (let i = 0; i < pixelGrid.length; i++) {
+      if (!pixelGrid[i]) continue;
+      ctx.fillStyle = pixelGrid[i];
+      ctx.fillRect((i % PIXEL_G) * cell, Math.floor(i / PIXEL_G) * cell, cell, cell);
+    }
+    // 격자선
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= PIXEL_G; i++) {
+      const p = i * cell;
+      ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, W); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(W, p); ctx.stroke();
+    }
+  }
+
+  function paintPixelAt(e) {
+    const canvas = document.getElementById('equipPixelCanvas');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / rect.width * PIXEL_G);
+    const row = Math.floor((e.clientY - rect.top) / rect.height * PIXEL_G);
+    if (col < 0 || col >= PIXEL_G || row < 0 || row >= PIXEL_G) return;
+    const idx = row * PIXEL_G + col;
+    if (pixelGrid[idx] === pixelColor) return;
+    pixelGrid[idx] = pixelColor;
+    renderPixelCanvas();
+  }
+
+  function buildPalette() {
+    const palette = document.getElementById('equipPalette');
+    if (!palette) return;
+    palette.innerHTML = '';
+    PIXEL_PALETTE.forEach((color, i) => {
+      const sw = document.createElement('button');
+      sw.type = 'button';
+      sw.className = 'equip-palette-swatch' + (color === null ? ' equip-palette-swatch--eraser' : '');
+      if (color) sw.style.background = color;
+      if (color === pixelColor || (color === null && pixelColor === null)) sw.classList.add('is-selected');
+      sw.title = color === null ? '지우개' : color;
+      sw.addEventListener('click', () => {
+        pixelColor = color;
+        palette.querySelectorAll('.equip-palette-swatch').forEach((s) => s.classList.remove('is-selected'));
+        sw.classList.add('is-selected');
+      });
+      palette.appendChild(sw);
+    });
+  }
+
+  function showCustomizeModal(mats) {
+    const modal = document.getElementById('equipCustomizeModal');
+    const nameInput = document.getElementById('equipNameInput');
+    if (!modal) return;
+    pixelGrid = generateRandomPixels(mats);
+    if (nameInput) nameInput.value = generateEquipName(mats);
+    modal.classList.remove('equip-customize-modal--hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    buildPalette();
+    renderPixelCanvas();
+    nameInput && nameInput.focus();
+
+    const canvas = document.getElementById('equipPixelCanvas');
+    if (canvas) {
+      canvas.onpointerdown = (e) => { e.preventDefault(); pixelPainting = true; paintPixelAt(e); };
+      canvas.onpointermove = (e) => { if (pixelPainting) { e.preventDefault(); paintPixelAt(e); } };
+      canvas.onpointerup = canvas.onpointerleave = canvas.onpointercancel = () => { pixelPainting = false; };
+    }
+
+    const rndNameBtn = document.getElementById('equipRandomNameBtn');
+    const rndPixelBtn = document.getElementById('equipRandomPixelBtn');
+    const clearBtn = document.getElementById('equipClearBtn');
+    const doneBtn = document.getElementById('equipCustomizeDoneBtn');
+    const backdrop = document.getElementById('equipCustomizeBackdrop');
+    if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats); };
+    if (rndPixelBtn) rndPixelBtn.onclick = () => { pixelGrid = generateRandomPixels(mats); renderPixelCanvas(); };
+    if (clearBtn) clearBtn.onclick = () => { pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null); renderPixelCanvas(); };
+    if (doneBtn) doneBtn.onclick = () => {
+      const name = (nameInput?.value || '').trim() || generateEquipName(mats);
+      hideCustomizeModal();
+      void forge(name, [...pixelGrid]);
+    };
+    if (backdrop) backdrop.onclick = () => { hideCustomizeModal(); };
+  }
+
+  function hideCustomizeModal() {
+    const modal = document.getElementById('equipCustomizeModal');
+    if (!modal) return;
+    modal.classList.add('equip-customize-modal--hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  if (btnForge) btnForge.addEventListener('click', () => {
+    if (forgeInFlight) return;
+    const usedSlots = selected.map((m, i) => (m ? { m, i } : null)).filter(Boolean);
+    if (usedSlots.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
+    const used = usedSlots.map(({ m }) => m);
+    if (used.some((m) => !isSmeltMaterial(m))) {
+      if (statusMsgEl) statusMsgEl.textContent = '모루에는 기초 재료(산출물)만 올릴 수 있어요.';
+      return;
+    }
+    showCustomizeModal(used);
+  });
 
   const FORGE_SLOT_DEFS = [
     { id: 'weapon',    emoji: '⚔️', label: '무기'    },

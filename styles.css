@@ -1810,6 +1810,169 @@ body.forge-scroll-lock {
   height: 88px;
 }
 
+/* ── 장비 커스터마이즈 모달 ─────────────────────────────── */
+.equip-customize-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+}
+.equip-customize-modal--hidden { display: none; }
+
+.equip-customize-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.equip-customize-card {
+  position: relative;
+  z-index: 1;
+  background: #12121f;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 1.25rem 1.25rem 1rem;
+  width: min(480px, 96vw);
+  max-height: 94dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.equip-customize-title {
+  font-size: 1.05rem;
+  color: #f0c040;
+  margin: 0;
+  text-align: center;
+}
+
+.equip-customize-name-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.equip-name-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  color: #fff;
+  font-size: 1rem;
+  font-family: inherit;
+}
+.equip-name-input:focus { outline: none; border-color: #f0c040; }
+
+.equip-rand-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.equip-rand-btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+.equip-customize-body {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.equip-pixel-canvas {
+  width: min(270px, 52vw);
+  height: min(270px, 52vw);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: crosshair;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  flex-shrink: 0;
+  touch-action: none;
+  display: block;
+}
+
+.equip-palette-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.equip-palette {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.equip-palette-swatch {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.12s, transform 0.1s;
+  min-width: 0;
+}
+.equip-palette-swatch:hover { transform: scale(1.18); }
+.equip-palette-swatch.is-selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.4);
+}
+.equip-palette-swatch--eraser {
+  background: repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 0 0 / 10px 10px;
+}
+
+.equip-clear-btn {
+  background: rgba(255, 80, 80, 0.12);
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  border-radius: 6px;
+  color: #ff9090;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.equip-clear-btn:hover { background: rgba(255, 80, 80, 0.28); }
+
+.equip-customize-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: space-between;
+  padding-top: 0.25rem;
+}
+
+.equip-rand-pixel-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ccc;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+.equip-rand-pixel-btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+.equip-done-btn {
+  background: linear-gradient(135deg, #b8860b, #d4a017, #f0c040);
+  border: none;
+  border-radius: 8px;
+  color: #1a1000;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  font-weight: bold;
+}
+.equip-done-btn:hover { filter: brightness(1.12); }
+
 /* ── AI 시그니처 이름 축하 (제련 완료 후) ───────────────── */
 .material-detail-modal {
   position: fixed;
