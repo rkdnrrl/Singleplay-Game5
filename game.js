@@ -13,8 +13,8 @@
   let serverMeltLost = []; // 마지막 장비 녹임에서 소실된 재료 목록
   let totalCoins = 0;
   let forgeStartAt = 0; // 제련 시작 시각 (Date.now)
-  /** 모루는 산출물(smelt)만 허용 — 최소 2개. */
-  const MIN_SMELT_MATERIALS_FOR_FORGE = 2;
+  /** 모루는 산출물(smelt)만 허용 — 최소 1개, 슬롯 9칸. */
+  const MIN_SMELT_MATERIALS_FOR_FORGE = 1;
 
   const MAT_EMOJI_POOL = [
     '🐟', '🐠', '🐡', '🪸', '🦑', '🪼', '🐙', '✨', '🌌', '💎', '🔮', '🛸',
@@ -196,7 +196,8 @@
   /** 대장간 숙련도 (서버에서 로드, float) */
   let smithingProficiency = 0;
   let smithingProfLevelInfo = { mul: 1.0 };
-  let selected = [];
+  /** 9칸 고정 모루 슬롯 (null = 비어있음) */
+  let selected = new Array(9).fill(null);
   /** 용광로에 넣은 재료 (낚시 재료·장비) */
   let furnaceSelected = [];
   let resultHideTimer = 0;
@@ -1480,9 +1481,9 @@
 
   /** true면 제련 버튼 비활성: 선택 수량이 최소 미만이거나 smelt 아닌 재료가 있을 때. */
   function isForgeBlockedSmeltOnlyMinCount(sel) {
-    if (!Array.isArray(sel) || sel.length === 0) return true;
-    if (sel.length < MIN_SMELT_MATERIALS_FOR_FORGE) return true;
-    return sel.some((m) => !isSmeltMaterial(m));
+    const items = Array.isArray(sel) ? sel.filter(Boolean) : [];
+    if (items.length < MIN_SMELT_MATERIALS_FOR_FORGE) return true;
+    return items.some((m) => !isSmeltMaterial(m));
   }
 
   function materialHasForgeServerRef(m) {
@@ -1512,7 +1513,7 @@
   function countSelectedSmeltById(smeltId) {
     const sid = String(smeltId || '').trim();
     if (!sid) return 0;
-    return selected.filter((m) => isSmeltMaterial(m) && String(m.smeltId).trim() === sid).length;
+    return selected.filter((m) => m && isSmeltMaterial(m) && String(m.smeltId).trim() === sid).length;
   }
 
   function tryAddSmeltToAnvilBySid(sidRaw) {
@@ -1527,7 +1528,12 @@
       syncForgeUi();
       return true;
     }
-    selected.push(makeSmeltSelectionMaterial(latest || { id: sid, name: sid, emoji: '◆' }));
+    const emptyIdx = selected.indexOf(null);
+    if (emptyIdx < 0) {
+      if (statusMsgEl) statusMsgEl.textContent = '슬롯이 꽉 찼어요. (최대 9칸)';
+      return true;
+    }
+    selected[emptyIdx] = makeSmeltSelectionMaterial(latest || { id: sid, name: sid, emoji: '◆' });
     syncForgeUi();
     return true;
   }
@@ -1553,7 +1559,7 @@
 
   function consumeSmeltSelectionMaterials(used) {
     if (!Array.isArray(used) || used.length === 0) return;
-    const smeltUsed = used.filter((m) => isSmeltMaterial(m));
+    const smeltUsed = used.filter((m) => m && isSmeltMaterial(m));
     if (smeltUsed.length === 0) return;
     const stock = cloneSmeltStock(loadSmeltStock());
     const useCountById = {};
@@ -1946,8 +1952,8 @@
     const fi = furnaceSelected.findIndex((s) => s.uid === uid);
     if (fi >= 0) furnaceSelected.splice(fi, 1);
     else {
-      const ai = selected.findIndex((s) => s.uid === uid);
-      if (ai >= 0) selected.splice(ai, 1);
+      const ai = selected.findIndex((s) => s && s.uid === uid);
+      if (ai >= 0) selected[ai] = null;
       furnaceSelected.push(m);
     }
     syncFurnaceUi();
@@ -1957,7 +1963,6 @@
   function applyMaterialToAnvilByUid(uid) {
     const m = findMaterialByUid(uid);
     if (!m) return;
-    // 모루는 기초 재료(산출물)만 허용
     if (!isSmeltMaterial(m)) {
       if (statusMsgEl) {
         statusMsgEl.textContent = '낚시 재료·장비는 먼저 용광로에서 녹여야 해요. 재료를 용광로로 이동시켜 드릴게요.';
@@ -1967,9 +1972,14 @@
     }
     const fi = furnaceSelected.findIndex((s) => s.uid === uid);
     if (fi >= 0) furnaceSelected.splice(fi, 1);
-    const i = selected.findIndex((s) => s.uid === uid);
-    if (i >= 0) selected.splice(i, 1);
-    else selected.push(m);
+    const i = selected.findIndex((s) => s && s.uid === uid);
+    if (i >= 0) {
+      selected[i] = null;
+    } else {
+      const emptyIdx = selected.indexOf(null);
+      if (emptyIdx >= 0) selected[emptyIdx] = m;
+      else if (statusMsgEl) statusMsgEl.textContent = '슬롯이 꽉 찼어요. (최대 9칸)';
+    }
     syncForgeUi();
     syncFurnaceUi();
   }
@@ -2313,7 +2323,7 @@
       row.className = `inv-item inv-item--draggable rarity-${rarityClass(m.rarity)}${isEquipmentMaterial(m) ? ' inv-item--equipment' : ''}`;
       row.dataset.uid = m.uid;
       row.draggable = true;
-      if (selected.some((s) => s.uid === m.uid)) row.classList.add('selected');
+      if (selected.some((s) => s && s.uid === m.uid)) row.classList.add('selected');
       if (furnaceSelected.some((s) => s.uid === m.uid)) row.classList.add('inv-item--furnace');
       const thumb = document.createElement('div');
       thumb.className = 'inv-thumb';
@@ -2375,8 +2385,8 @@
   }
 
   function removeSelectedUid(uid) {
-    const i = selected.findIndex((s) => s.uid === uid);
-    if (i >= 0) selected.splice(i, 1);
+    const i = selected.findIndex((s) => s && s.uid === uid);
+    if (i >= 0) selected[i] = null;
     syncForgeUi();
   }
 
@@ -2416,31 +2426,32 @@
     }
   }
 
+  const GRID_SLOT_HINTS = ['공격', '속도', '공격', '방어', '내구', '방어', 'HP', 'HP', 'HP'];
+
   function syncForgeUi() {
     if (selectedSlotsEl) {
       selectedSlotsEl.innerHTML = '';
-      if (selected.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'anvil-empty';
-        empty.innerHTML = '<span class="anvil-empty-mark">—</span>';
-        selectedSlotsEl.appendChild(empty);
-      } else {
-        selected.forEach((m) => {
-          const chip = document.createElement('button');
-          chip.type = 'button';
-          chip.className = 'anvil-chip';
-          chip.title = '클릭하여 빼기';
-          const n = m.name;
-          const label = n.length > 22 ? `${n.slice(0, 20)}…` : n;
-          chip.innerHTML = `<span class="anvil-chip-label">${escapeHtml(label)}</span>`;
-          chip.addEventListener('click', () => removeSelectedUid(m.uid));
-          selectedSlotsEl.appendChild(chip);
-        });
+      for (let i = 0; i < 9; i++) {
+        const m = selected[i];
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.setAttribute('data-slot', String(i));
+        if (m) {
+          cell.className = 'forge-grid-cell forge-grid-cell--filled';
+          const label = m.name.length > 5 ? m.name.slice(0, 4) + '…' : m.name;
+          cell.innerHTML = `<span class="fgc-emoji">${escapeHtml(m.emoji || '◆')}</span><span class="fgc-name">${escapeHtml(label)}</span>`;
+          cell.title = `${m.name} (클릭하여 빼기)`;
+          cell.addEventListener('click', () => removeSelectedUid(m.uid));
+        } else {
+          cell.className = 'forge-grid-cell forge-grid-cell--empty';
+          cell.innerHTML = `<span class="fgc-hint">${GRID_SLOT_HINTS[i]}</span>`;
+          cell.disabled = true;
+        }
+        selectedSlotsEl.appendChild(cell);
       }
     }
     if (btnForge) {
       const hasServer = Boolean(alpToken && platformApi);
-      // 모루: 산출물 2개 이상이어야 활성화
       const smeltGateBlocked = isForgeBlockedSmeltOnlyMinCount(selected);
       btnForge.disabled = !hasServer || smeltGateBlocked;
     }
@@ -2451,47 +2462,41 @@
 
   function updateStatusMsg() {
     if (!statusMsgEl) return;
-    statusMsgEl.className = 'status-msg'; // 매번 초기화 후 조건부 강도 클래스 추가
-    if (selected.length === 0) {
-      statusMsgEl.textContent = '기초 재료(산출물)를 모루에 끌어다 놓으세요. 낚시·장비는 먼저 용광로에 녹이세요.';
+    statusMsgEl.className = 'status-msg';
+    const items = selected.filter(Boolean);
+    if (items.length === 0) {
+      statusMsgEl.textContent = '기초 재료(산출물)를 슬롯에 클릭해서 넣으세요. 슬롯 위치에 따라 능력치가 달라져요.';
       return;
     }
     if (!alpToken || !platformApi) {
       statusMsgEl.textContent = '게임에서 이 화면을 연 경우에만 서버에 제련할 수 있어요.';
       return;
     }
-    const nonSmelt = selected.filter((m) => !isSmeltMaterial(m));
+    const nonSmelt = items.filter((m) => !isSmeltMaterial(m));
     if (nonSmelt.length > 0) {
-      statusMsgEl.textContent = `모루에는 기초 재료(산출물)만 올릴 수 있어요. 낚시·장비는 용광로에 먼저 녹이세요.`;
+      statusMsgEl.textContent = `모루에는 기초 재료(산출물)만 올릴 수 있어요.`;
       return;
     }
-    if (selected.length < MIN_SMELT_MATERIALS_FOR_FORGE) {
-      statusMsgEl.textContent = `기초 재료(산출물)가 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 필요해요.`;
-      return;
-    }
-    if (selected.every((m) => isSmeltMaterial(m))) {
-      const avgStr = calcSelectedAvgStrength(selected);
-      const uniqueTiers = countUniqueStrengthTiers(selected);
+    if (items.every((m) => isSmeltMaterial(m))) {
+      const avgStr = calcSelectedAvgStrength(items);
+      const uniqueTiers = countUniqueStrengthTiers(items);
       const harmLabel = clientHarmonyLabel(uniqueTiers);
       const successPct = Math.round(clientSuccessRate(smithingProficiency, avgStr) * 100);
-      const activeSyn = detectClientSynergies(selected);
-      // 조합 품질에 따라 색상 클래스 (시너지 발동 시 최상 색상 우선)
+      const activeSyn = detectClientSynergies(items);
       const harmCls = activeSyn.length > 0 ? 'strength--legendary'
         : uniqueTiers >= 4 ? 'strength--legendary'
         : uniqueTiers >= 3 ? 'strength--strong'
         : uniqueTiers >= 2 ? 'strength--medium'
         : 'strength--weak';
-      const hint = uniqueTiers < 4 ? `  ★ ${4 - uniqueTiers}종 더 추가하면 조합 강화!` : '  ★ 최고 조합!';
       const synLine = activeSyn.length > 0
         ? `  ⚡ ${activeSyn.map((s) => s.name).join(' · ')}`
         : '';
-      statusMsgEl.textContent = `기초 재료 ${selected.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${synLine}${synLine ? '' : hint}`;
+      statusMsgEl.textContent = `재료 ${items.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${synLine}`;
       statusMsgEl.className = `status-msg ${harmCls}`;
       return;
     }
     statusMsgEl.className = 'status-msg';
-    statusMsgEl.textContent =
-      `기초 재료(산출물) ${selected.length}개 — 「⚒️ 제련하기」를 눌러 장비를 만드세요.`;
+    statusMsgEl.textContent = `기초 재료(산출물) ${items.length}개 — 「⚒️ 제련하기」를 눌러 장비를 만드세요.`;
   }
 
   function hideResultCard() {
@@ -2599,46 +2604,32 @@
     } else {
       resultDesc.textContent = `${aiLine}${baseDesc}`;
     }
-    mountForgeThumbOrImage(
-      resultSpriteHost,
-      eq.pixelArt || eq.pixel_art,
-      eq.emoji || eq.icon || matEmoji(String(eq.name || '')),
-      88,
-      88,
-    );
+    if (resultSpriteHost) resultSpriteHost.innerHTML = '';
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
 
   async function forge() {
     if (forgeInFlight) return;
-    if (selected.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
+    const usedSlots = selected.map((m, i) => m ? { m, i } : null).filter(Boolean);
+    if (usedSlots.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
     if (!alpToken || !platformApi) {
       if (statusMsgEl) statusMsgEl.textContent = '게임 연결(토큰)이 없어 제련할 수 없어요.';
       return;
     }
 
-    const used = selected.slice();
-    // 모루는 산출물(smelt)만 허용
+    const used = usedSlots.map(({ m }) => m);
     if (used.some((m) => !isSmeltMaterial(m))) {
       if (statusMsgEl) {
-        statusMsgEl.textContent = '모루에는 기초 재료(산출물)만 올릴 수 있어요. 낚시 재료·장비를 용광로에 먼저 녹이세요.';
-      }
-      return;
-    }
-    if (used.length < MIN_SMELT_MATERIALS_FOR_FORGE) {
-      if (statusMsgEl) {
-        statusMsgEl.textContent = `기초 재료(산출물)가 최소 ${MIN_SMELT_MATERIALS_FOR_FORGE}개 필요해요.`;
+        statusMsgEl.textContent = '모루에는 기초 재료(산출물)만 올릴 수 있어요.';
       }
       return;
     }
 
-    const materialsPayload = used.map((m) =>
+    const materialsPayload = usedSlots.map(({ m, i }) =>
       isSmeltMaterial(m)
-        ? { kind: 'smelt', id: String(m.smeltId).trim() }
-        : isEquipmentMaterial(m)
-          ? { kind: 'equipment', id: String(m.equipmentId).trim() }
-          : { kind: 'catch', id: String(m.serverId).trim() },
+        ? { kind: 'smelt', id: String(m.smeltId).trim(), slotIndex: i }
+        : { kind: 'catch', id: String(m.serverId).trim(), slotIndex: i },
     );
 
     forgeInFlight = true;
@@ -2649,34 +2640,6 @@
       btnForge.textContent = '제련 중…';
     }
 
-    // recipe-check 먼저 → 새 조합이면 오버레이, 기존 조합이면 바로 제작
-    let isNewRecipe = false;
-    {
-      const smeltIds = materialsPayload
-        .filter((m) => m.kind === 'smelt')
-        .map((m) => m.id)
-        .sort()
-        .join(',');
-      if (smeltIds) {
-        try {
-          const rr = await fetch(
-            `${platformApi}/api/craft/recipe-check?slot=${encodeURIComponent(forgeSlot)}&ids=${encodeURIComponent(smeltIds)}`,
-            { headers: { Authorization: `Bearer ${alpToken}` } },
-          );
-          const dd = await rr.json();
-          isNewRecipe = !!dd.isNew;
-        } catch {}
-      }
-    }
-    if (isNewRecipe) {
-      setForgeOverlay(true);
-      if (forgeOverlayTitleEl) forgeOverlayTitleEl.textContent = '새로운 조합 발견!';
-      if (forgeDiscoveryBannerEl) {
-        forgeDiscoveryBannerEl.textContent = '✨ 축하드립니다! 도감에 없는 새 조합이에요.';
-        forgeDiscoveryBannerEl.classList.remove('forge-discovery-banner--hidden');
-      }
-    }
-
     try {
       const res = await fetch(`${platformApi}/api/craft/equipment`, {
         method: 'POST',
@@ -2684,10 +2647,7 @@
           'Content-Type': 'application/json',
           Authorization: `Bearer ${alpToken}`,
         },
-        body: JSON.stringify({
-          materials: materialsPayload,
-          slot: forgeSlot,
-        }),
+        body: JSON.stringify({ materials: materialsPayload }),
       });
       const text = await res.text();
       let data = null;
@@ -2720,8 +2680,7 @@
       appendSpent(uids.filter((u) => !String(u).startsWith('eq-') && !String(u).startsWith('smelt-')));
       removeMaterialsFromStore(uids);
       consumeSmeltSelectionMaterials(used);
-      const usedSet = new Set(uids);
-      selected = selected.filter((s) => !usedSet.has(s.uid));
+      selected = new Array(9).fill(null);
       refreshMaterials();
 
       // ── 실패 처리 ────────────────────────────────────────────
@@ -2845,7 +2804,7 @@
         serverEquipmentForgePool = [];
         refreshMaterials();
         renderMaterials();
-        selected = selected.filter((s) => isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid));
+        selected = selected.map((s) => (s && (isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid))) ? s : null);
         syncForgeUi();
         return;
       }
@@ -2877,7 +2836,7 @@
       );
       refreshMaterials();
       renderMaterials();
-      selected = selected.filter((s) => isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid));
+      selected = selected.map((s) => (s && (isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid))) ? s : null);
       syncForgeUi();
 
       craftedListEl.innerHTML = '';
@@ -2937,7 +2896,7 @@
   function onStorage(e) {
     if (e.key !== FORGE_MATERIALS_KEY && e.key !== FORGE_SPENT_UIDS_KEY && e.key !== SMELT_STOCK_KEY) return;
     refreshMaterials();
-    selected = selected.filter((s) => isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid));
+    selected = selected.map((s) => (s && (isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid))) ? s : null);
     furnaceSelected = furnaceSelected.filter((s) => materials.some((m) => m.uid === s.uid));
     syncForgeUi();
     syncFurnaceUi();
@@ -2945,7 +2904,7 @@
 
   if (btnClear) {
     btnClear.addEventListener('click', () => {
-      selected = [];
+      selected = new Array(9).fill(null);
       syncForgeUi();
     });
   }
