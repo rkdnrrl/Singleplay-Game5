@@ -3299,78 +3299,110 @@
       ctx.restore();
     }
 
-    // 구분선
+    // 구분선 (강철 색상)
     const divG = ctx.createLinearGradient(0, splitY-2, 0, splitY+3);
-    divG.addColorStop(0,'rgba(220,90,10,0.75)'); divG.addColorStop(1,'rgba(60,10,0,0.4)');
+    divG.addColorStop(0,'rgba(150,175,210,0.65)'); divG.addColorStop(1,'rgba(40,55,80,0.4)');
     ctx.fillStyle=divG; ctx.fillRect(0, splitY-1, cw, 4);
 
-    // ═══ 용광로 영역 ═══
-    const forgeBg = ctx.createLinearGradient(0, splitY, 0, ch);
-    forgeBg.addColorStop(0,'#210a00'); forgeBg.addColorStop(0.5,'#2e0f00'); forgeBg.addColorStop(1,'#0c0400');
-    ctx.fillStyle=forgeBg; ctx.fillRect(0, splitY, cw, forgeH);
+    // ═══ 분쇄기 영역 ═══
+    // 공업용 어두운 배경
+    const grindBg = ctx.createLinearGradient(0, splitY, 0, ch);
+    grindBg.addColorStop(0,'#13151e'); grindBg.addColorStop(0.7,'#0d0e16'); grindBg.addColorStop(1,'#08090e');
+    ctx.fillStyle=grindBg; ctx.fillRect(0, splitY, cw, forgeH);
 
-    const flicker = 0.82 + 0.18*Math.sin(ts*0.013) + 0.09*Math.sin(ts*0.021);
-    const fireG = ctx.createRadialGradient(cw*0.5, ch+10, 0, cw*0.5, ch+10, cw*0.56);
-    fireG.addColorStop(0,`rgba(255,100,10,${0.44*flicker})`);
-    fireG.addColorStop(0.55,`rgba(180,40,0,${0.17*flicker})`);
-    fireG.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=fireG; ctx.fillRect(0, splitY, cw, forgeH);
+    // 분쇄기 회전 원판 (하단에서 상단 호만 보임)
+    const pivX = cw*0.5, pivY = splitY+8;
+    const discR  = Math.min(cw*0.46, forgeH*1.15);
+    const discCx = pivX, discCy = ch + discR*0.38;
+    const hamLen = Math.max(forgeH*0.28, discCy - discR - pivY);
+    const discRot = ts * 0.0028; // 느린 회전
 
-    // 시계추 망치
-    const pivX = cw*0.5, pivY = splitY+6;
-    const hamLen = forgeH*0.80;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, splitY, cw, forgeH); ctx.clip(); // 캔버스 안만 그리기
+
+    // 원판 본체
+    ctx.beginPath(); ctx.arc(discCx, discCy, discR, 0, Math.PI*2);
+    ctx.fillStyle='#252830'; ctx.fill();
+
+    // 원판 세그먼트 + 외곽 톱니 (회전)
+    ctx.save();
+    ctx.translate(discCx, discCy); ctx.rotate(discRot);
+    const segN = 20;
+    for (let i=0; i<segN; i++) {
+      const a = (i/segN)*Math.PI*2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*discR*0.28, Math.sin(a)*discR*0.28);
+      ctx.lineTo(Math.cos(a)*discR*0.92, Math.sin(a)*discR*0.92);
+      ctx.strokeStyle = i%2===0 ? 'rgba(75,88,115,0.7)' : 'rgba(50,60,85,0.45)';
+      ctx.lineWidth=1.8; ctx.stroke();
+    }
+    // 톱니 외곽 (그라인더 질감)
+    for (let i=0; i<segN*2; i++) {
+      const a1=(i/(segN*2))*Math.PI*2, a2=((i+0.5)/(segN*2))*Math.PI*2;
+      ctx.beginPath(); ctx.arc(0,0,discR*0.965,a1,a2);
+      ctx.strokeStyle = i%2===0 ? 'rgba(110,128,160,0.8)' : 'rgba(65,78,105,0.5)';
+      ctx.lineWidth=discR*0.07; ctx.stroke();
+    }
+    ctx.restore();
+
+    // 원판 테두리 링
+    ctx.beginPath(); ctx.arc(discCx, discCy, discR, 0, Math.PI*2);
+    ctx.strokeStyle='rgba(95,115,150,0.75)'; ctx.lineWidth=3; ctx.stroke();
+    ctx.restore();
+
     const hamAngle = Math.sin(repairHammerT) * Math.PI * 0.54;
     const hamHeadX = pivX + Math.sin(hamAngle)*hamLen;
     const hamHeadY = pivY + Math.cos(hamAngle)*hamLen;
 
-    // 타격 구역 호 (모루 위)
+    // 접촉 구역 글로우 (팔이 중앙 가까울수록 빛남)
+    const nearness = Math.max(0, 1 - Math.abs(Math.sin(repairHammerT)) / repairStrikeThresh);
+    if (nearness > 0.05) {
+      const cGlow = ctx.createRadialGradient(pivX, pivY+hamLen, 0, pivX, pivY+hamLen, hamLen*0.22);
+      cGlow.addColorStop(0, `rgba(200,225,255,${nearness*0.4})`);
+      cGlow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle=cGlow;
+      ctx.fillRect(pivX-hamLen*0.22, pivY+hamLen-hamLen*0.22, hamLen*0.44, hamLen*0.44);
+    }
+
+    // 타격 구역 호 (파란 계열)
     const zoneA = Math.asin(Math.min(0.998, repairStrikeThresh));
     const perfA  = zoneA * 0.30;
     ctx.save();
     ctx.beginPath();
     ctx.arc(pivX, pivY, hamLen, Math.PI*0.5-zoneA, Math.PI*0.5+zoneA);
-    ctx.strokeStyle='rgba(255,150,20,0.22)';
-    ctx.lineWidth=Math.max(5, Math.sin(zoneA)*hamLen*2.0);
-    ctx.stroke();
+    ctx.strokeStyle='rgba(100,180,255,0.20)';
+    ctx.lineWidth=Math.max(5, Math.sin(zoneA)*hamLen*2.0); ctx.stroke();
     ctx.beginPath();
     ctx.arc(pivX, pivY, hamLen, Math.PI*0.5-perfA, Math.PI*0.5+perfA);
-    ctx.strokeStyle='rgba(255,230,70,0.55)';
-    ctx.lineWidth=Math.max(3, Math.sin(perfA)*hamLen*2.0);
-    ctx.stroke();
+    ctx.strokeStyle='rgba(200,235,255,0.55)';
+    ctx.lineWidth=Math.max(3, Math.sin(perfA)*hamLen*2.0); ctx.stroke();
     ctx.restore();
 
-    // 모루
-    const anvW=Math.min(78,cw*0.22), anvTop=pivY+hamLen-6;
+    // 프레스 팔 (금속 막대)
     ctx.save();
-    ctx.fillStyle='#2c2020'; ctx.shadowColor='rgba(255,80,0,0.35)'; ctx.shadowBlur=12;
-    ctx.beginPath();
-    ctx.moveTo(anvW*-0.56+pivX,anvTop); ctx.lineTo(anvW*0.56+pivX,anvTop);
-    ctx.lineTo(anvW*0.40+pivX,anvTop+13); ctx.lineTo(anvW*-0.40+pivX,anvTop+13);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#3a2828'; ctx.shadowBlur=0;
-    ctx.fillRect(pivX-anvW*0.32, anvTop+13, anvW*0.64, 5);
-    ctx.restore();
-
-    // 손잡이
-    ctx.save();
-    ctx.strokeStyle='#5c3412'; ctx.lineWidth=8; ctx.lineCap='round';
-    ctx.shadowColor='rgba(0,0,0,0.55)'; ctx.shadowBlur=5;
+    ctx.strokeStyle='#6a7488'; ctx.lineWidth=9; ctx.lineCap='round';
+    ctx.shadowColor='rgba(0,0,0,0.65)'; ctx.shadowBlur=6;
     ctx.beginPath(); ctx.moveTo(pivX,pivY); ctx.lineTo(hamHeadX,hamHeadY); ctx.stroke();
-    // 망치 머리
-    const hW=Math.min(32,cw*0.096), hH=Math.min(20,cw*0.064);
+    // 광택 하이라이트
+    ctx.strokeStyle='rgba(170,195,225,0.32)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(pivX,pivY); ctx.lineTo(hamHeadX,hamHeadY); ctx.stroke();
+    // 프레스 블록 (팔 끝)
+    const hW=Math.min(28,cw*0.088), hH=Math.min(15,cw*0.052);
     ctx.translate(hamHeadX,hamHeadY); ctx.rotate(hamAngle);
-    ctx.fillStyle='#4a3c3c'; ctx.shadowColor='rgba(255,80,20,0.3)'; ctx.shadowBlur=8;
+    ctx.fillStyle='#505868'; ctx.shadowColor='rgba(150,200,255,0.25)'; ctx.shadowBlur=8;
     ctx.fillRect(-hW*0.5,-hH*0.5,hW,hH);
-    ctx.fillStyle=`rgba(255,60,10,${0.25+0.15*flicker})`;
-    ctx.fillRect(-hW*0.5,hH*0.5-5,hW,5);
-    ctx.strokeStyle='#6a5050'; ctx.lineWidth=1; ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(190,218,245,0.45)';
+    ctx.fillRect(-hW*0.5,hH*0.5-4,hW,4); // 접촉면 광택
+    ctx.strokeStyle='#8090aa'; ctx.lineWidth=1; ctx.shadowBlur=0;
     ctx.strokeRect(-hW*0.5,-hH*0.5,hW,hH);
     ctx.restore();
 
     // 피벗 볼트
     ctx.save();
-    ctx.fillStyle='#7a5030';
-    ctx.beginPath(); ctx.arc(pivX,pivY,5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#8898b0'; ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=3;
+    ctx.beginPath(); ctx.arc(pivX,pivY,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#c0cede';
+    ctx.beginPath(); ctx.arc(pivX,pivY,2.5,0,Math.PI*2); ctx.fill();
     ctx.restore();
 
     // 파티클
@@ -3385,18 +3417,18 @@
       ctx.restore();
     }
 
-    // 속도 게이지
+    // RPM 게이지
     const hPct = Math.min(1, repairHammerSpeed / repairHammerSpeedMax);
     const barW = Math.min(65, cw*0.19);
     ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(8,ch-18,barW,7);
-    const hCol = hPct>0.72?'#ff3300':hPct>0.42?'#ff8800':'#ffcc00';
+    const hCol = hPct>0.72?'#00ccff':hPct>0.42?'#3388ee':'#1155bb';
     ctx.fillStyle=hCol; ctx.shadowColor=hCol; ctx.shadowBlur=5;
     ctx.fillRect(8,ch-18,barW*hPct,7);
     ctx.shadowBlur=0;
-    ctx.font='10px Jua,sans-serif'; ctx.fillStyle='rgba(255,190,90,0.75)';
-    ctx.textAlign='left'; ctx.fillText('속도', 8, ch-22);
+    ctx.font='10px Jua,sans-serif'; ctx.fillStyle='rgba(140,190,240,0.8)';
+    ctx.textAlign='left'; ctx.fillText('RPM', 8, ch-22);
     ctx.textAlign='right'; ctx.font='12px Jua,sans-serif';
-    ctx.fillStyle='rgba(255,160,60,0.85)';
+    ctx.fillStyle='rgba(140,190,240,0.85)';
     ctx.fillText(`균열 ${repairCracks.size}개`, cw-8, ch-20);
   }
 
@@ -3442,21 +3474,25 @@
       repairSpent += cost;
       repairFlash = { hit: true, born: performance.now() };
 
-      // 불꽃 파티클 (망치 머리 위치)
+      // 분쇄 스파크 파티클 (프레스 블록 위치)
       if ($repairCanvas) {
         const ch2=$repairCanvas.height, cw2=$repairCanvas.width;
-        const sY=Math.floor(ch2*0.58);
-        const pX=cw2*0.5, pY=sY+6, hL=(ch2-sY)*0.80;
+        const sY=Math.floor(ch2*0.58), fH=ch2-sY;
+        const pX=cw2*0.5, pY=sY+8;
+        const dR=Math.min(cw2*0.46,fH*1.15), dCy=ch2+dR*0.38;
+        const hL=Math.max(fH*0.28, dCy-dR-pY);
         const hA=Math.sin(repairHammerT)*Math.PI*0.54;
         const hx=pX+Math.sin(hA)*hL, hy=pY+Math.cos(hA)*hL;
-        const cols=isPerfect?['#ffffff','#fff8a0','#ffe840','#ffc020']:['#ffd040','#ff9020','#ffb030','#fff0a0'];
-        for (let i=0,cnt=isPerfect?28:16; i<cnt; i++) {
-          const a=-Math.PI*0.5+(Math.random()-0.5)*Math.PI*1.4;
-          const spd=2.5+Math.random()*(isPerfect?6:4);
+        // 분쇄기 스파크: 좌우로 퍼지는 흰색/파란색
+        const cols=isPerfect?['#ffffff','#e8f4ff','#c8e8ff','#a0d0ff']:['#d0e8ff','#a8c8ee','#ffffff','#e0f0ff'];
+        for (let i=0,cnt=isPerfect?30:18; i<cnt; i++) {
+          const side=Math.random()>0.5?1:-1;
+          const a=side*(Math.PI*0.08+Math.random()*Math.PI*0.52); // 수평 방향 위주
+          const spd=3+Math.random()*(isPerfect?7:5);
           repairParticles.push({
-            x:hx,y:hy,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-1.5,
-            life:1,size:isPerfect?3+Math.random()*3.5:2+Math.random()*2.5,
-            color:cols[Math.floor(Math.random()*cols.length)],grav:0.18,
+            x:hx,y:hy,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-0.8,
+            life:1,size:isPerfect?1.5+Math.random()*2.5:1+Math.random()*2,
+            color:cols[Math.floor(Math.random()*cols.length)],grav:0.22,
           });
         }
       }
@@ -3477,10 +3513,9 @@
         setTimeout(() => confirmRepairSession(), 750);
       }
     } else {
-      // 실패: 콤보 리셋, 약간 속도 완화(자비)
+      // 실패: 콤보 리셋 (속도 변화 없음 — 성공해야만 빨라짐)
       repairCombo = 0;
       repairFlash = { hit: false, born: performance.now() };
-      repairHammerSpeed = Math.max(repairHammerSpeed*0.86, repairHammerSpeed - 0.00015);
     }
   }
 
