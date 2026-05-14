@@ -3091,6 +3091,33 @@
     });
   }
 
+  // ── 로딩 오버레이 타이머 ───────────────────────────────────
+  let _eclTimerRef = null;
+  const ECL_EXPECTED = 20; // 예상 대기 초
+
+  function _startEclTimer() {
+    const timerEl = document.getElementById('eclTimer');
+    if (!timerEl) return;
+    timerEl.className = 'ecl-timer';
+    timerEl.textContent = `예상 대기시간 ${ECL_EXPECTED}초`;
+    const startMs = Date.now();
+    _eclTimerRef = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startMs) / 1000);
+      const remaining = ECL_EXPECTED - elapsed;
+      if (remaining > 0) {
+        timerEl.textContent = `예상 대기시간 ${remaining}초`;
+        timerEl.className = 'ecl-timer';
+      } else {
+        timerEl.textContent = `예상 대기시간 초과 +${Math.abs(remaining)}초`;
+        timerEl.className = 'ecl-timer ecl-timer--over';
+      }
+    }, 1000);
+  }
+
+  function _stopEclTimer() {
+    if (_eclTimerRef) { clearInterval(_eclTimerRef); _eclTimerRef = null; }
+  }
+
   // PixelLab API로 픽셀아트 생성 (캐시 있으면 즉시 반환)
   async function _genPixelArtApi(mats, name) {
     const btn = document.getElementById('equipRandomPixelBtn');
@@ -3110,6 +3137,15 @@
         pixelArtImageUrl = data.imageDataUrl;
         await _imageUrlToPixelGrid(data.imageDataUrl);
         renderPixelCanvas();
+        // 코인 보상 지급 (서버가 실제 지급, 클라이언트는 표시만 동기화)
+        if (data.coinReward && data.coinReward > 0) {
+          totalCoins += data.coinReward;
+          updateCoinDisplay();
+          if (statusMsgEl) {
+            statusMsgEl.textContent = `🪙 대기 보상 +${data.coinReward} 코인 획득!`;
+            window.setTimeout(() => { if (statusMsgEl) statusMsgEl.textContent = ''; }, 3000);
+          }
+        }
         return;
       }
       throw new Error('no imageDataUrl');
@@ -3120,6 +3156,7 @@
       pixelGrid = generateRandomPixels(mats, name);
       renderPixelCanvas();
     } finally {
+      _stopEclTimer();
       if (btn) { btn.disabled = false; btn.textContent = '랜덤도안'; }
       const loadingEl = document.getElementById('equipCustomizeLoading');
       if (loadingEl) loadingEl.classList.add('ecl-overlay--hidden');
@@ -3658,9 +3695,10 @@
     modal.setAttribute('aria-hidden', 'false');
     renderPixelCanvas();
     nameInput && nameInput.focus();
-    // 로딩 오버레이 표시
+    // 로딩 오버레이 표시 + 타이머 시작
     const _loadingEl = document.getElementById('equipCustomizeLoading');
     if (_loadingEl) _loadingEl.classList.remove('ecl-overlay--hidden');
+    _startEclTimer();
     void _genPixelArtApi(mats, initName);
 
     const canvas = document.getElementById('equipPixelCanvas');

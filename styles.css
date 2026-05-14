@@ -901,9 +901,25 @@ html.material-detail-open body {
   line-height: 1.5;
   margin: 0;
 }
+.ecl-timer {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #7ecfff;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s;
+}
+.ecl-timer--over {
+  color: #ff7070;
+}
+.ecl-coin-hint {
+  font-size: 0.82rem;
+  color: rgba(255, 208, 96, 0.75);
+  margin: 0;
+}
 .ecl-wait {
-  font-size: 0.85rem;
-  color: rgba(255,255,255,0.55);
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.45);
   margin: 0;
 }
 
