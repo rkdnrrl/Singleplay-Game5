@@ -3097,21 +3097,27 @@
     return cracked;
   }
 
+  function repairMsg(msg) {
+    if (statusMsgEl) { statusMsgEl.textContent = msg; setTimeout(() => { if (statusMsgEl.textContent === msg) statusMsgEl.textContent = ''; }, 3000); }
+  }
+
   function loadRepairItem(item) {
     const stats = item.stats || {};
     const maxDur = Number(stats.durabilityMax || 0);
-    if (maxDur <= 0) { toast('내구도가 없는 장비입니다.'); return; }
+    if (maxDur <= 0) { repairMsg('내구도가 없는 장비입니다.'); return; }
     const curDur = stats.durability != null ? Number(stats.durability) : maxDur;
-    repairItem = item; repairMaxDur = maxDur; repairOrigDur = curDur;
+    const eqId = item.equipmentId || item.id || '';
+    repairItem = { ...item, _eqId: eqId };
+    repairMaxDur = maxDur; repairOrigDur = curDur;
     repairDur = curDur; repairSpent = 0; repairZoom = 1.0;
-    repairCracks = generateCracks(curDur, maxDur, item.id);
+    repairCracks = generateCracks(curDur, maxDur, eqId);
     $repairEquipList?.querySelectorAll('.repair-equip-item')
-      .forEach(el => el.classList.toggle('is-selected', el.dataset.id === String(item.id)));
+      .forEach(el => el.classList.toggle('is-selected', el.dataset.id === eqId));
     $repairHint?.classList.add('hidden');
     $repairCanvas?.classList.remove('hidden');
     $repairControls?.classList.remove('hidden');
     repairImg = null;
-    const imgSrc = item.imageUrl || item.pixelArt?.imageDataUrl;
+    const imgSrc = item.pixelArt?.imageDataUrl;
     if (imgSrc) {
       const img = new Image();
       img.onload = () => { repairImg = img; drawRepairCanvas(); };
@@ -3166,7 +3172,7 @@
       ctx.fillStyle = 'rgba(0,0,0,0.68)';
       ctx.fillRect(x, y, cellW, cellH);
       // 균열선 (각 셀 고유 패턴)
-      const rng = seededRng(hashStr(`${key}${repairItem.id}`));
+      const rng = seededRng(hashStr(`${key}${repairItem._eqId}`));
       ctx.strokeStyle = 'rgba(255,80,30,0.8)';
       ctx.lineWidth = Math.max(1, cellW * 0.05); ctx.lineCap = 'round';
       const pts = Array.from({length: 4}, () => [rng() * cellW, rng() * cellH]);
@@ -3247,28 +3253,28 @@
   async function confirmRepairSession() {
     if (!repairItem) return;
     const netRepair = repairDur - repairOrigDur;
-    if (netRepair <= 0) { toast('수리한 내용이 없습니다.'); return; }
-    if (!alpToken || !platformApi) { toast('로그인이 필요합니다.'); return; }
+    if (netRepair <= 0) { repairMsg('수리한 내용이 없습니다.'); return; }
+    if (!alpToken || !platformApi) { repairMsg('로그인이 필요합니다.'); return; }
     const btn = document.getElementById('repairConfirmBtn');
     if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
     try {
-      const res = await fetch(`${platformApi}/api/craft/equipment/${encodeURIComponent(repairItem.id)}/repair`, {
+      const res = await fetch(`${platformApi}/api/craft/equipment/${encodeURIComponent(repairItem._eqId)}/repair`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
         body: JSON.stringify({ amount: netRepair }),
       });
       const d = await res.json();
-      if (!res.ok) { toast(d?.error?.message || '수리에 실패했습니다.'); return; }
+      if (!res.ok) { repairMsg(d?.error?.message || '수리에 실패했습니다.'); return; }
       totalCoins = Math.max(0, totalCoins - (d.costPaid || 0));
       updateCoinDisplay();
-      toast(`✅ 수리 완료! 🪙-${d.costPaid}`);
+      repairMsg(`✅ 수리 완료! 🪙-${d.costPaid}`);
       repairItem = null;
       $repairCanvas?.classList.add('hidden');
       $repairControls?.classList.add('hidden');
       $repairHint?.classList.remove('hidden');
       await refreshCraftedList();
       refreshRepairEquipList();
-    } catch { toast('수리 중 오류가 발생했습니다.'); }
+    } catch { repairMsg('수리 중 오류가 발생했습니다.'); }
     finally {
       if (btn) { btn.disabled = false; btn.textContent = '✅ 수리 완료'; }
     }
@@ -3286,7 +3292,7 @@
 
       const el = document.createElement('div');
       el.className = 'repair-equip-item' + (damaged ? '' : ' no-damage');
-      el.dataset.id = String(item.id);
+      el.dataset.id = String(item.equipmentId || item.id);
       el.draggable = damaged;
       el.title = item.name || '장비';
 
@@ -3312,7 +3318,7 @@
       el.appendChild(thumb); el.appendChild(info);
 
       if (damaged) {
-        el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', String(item.id)));
+        el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', String(item.equipmentId || item.id)));
         el.addEventListener('click', () => loadRepairItem(item));
       }
       $repairEquipList.appendChild(el);
@@ -3329,7 +3335,7 @@
         e.preventDefault(); dropZone.classList.remove('drag-over');
         const id = e.dataTransfer.getData('text/plain');
         const pool = (typeof serverEquipmentForgePool !== 'undefined') ? serverEquipmentForgePool : [];
-        const item = pool.find(i => String(i.id) === id);
+        const item = pool.find(i => String(i.equipmentId || i.id) === id);
         if (item) loadRepairItem(item);
       });
     }
