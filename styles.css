@@ -39,8 +39,7 @@ body {
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
   /* 가로 스와이프가 브라우저 뒤로 가기·히스토리 네비로 이어지는 것 완화 */
-  overscroll-behavior-x: none;
-  overscroll-behavior-y: auto;
+  overscroll-behavior: none;
 }
 
 /* 터치 드래그 중: 제스처를 페이지(뒤로 가기)에 넘기지 않음 */

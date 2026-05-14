@@ -2114,7 +2114,6 @@
 
   function onForgeTouchProbeMove(ev) {
     if (!touchDragSession || touchDragSession.phase !== 'probe' || ev.touches.length !== 1) return;
-    if (ev.cancelable) ev.preventDefault();
     const t = ev.touches[0];
     touchDragSession.lastTouch = { clientX: t.clientX, clientY: t.clientY };
     const dx = t.clientX - touchDragSession.x0;
@@ -2251,7 +2250,7 @@
       touchDragSession.longPressTimerId = 0;
       commitProbeToForgeDrag();
     }, FORGE_LONG_PRESS_MS);
-    document.addEventListener('touchmove', onForgeTouchProbeMove, { capture: true, passive: false });
+    document.addEventListener('touchmove', onForgeTouchProbeMove, { capture: true, passive: true });
     document.addEventListener('touchend', onForgeTouchProbeEnd, { capture: true, passive: false });
     document.addEventListener('touchcancel', onForgeTouchProbeEnd, { capture: true });
   }
