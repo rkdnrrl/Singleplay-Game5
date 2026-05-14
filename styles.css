@@ -2065,6 +2065,13 @@ body.forge-scroll-lock {
   body[data-tab="equipment"] .log-panel.forge-extra .crafted-list {
     max-height: none; flex: 1; min-height: 0;
   }
+  /* ══ TAB: 수리 (모바일) ══ */
+  body[data-tab="repair"] .repair-panel {
+    display: flex !important;
+    position: fixed;
+    inset: 0 0 var(--tabbar-h);
+    overflow: hidden;
+  }
 }
 
 /* ════════════════════════════════════════════════
@@ -2247,6 +2254,14 @@ body.forge-scroll-lock {
   body[data-tab="equipment"] .log-panel.forge-extra .crafted-list {
     max-height: none !important; flex: 1; min-height: 0; overflow-y: auto;
   }
+  /* ══ TAB: 수리 (PC) ══ */
+  body[data-tab="repair"] .repair-panel {
+    display: flex !important;
+    position: fixed !important;
+    left: var(--sidebar-w) !important; top: 0 !important;
+    right: 0 !important; bottom: 0 !important;
+    z-index: 50;
+  }
 }
 
 /* ── 숙련도 표시 바 ───────────────────────── */
@@ -2285,6 +2300,196 @@ body.forge-scroll-lock {
   animation: profGainPulse 1.2s ease-out forwards;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   수리 탭 — 공통 스타일
+   ══════════════════════════════════════════════════════════════ */
+.repair-panel {
+  display: none;
+  width: 100%; height: 100%;
+  background: var(--bg, #0b0b18);
+  overflow: hidden;
+}
+.repair-layout {
+  display: flex;
+  width: 100%; height: 100%;
+  gap: 0;
+}
+/* 왼쪽: 캔버스 영역 */
+.repair-canvas-area {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+.repair-drop-zone {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(180,160,255,0.25);
+  border-radius: 0.75rem;
+  background: rgba(20,15,40,0.6);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.15s, background 0.15s;
+}
+.repair-drop-zone.drag-over {
+  border-color: rgba(180,160,255,0.7);
+  background: rgba(40,30,80,0.7);
+}
+.repair-drop-hint {
+  color: rgba(200,190,240,0.45);
+  font-size: 0.82rem;
+  font-family: Jua, sans-serif;
+  text-align: center;
+  line-height: 1.6;
+  pointer-events: none;
+}
+.repair-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  touch-action: none;
+  cursor: crosshair;
+}
+.repair-canvas.hidden { display: none; }
+/* HUD 컨트롤 */
+.repair-controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.repair-controls.hidden { display: none; }
+.repair-hud-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.repair-dur-info {
+  font-size: 0.78rem;
+  font-family: Jua, sans-serif;
+  color: #f87171;
+}
+.repair-coin-info {
+  font-size: 0.75rem;
+  font-family: Jua, sans-serif;
+  color: #fbbf24;
+  margin-left: auto;
+}
+.repair-zoom-btn {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-family: Jua, sans-serif;
+  background: rgba(120,100,200,0.18);
+  color: #c4b5fd;
+  border: 1px solid rgba(160,140,220,0.3);
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+.repair-zoom-btn:hover { background: rgba(120,100,200,0.32); }
+.repair-confirm-btn {
+  margin-left: auto;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.8rem;
+  font-family: Jua, sans-serif;
+  background: rgba(34,197,94,0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34,197,94,0.35);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.repair-confirm-btn:hover { background: rgba(34,197,94,0.28); }
+.repair-confirm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* 오른쪽: 장비 사이드바 */
+.repair-equip-sidebar {
+  width: 130px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(255,255,255,0.07);
+  padding: 0.5rem 0.4rem;
+  overflow: hidden;
+}
+.repair-sidebar-title {
+  font-size: 0.78rem;
+  font-family: Jua, sans-serif;
+  color: rgba(200,190,255,0.6);
+  margin: 0 0 0.4rem;
+  text-align: center;
+}
+.repair-equip-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.repair-equip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.35rem;
+  border-radius: 0.45rem;
+  background: rgba(30,25,55,0.6);
+  border: 1px solid rgba(255,255,255,0.07);
+  cursor: grab;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.repair-equip-item:hover { background: rgba(60,50,110,0.7); border-color: rgba(160,140,220,0.3); }
+.repair-equip-item.is-selected { border-color: rgba(160,140,220,0.7); background: rgba(80,60,150,0.5); }
+.repair-equip-item.no-damage { opacity: 0.4; cursor: default; }
+.repair-equip-thumb {
+  width: 28px; height: 28px;
+  border-radius: 0.3rem;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.05);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.repair-equip-img { width: 100%; height: 100%; object-fit: cover; }
+.repair-equip-info { min-width: 0; }
+.repair-equip-name {
+  font-size: 0.7rem;
+  font-family: Jua, sans-serif;
+  color: rgba(232,230,255,0.85);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 72px;
+}
+.repair-equip-dur {
+  font-size: 0.62rem;
+  color: rgba(200,190,240,0.55);
+}
+/* 코인 차감 플로팅 텍스트 */
+.repair-fx-coin {
+  position: fixed;
+  font-size: 0.95rem;
+  font-family: Jua, sans-serif;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 9999;
+  transition: transform 0.65s ease-out, opacity 0.65s ease-out;
+  transform: translateY(0); opacity: 1;
+}
+.repair-fx-coin--rise {
+  transform: translateY(-40px); opacity: 0;
+}
+/* PC 사이드바 너비 늘리기 */
+@media (min-width: 640px) {
+  .repair-equip-sidebar { width: 180px; }
+  .repair-equip-name { max-width: 112px; }
+}
+
 /* ── PC 글자 크기 보정 (min-width: 640px) ─────────────────────── */
 @media (min-width: 640px) {
   .furnace-hint           { font-size: 0.88rem; }
@@ -2308,6 +2513,12 @@ body.forge-scroll-lock {
   .cr-desc,
   .cr-stats               { font-size: 0.82rem; }
   .crafted-repair-btn     { font-size: 0.82rem; }
+  .repair-sidebar-title   { font-size: 0.95rem; }
+  .repair-equip-name      { font-size: 0.88rem; }
+  .repair-equip-dur       { font-size: 0.8rem; }
+  .repair-dur-info,
+  .repair-coin-info       { font-size: 0.88rem; }
+  .repair-confirm-btn     { font-size: 0.9rem; }
   .inventory-dock .inv-item { font-size: 0.9rem; }
   .inv-tag                { font-size: 0.8rem; }
   .inventory-dock .log-title { font-size: 0.98rem; }

@@ -73,6 +73,35 @@
     <div id="craftedList" class="crafted-list"></div>
   </section>
 
+  <!-- 수리 탭 패널 -->
+  <section class="repair-panel" id="repairPanel" aria-label="장비 수리">
+    <div class="repair-layout">
+      <!-- 왼쪽: 수리 캔버스 영역 -->
+      <div class="repair-canvas-area">
+        <div class="repair-drop-zone" id="repairDropZone">
+          <p class="repair-drop-hint" id="repairDropHint">← 오른쪽 장비를 드래그해서<br>여기에 놓으세요</p>
+          <canvas id="repairCanvas" class="repair-canvas hidden" width="320" height="400"></canvas>
+        </div>
+        <div class="repair-controls hidden" id="repairControls">
+          <div class="repair-hud-row">
+            <span class="repair-dur-info" id="repairDurInfo">내구도 --/--</span>
+            <span class="repair-coin-info" id="repairCoinInfo">🪙 ---</span>
+          </div>
+          <div class="repair-hud-row">
+            <button class="repair-zoom-btn" id="repairZoomOut">🔍−</button>
+            <button class="repair-zoom-btn" id="repairZoomIn">🔍+</button>
+            <button class="repair-confirm-btn" id="repairConfirmBtn">✅ 수리 완료</button>
+          </div>
+        </div>
+      </div>
+      <!-- 오른쪽: 장비 목록 -->
+      <div class="repair-equip-sidebar">
+        <p class="repair-sidebar-title">🛡️ 장비 목록</p>
+        <div class="repair-equip-list" id="repairEquipList"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="log-panel inventory-dock" id="materialDock" aria-label="재료 보관함">
     <div class="inv-header">
       <h2 class="log-title">📦 재료 <span id="matCountBadge" class="mat-badge">0</span></h2>
@@ -188,6 +217,10 @@
     <button type="button" class="mobile-tab" data-tab="equipment">
       <span class="mobile-tab-icon">🛡️</span>
       <span class="mobile-tab-label">장비</span>
+    </button>
+    <button type="button" class="mobile-tab" data-tab="repair">
+      <span class="mobile-tab-icon">🔨</span>
+      <span class="mobile-tab-label">수리</span>
     </button>
   </nav>
 

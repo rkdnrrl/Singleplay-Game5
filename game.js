@@ -2921,39 +2921,7 @@
           <div class="cr-desc">${escapeHtml(c.desc || '')}</div>
           ${statsLine}
         `;
-        if (isDamaged && item.id && alpToken && platformApi) {
-          const repairBtn = document.createElement('button');
-          repairBtn.type = 'button';
-          repairBtn.className = 'crafted-repair-btn';
-          repairBtn.textContent = `🔧 수리 🪙${repairCost.toLocaleString()}`;
-          repairBtn.addEventListener('click', async () => {
-            repairBtn.disabled = true;
-            repairBtn.textContent = '수리 중…';
-            try {
-              const res = await fetch(`${platformApi}/api/craft/equipment/${encodeURIComponent(item.id)}/repair`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${alpToken}` },
-              });
-              const d = await res.json();
-              if (!res.ok) {
-                alert(d?.error?.message || '수리에 실패했습니다.');
-                repairBtn.disabled = false;
-                repairBtn.textContent = `🔧 수리 🪙${repairCost.toLocaleString()}`;
-                return;
-              }
-              if (typeof d.equipment?.stats?.durability === 'number') {
-                totalCoins = Math.max(0, totalCoins - d.costPaid);
-                updateCoinDisplay();
-              }
-              await refreshCraftedList();
-            } catch {
-              alert('수리 중 오류가 발생했습니다.');
-              repairBtn.disabled = false;
-              repairBtn.textContent = `🔧 수리 🪙${repairCost.toLocaleString()}`;
-            }
-          });
-          body.appendChild(repairBtn);
-        }
+        // 수리는 🔨 수리 탭에서 진행
         row.appendChild(body);
         craftedListEl.appendChild(row);
       });
@@ -3071,6 +3039,315 @@
     .then(() => refreshCraftedList())
     .then(() => syncSmeltFromServer());
 
+  // ══════════════════════════════════════════════════════════════
+  // 수리 탭
+  // ══════════════════════════════════════════════════════════════
+  const REPAIR_COLS = 8, REPAIR_ROWS = 10;
+  const REPAIR_COST_TABLE = { common: 5, rare: 12, epic: 30, legendary: 70 };
+
+  let repairItem = null;
+  let repairMaxDur = 0, repairOrigDur = 0, repairDur = 0;
+  let repairCracks = null; // Set<"col,row">
+  let repairZoom = 1.0;
+  let repairImg = null;
+  let repairSpent = 0;
+
+  const $repairCanvas    = document.getElementById('repairCanvas');
+  const $repairHint      = document.getElementById('repairDropHint');
+  const $repairControls  = document.getElementById('repairControls');
+  const $repairDurInfo   = document.getElementById('repairDurInfo');
+  const $repairCoinInfo  = document.getElementById('repairCoinInfo');
+  const $repairEquipList = document.getElementById('repairEquipList');
+  let repairCtx = $repairCanvas ? $repairCanvas.getContext('2d') : null;
+
+  function seededRng(seed) {
+    let s = (seed >>> 0) || 1;
+    return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0x100000000; };
+  }
+  function hashStr(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = (Math.imul(h, 31) + str.charCodeAt(i)) | 0;
+    return h >>> 0;
+  }
+
+  function generateCracks(curDur, maxDur, seedStr) {
+    const damagedCount = Math.round(((maxDur - curDur) / maxDur) * (REPAIR_COLS * REPAIR_ROWS));
+    if (damagedCount <= 0) return new Set();
+    const rng = seededRng(hashStr(String(seedStr)));
+    const cracked = new Set();
+    const queue = [];
+    const numOrigins = 2 + (rng() < 0.4 ? 1 : 0);
+    for (let i = 0; i < numOrigins; i++) {
+      const cx = Math.floor(rng() * REPAIR_COLS), cy = Math.floor(rng() * REPAIR_ROWS);
+      const k = `${cx},${cy}`;
+      if (!cracked.has(k)) { cracked.add(k); queue.push([cx, cy]); }
+    }
+    let safety = 5000;
+    while (cracked.size < damagedCount && queue.length > 0 && --safety > 0) {
+      const idx = Math.floor(rng() * Math.min(queue.length, 4));
+      const [x, y] = queue.splice(idx, 1)[0];
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        if (cracked.size >= damagedCount) break;
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || nx >= REPAIR_COLS || ny < 0 || ny >= REPAIR_ROWS) continue;
+        const k = `${nx},${ny}`;
+        if (!cracked.has(k) && rng() < 0.72) { cracked.add(k); queue.push([nx, ny]); }
+      }
+    }
+    return cracked;
+  }
+
+  function loadRepairItem(item) {
+    const stats = item.stats || {};
+    const maxDur = Number(stats.durabilityMax || 0);
+    if (maxDur <= 0) { toast('내구도가 없는 장비입니다.'); return; }
+    const curDur = stats.durability != null ? Number(stats.durability) : maxDur;
+    repairItem = item; repairMaxDur = maxDur; repairOrigDur = curDur;
+    repairDur = curDur; repairSpent = 0; repairZoom = 1.0;
+    repairCracks = generateCracks(curDur, maxDur, item.id);
+    $repairEquipList?.querySelectorAll('.repair-equip-item')
+      .forEach(el => el.classList.toggle('is-selected', el.dataset.id === String(item.id)));
+    $repairHint?.classList.add('hidden');
+    $repairCanvas?.classList.remove('hidden');
+    $repairControls?.classList.remove('hidden');
+    repairImg = null;
+    const imgSrc = item.imageUrl || item.pixelArt?.imageDataUrl;
+    if (imgSrc) {
+      const img = new Image();
+      img.onload = () => { repairImg = img; drawRepairCanvas(); };
+      img.src = imgSrc;
+    } else { drawRepairCanvas(); }
+    updateRepairHud();
+
+    // 캔버스 크기를 드롭존에 맞게 조정
+    if ($repairCanvas) {
+      const dz = document.getElementById('repairDropZone');
+      if (dz) {
+        $repairCanvas.width  = dz.clientWidth  || 320;
+        $repairCanvas.height = dz.clientHeight || 400;
+        repairCtx = $repairCanvas.getContext('2d');
+      }
+    }
+    drawRepairCanvas();
+  }
+
+  function drawRepairCanvas() {
+    if (!repairCtx || !repairItem || !repairCracks) return;
+    const canvas = $repairCanvas;
+    const ctx = repairCtx;
+    const cw = canvas.width, ch = canvas.height;
+    ctx.clearRect(0, 0, cw, ch);
+
+    const cellW = (cw / REPAIR_COLS) * repairZoom;
+    const cellH = (ch / REPAIR_ROWS) * repairZoom;
+    const ox = (cw - cellW * REPAIR_COLS) / 2;
+    const oy = (ch - cellH * REPAIR_ROWS) / 2;
+    const gridW = cellW * REPAIR_COLS, gridH = cellH * REPAIR_ROWS;
+
+    ctx.fillStyle = '#0d0d1e';
+    ctx.fillRect(0, 0, cw, ch);
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(ox, oy, gridW, gridH); ctx.clip();
+    if (repairImg) {
+      ctx.drawImage(repairImg, ox, oy, gridW, gridH);
+    } else {
+      ctx.font = `${Math.min(gridW, gridH) * 0.6}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillText(repairItem.emoji || '⚔️', cw / 2, ch / 2);
+    }
+    ctx.restore();
+
+    // 균열 칸 오버레이
+    for (const key of repairCracks) {
+      const [c, r] = key.split(',').map(Number);
+      const x = ox + c * cellW, y = oy + r * cellH;
+      ctx.fillStyle = 'rgba(0,0,0,0.68)';
+      ctx.fillRect(x, y, cellW, cellH);
+      // 균열선 (각 셀 고유 패턴)
+      const rng = seededRng(hashStr(`${key}${repairItem.id}`));
+      ctx.strokeStyle = 'rgba(255,80,30,0.8)';
+      ctx.lineWidth = Math.max(1, cellW * 0.05); ctx.lineCap = 'round';
+      const pts = Array.from({length: 4}, () => [rng() * cellW, rng() * cellH]);
+      ctx.beginPath();
+      ctx.moveTo(x + pts[0][0], y + pts[0][1]);
+      pts.slice(1).forEach(p => ctx.lineTo(x + p[0], y + p[1]));
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + pts[1][0], y + pts[1][1]);
+      ctx.lineTo(x + pts[1][0] + (rng()-0.5)*cellW*0.6, y + pts[1][1] - rng()*cellH*0.4);
+      ctx.stroke();
+    }
+
+    // 격자선
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 0.5;
+    for (let c = 0; c <= REPAIR_COLS; c++) {
+      const x = ox + c * cellW;
+      ctx.beginPath(); ctx.moveTo(x, oy); ctx.lineTo(x, oy + gridH); ctx.stroke();
+    }
+    for (let r = 0; r <= REPAIR_ROWS; r++) {
+      const y = oy + r * cellH;
+      ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + gridW, y); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(120,90,220,0.3)'; ctx.lineWidth = 2;
+    ctx.strokeRect(ox, oy, gridW, gridH);
+  }
+
+  function onRepairTapAt(clientX, clientY) {
+    if (!repairItem || !$repairCanvas || !repairCracks) return;
+    const rect = $repairCanvas.getBoundingClientRect();
+    const px = (clientX - rect.left) * ($repairCanvas.width / rect.width);
+    const py = (clientY - rect.top)  * ($repairCanvas.height / rect.height);
+    const cellW = ($repairCanvas.width  / REPAIR_COLS) * repairZoom;
+    const cellH = ($repairCanvas.height / REPAIR_ROWS) * repairZoom;
+    const ox = ($repairCanvas.width  - cellW * REPAIR_COLS) / 2;
+    const oy = ($repairCanvas.height - cellH * REPAIR_ROWS) / 2;
+    const col = Math.floor((px - ox) / cellW);
+    const row = Math.floor((py - oy) / cellH);
+    if (col < 0 || col >= REPAIR_COLS || row < 0 || row >= REPAIR_ROWS) return;
+
+    const key = `${col},${row}`;
+    const cost = REPAIR_COST_TABLE[String(repairItem.tier || 'common').toLowerCase()] ?? 5;
+
+    if (repairCracks.has(key)) {
+      if (repairDur >= repairMaxDur) return;
+      repairCracks.delete(key); repairDur++; repairSpent += cost;
+      showRepairCoinFx(clientX, clientY, `-${cost}`, '#fbbf24');
+    } else {
+      if (repairDur <= 0) return;
+      repairCracks.add(key); repairDur--; repairSpent += cost;
+      showRepairCoinFx(clientX, clientY, `-${cost}`, '#f87171');
+    }
+    drawRepairCanvas(); updateRepairHud();
+  }
+
+  function showRepairCoinFx(x, y, text, color) {
+    const el = document.createElement('span');
+    el.className = 'repair-fx-coin';
+    el.textContent = text; el.style.color = color;
+    el.style.left = `${x - 12}px`; el.style.top = `${y - 16}px`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+      el.classList.add('repair-fx-coin--rise');
+      setTimeout(() => el.remove(), 700);
+    });
+  }
+
+  function updateRepairHud() {
+    if ($repairDurInfo) {
+      $repairDurInfo.textContent = `내구도: ${repairDur} / ${repairMaxDur}`;
+      $repairDurInfo.style.color = repairDur < repairMaxDur ? '#f87171' : '#4ade80';
+    }
+    if ($repairCoinInfo) {
+      $repairCoinInfo.textContent = `🪙 ${Math.max(0, totalCoins - repairSpent).toLocaleString()}  (-${repairSpent})`;
+    }
+  }
+
+  async function confirmRepairSession() {
+    if (!repairItem) return;
+    const netRepair = repairDur - repairOrigDur;
+    if (netRepair <= 0) { toast('수리한 내용이 없습니다.'); return; }
+    if (!alpToken || !platformApi) { toast('로그인이 필요합니다.'); return; }
+    const btn = document.getElementById('repairConfirmBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
+    try {
+      const res = await fetch(`${platformApi}/api/craft/equipment/${encodeURIComponent(repairItem.id)}/repair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+        body: JSON.stringify({ amount: netRepair }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast(d?.error?.message || '수리에 실패했습니다.'); return; }
+      totalCoins = Math.max(0, totalCoins - (d.costPaid || 0));
+      updateCoinDisplay();
+      toast(`✅ 수리 완료! 🪙-${d.costPaid}`);
+      repairItem = null;
+      $repairCanvas?.classList.add('hidden');
+      $repairControls?.classList.add('hidden');
+      $repairHint?.classList.remove('hidden');
+      await refreshCraftedList();
+      refreshRepairEquipList();
+    } catch { toast('수리 중 오류가 발생했습니다.'); }
+    finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ 수리 완료'; }
+    }
+  }
+
+  function refreshRepairEquipList() {
+    if (!$repairEquipList) return;
+    $repairEquipList.innerHTML = '';
+    const pool = (typeof serverEquipmentForgePool !== 'undefined') ? serverEquipmentForgePool : [];
+    for (const item of pool) {
+      const stats = item.stats || {};
+      const maxDur = Number(stats.durabilityMax || 0);
+      const curDur = stats.durability != null ? Number(stats.durability) : maxDur;
+      const damaged = maxDur > 0 && curDur < maxDur;
+
+      const el = document.createElement('div');
+      el.className = 'repair-equip-item' + (damaged ? '' : ' no-damage');
+      el.dataset.id = String(item.id);
+      el.draggable = damaged;
+      el.title = item.name || '장비';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'repair-equip-thumb';
+      const imgSrc = item.imageUrl || item.pixelArt?.imageDataUrl;
+      if (imgSrc) {
+        const img = document.createElement('img');
+        img.className = 'repair-equip-img'; img.src = imgSrc;
+        thumb.appendChild(img);
+      } else { thumb.textContent = item.emoji || '⚔️'; }
+
+      const info = document.createElement('div');
+      info.className = 'repair-equip-info';
+      const name = document.createElement('div');
+      name.className = 'repair-equip-name'; name.textContent = item.name || '장비';
+      const dur = document.createElement('div');
+      dur.className = 'repair-equip-dur';
+      if (maxDur > 0) {
+        dur.innerHTML = `<span style="color:${damaged ? '#f87171' : '#4ade80'}">${curDur}/${maxDur}</span>`;
+      } else { dur.textContent = '—'; }
+      info.appendChild(name); info.appendChild(dur);
+      el.appendChild(thumb); el.appendChild(info);
+
+      if (damaged) {
+        el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', String(item.id)));
+        el.addEventListener('click', () => loadRepairItem(item));
+      }
+      $repairEquipList.appendChild(el);
+    }
+  }
+
+  // 수리 탭 이벤트 바인딩
+  if ($repairCanvas) {
+    const dropZone = document.getElementById('repairDropZone');
+    if (dropZone) {
+      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault(); dropZone.classList.remove('drag-over');
+        const id = e.dataTransfer.getData('text/plain');
+        const pool = (typeof serverEquipmentForgePool !== 'undefined') ? serverEquipmentForgePool : [];
+        const item = pool.find(i => String(i.id) === id);
+        if (item) loadRepairItem(item);
+      });
+    }
+    $repairCanvas.addEventListener('click', e => onRepairTapAt(e.clientX, e.clientY));
+    $repairCanvas.addEventListener('touchend', e => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      onRepairTapAt(t.clientX, t.clientY);
+    }, { passive: false });
+    document.getElementById('repairZoomIn')?.addEventListener('click', () => {
+      repairZoom = Math.min(3, repairZoom + 0.25); drawRepairCanvas();
+    });
+    document.getElementById('repairZoomOut')?.addEventListener('click', () => {
+      repairZoom = Math.max(0.3, repairZoom - 0.25); drawRepairCanvas();
+    });
+    document.getElementById('repairConfirmBtn')?.addEventListener('click', confirmRepairSession);
+  }
+
   // ── 탭바 (모바일 하단 / PC 좌측 사이드바 공용) ──
   const mobileTabbarEl = document.getElementById('mobileTabbar');
   if (mobileTabbarEl) {
@@ -3079,6 +3356,7 @@
       mobileTabbarEl.querySelectorAll('.mobile-tab').forEach((btn) => {
         btn.classList.toggle('is-active', btn.dataset.tab === tab);
       });
+      if (tab === 'repair') refreshRepairEquipList();
     }
     if (!document.body.dataset.tab) setMobileTab('furnace');
     mobileTabbarEl.addEventListener('click', (e) => {
