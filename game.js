@@ -1876,6 +1876,14 @@
       appendMaterialDetailRow(materialDetailDlEl, '분류', materialDetailKindLabel(m));
       appendEquipmentStatsDetail(materialDetailDlEl, m.stats);
       appendMaterialDetailRow(materialDetailDlEl, '장비 ID', m.equipmentId);
+      const srcMats = equipSourceMatsMap.get(String(m.equipmentId)) || [];
+      const smeltMats = srcMats.filter((x) => x.kind === 'smelt');
+      const catchMats = srcMats.filter((x) => x.kind === 'catch');
+      if (smeltMats.length > 0) {
+        const names = smeltMats.map((x) => { const meta = smeltProductMeta(x.id); return `${meta.emoji} ${meta.name}`; }).join(', ');
+        appendMaterialDetailRow(materialDetailDlEl, '기초 재료', names);
+      }
+      if (catchMats.length > 0) appendMaterialDetailRow(materialDetailDlEl, '낚시 재료', `${catchMats.length}종`);
     } else {
       appendMaterialDetailRow(materialDetailDlEl, '분류', materialDetailKindLabel(m));
       appendMaterialDetailRow(materialDetailDlEl, '인벤토리 ID', m.serverId);
