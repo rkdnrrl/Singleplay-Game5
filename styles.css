@@ -2069,7 +2069,11 @@ body.forge-scroll-lock {
   body[data-tab="repair"] .repair-panel {
     display: flex !important;
     position: fixed;
-    inset: 0 0 var(--tabbar-h);
+    top: env(safe-area-inset-top, 0px);
+    left: 0; right: 0;
+    bottom: var(--tabbar-h);
+    height: auto !important;
+    z-index: 50;
     overflow: hidden;
   }
 }
@@ -2260,6 +2264,7 @@ body.forge-scroll-lock {
     position: fixed !important;
     left: var(--sidebar-w) !important; top: 0 !important;
     right: 0 !important; bottom: 0 !important;
+    height: auto !important;
     z-index: 50;
   }
 }
