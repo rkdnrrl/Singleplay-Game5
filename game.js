@@ -2781,10 +2781,17 @@
         row.appendChild(thumb);
         const body = document.createElement('div');
         const st = c.stats;
-        const durPart =
-          st && st.durabilityMax != null && Number.isFinite(Number(st.durabilityMax))
-            ? ` · 내구 ${st.durability != null ? st.durability : st.durabilityMax}/${st.durabilityMax}`
-            : '';
+        const durMax = st && st.durabilityMax != null && Number.isFinite(Number(st.durabilityMax)) ? Number(st.durabilityMax) : 0;
+        const durCur = durMax > 0 ? (st.durability != null && Number.isFinite(Number(st.durability)) ? Number(st.durability) : durMax) : 0;
+        const isDamaged = durMax > 0 && durCur < durMax;
+
+        const REPAIR_COST_PER_DUR = { common: 5, rare: 12, epic: 30, legendary: 70 };
+        const tier = String(c.rarity || item.tier || 'common').toLowerCase();
+        const repairCost = isDamaged ? Math.max(1, Math.ceil((durMax - durCur) * (REPAIR_COST_PER_DUR[tier] ?? 5))) : 0;
+
+        const durPart = durMax > 0
+          ? ` · 내구 <span style="color:${isDamaged ? '#f87171' : 'inherit'}">${durCur}/${durMax}</span>`
+          : '';
         const SLOT_EMOJI_MAP = { weapon:'⚔️',head:'🪖',chest:'🧥',pants:'👖',gloves:'🧤',boots:'👢',accessory:'💍' };
         const slotTag = st && st.equipSlot ? `<span style="opacity:0.55">${SLOT_EMOJI_MAP[st.equipSlot]||''}</span> ` : '';
         const hpPart = st && st.hpBonus > 0 ? ` · HP +${st.hpBonus}` : '';
@@ -2797,6 +2804,39 @@
           <div class="cr-desc">${escapeHtml(c.desc || '')}</div>
           ${statsLine}
         `;
+        if (isDamaged && item.id && alpToken && platformApi) {
+          const repairBtn = document.createElement('button');
+          repairBtn.type = 'button';
+          repairBtn.className = 'crafted-repair-btn';
+          repairBtn.textContent = `🔧 수리 🪙${repairCost.toLocaleString()}`;
+          repairBtn.addEventListener('click', async () => {
+            repairBtn.disabled = true;
+            repairBtn.textContent = '수리 중…';
+            try {
+              const res = await fetch(`${platformApi}/api/craft/equipment/${encodeURIComponent(item.id)}/repair`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${alpToken}` },
+              });
+              const d = await res.json();
+              if (!res.ok) {
+                alert(d?.error?.message || '수리에 실패했습니다.');
+                repairBtn.disabled = false;
+                repairBtn.textContent = `🔧 수리 🪙${repairCost.toLocaleString()}`;
+                return;
+              }
+              if (typeof d.equipment?.stats?.durability === 'number') {
+                totalCoins = Math.max(0, totalCoins - d.costPaid);
+                updateCoinDisplay();
+              }
+              await refreshCraftedList();
+            } catch {
+              alert('수리 중 오류가 발생했습니다.');
+              repairBtn.disabled = false;
+              repairBtn.textContent = `🔧 수리 🪙${repairCost.toLocaleString()}`;
+            }
+          });
+          body.appendChild(repairBtn);
+        }
         row.appendChild(body);
         craftedListEl.appendChild(row);
       });

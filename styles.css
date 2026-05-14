@@ -1210,6 +1210,30 @@ html.material-detail-open body {
   opacity: 0.9;
 }
 
+.crafted-repair-btn {
+  margin-top: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
+  font-family: Jua, sans-serif;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.crafted-repair-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+.crafted-repair-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .inv-item.inv-item--equipment {
   outline: 1px solid rgba(255, 193, 7, 0.35);
 }
