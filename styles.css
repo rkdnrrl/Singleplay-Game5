@@ -366,13 +366,13 @@ html.material-detail-open body {
 }
 
 .furnace-preview {
-  font-size: 0.68rem;
+  font-size: 0.82rem;
   color: #7e57c2;
   text-align: center;
   min-height: 1.2em;
-  padding: 0 0.25rem;
+  padding: 0.15rem 0.25rem;
   font-style: italic;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .furnace-result {
