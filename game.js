@@ -1362,6 +1362,11 @@
     if (!forgeOverlayEl) return;
     if (visible) {
       hideSignatureCelebrate();
+      if (forgeOverlayTitleEl) forgeOverlayTitleEl.textContent = '대장간에서 제작 중…';
+      if (forgeDiscoveryBannerEl) {
+        forgeDiscoveryBannerEl.textContent = '';
+        forgeDiscoveryBannerEl.classList.add('forge-discovery-banner--hidden');
+      }
       startForgeOverlayTimer();
     } else {
       stopForgeOverlayTimer();
@@ -2541,6 +2546,30 @@
       btnForge.textContent = '제련 중…';
     }
     setForgeOverlay(true);
+
+    // 오버레이 뜨는 즉시 recipe-check → 첫 조합이면 배너 즉시 표시
+    {
+      const smeltIds = materialsPayload
+        .filter((m) => m.kind === 'smelt')
+        .map((m) => m.id)
+        .sort()
+        .join(',');
+      if (smeltIds) {
+        fetch(
+          `${platformApi}/api/craft/recipe-check?slot=${encodeURIComponent(forgeSlot)}&ids=${encodeURIComponent(smeltIds)}`,
+          { headers: { Authorization: `Bearer ${alpToken}` } },
+        )
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.isNew && forgeDiscoveryBannerEl) {
+              forgeDiscoveryBannerEl.textContent = '✨ 도감에 없는 조합입니다! 축하합니다!';
+              forgeDiscoveryBannerEl.classList.remove('forge-discovery-banner--hidden');
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
     try {
       const res = await fetch(`${platformApi}/api/craft/equipment`, {
         method: 'POST',
@@ -2608,17 +2637,6 @@
       syncForgeUi();
       await refreshCraftedList();
       void syncSmeltFromServer();
-
-      // 첫 조합이면 오버레이에 발견 배너 표시
-      if (data.firstDiscovery) {
-        stopForgeOverlayTimer();
-        if (forgeOverlayTitleEl) forgeOverlayTitleEl.textContent = '🎉 첫 조합 발견!';
-        if (forgeDiscoveryBannerEl) {
-          forgeDiscoveryBannerEl.textContent = '✨ 도감에 없는 조합입니다! 축하합니다!';
-          forgeDiscoveryBannerEl.classList.remove('forge-discovery-banner--hidden');
-        }
-        await new Promise((r) => window.setTimeout(r, 2200));
-      }
 
       // 실제 경과 시간으로 게임머니 지급
       const forgeBonus = await grantForgeBonus(Date.now() - forgeStartAt);
