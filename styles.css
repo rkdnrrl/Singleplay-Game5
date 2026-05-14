@@ -2598,8 +2598,7 @@ body.forge-scroll-lock {
   }
   /* ══ TAB: 수리 (모바일) ══ */
   body[data-tab="repair"] .repair-panel {
-    display: flex !important;
-    flex-direction: column !important;
+    display: block !important;
     position: fixed;
     top: env(safe-area-inset-top, 0px);
     left: 0; right: 0;
@@ -2609,12 +2608,10 @@ body.forge-scroll-lock {
     overflow: hidden;
   }
   body[data-tab="repair"] .repair-layout {
-    flex: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
     min-height: 0 !important;
-    height: auto !important;
-  }
-  body[data-tab="repair"] .repair-canvas-area {
-    min-height: 0 !important;
+    overflow: hidden !important;
   }
 }
 
@@ -2800,29 +2797,28 @@ body.forge-scroll-lock {
   }
   /* ══ TAB: 수리 (PC) ══ */
   body[data-tab="repair"] .repair-panel {
-    display: flex !important;
-    flex-direction: column !important;
+    display: block !important;          /* block 으로 두고 내부 layout이 채움 */
     position: fixed !important;
     left: var(--sidebar-w) !important; top: 0 !important;
     right: 0 !important; bottom: 0 !important;
-    height: auto !important;
+    width: auto !important; height: auto !important;
+    overflow: hidden !important;
     z-index: 50;
-    overflow: hidden;
   }
   body[data-tab="repair"] .repair-layout {
-    flex: 1 !important;
-    min-height: 0 !important;
-    height: auto !important;
     width: 100% !important;
-  }
-  body[data-tab="repair"] .repair-canvas-area {
-    min-height: 0 !important;
-  }
-  body[data-tab="repair"] .repair-equip-sidebar {
     height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    width: 200px !important;
+  }
+  body[data-tab="repair"] .repair-canvas-area {
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+  body[data-tab="repair"] .repair-equip-sidebar {
+    width: 220px !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
   }
 }
 
@@ -2992,6 +2988,7 @@ body.forge-scroll-lock {
   border-left: 1px solid rgba(255,255,255,0.07);
   padding: 0.5rem 0.4rem;
   overflow: hidden;
+  min-height: 0;
 }
 .repair-sidebar-title {
   font-size: 0.78rem;
