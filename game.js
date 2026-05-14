@@ -181,6 +181,7 @@
   const materialDetailTitleEl = document.getElementById('materialDetailTitle');
   const materialDetailRarityEl = document.getElementById('materialDetailRarity');
   const materialDetailDlEl = document.getElementById('materialDetailDl');
+  const materialDetailHintEl = document.getElementById('materialDetailHint');
   /** 터치로 상세를 연 직후 합성 click이 배경/행에 닿아 바로 닫히는 것 방지 */
   let materialDetailBackdropIgnoreUntil = 0;
   let materialDetailSyntheticClickSuppressUntil = 0;
@@ -188,6 +189,8 @@
   let materials = [];
   /** 서버에 저장된 장비 — 재료 슬롯에 합류 */
   let serverEquipmentForgePool = [];
+  /** 장비 ID → sourceMaterials 맵 */
+  let equipSourceMatsMap = new Map();
   /** 대장간 숙련도 (서버에서 로드, float) */
   let smithingProficiency = 0;
   let smithingProfLevelInfo = { mul: 1.0 };
@@ -1156,10 +1159,28 @@
       }
     }
     if (btnSmelt) btnSmelt.disabled = furnaceSelected.length === 0;
-    // 장비가 있으면 소실 경고 표시
+    // 장비가 있으면 소실 경고 표시 + 산출물 예상 미리보기
     if (furnaceEquipWarnEl) {
-      const hasEquip = furnaceSelected.some((m) => isEquipmentMaterial(m));
-      furnaceEquipWarnEl.classList.toggle('hidden', !hasEquip);
+      const equipItems = furnaceSelected.filter((m) => isEquipmentMaterial(m));
+      furnaceEquipWarnEl.classList.toggle('hidden', equipItems.length === 0);
+      if (equipItems.length > 0) {
+        const previewParts = [];
+        for (const m of equipItems) {
+          const mats = equipSourceMatsMap.get(String(m.equipmentId)) || [];
+          const smeltMats = mats.filter((x) => x.kind === 'smelt');
+          for (const sm of smeltMats) {
+            const meta = smeltProductMeta(sm.id);
+            previewParts.push(`${meta.emoji} ${meta.name}`);
+          }
+        }
+        if (previewParts.length > 0 && furnaceMsgEl) {
+          furnaceMsgEl.textContent = `녹이면 나올 수 있는 재료: ${previewParts.join(', ')}`;
+        } else if (furnaceMsgEl) {
+          furnaceMsgEl.textContent = '';
+        }
+      } else if (furnaceMsgEl) {
+        furnaceMsgEl.textContent = '';
+      }
     }
     renderSmeltStock();
   }
@@ -1802,6 +1823,47 @@
     document.body.classList.remove('material-detail-open');
   }
 
+  function smeltProductMeta(id) {
+    const entry = SMELT_CATALOG.find((e) => e.id === id);
+    return entry || { id, name: id, emoji: '🔩' };
+  }
+
+  function openCraftedEquipmentDetail(item, sourceMats) {
+    if (!materialDetailModalEl || !materialDetailTitleEl || !materialDetailRarityEl || !materialDetailDlEl || !materialDetailThumbEl) return;
+    const nameStr = item.name || item.displayName || '장비';
+    materialDetailTitleEl.textContent = nameStr;
+    const tier = rarityClass(item.tier || item.rarity || 'common');
+    materialDetailRarityEl.textContent = tierLabel(tier);
+    materialDetailRarityEl.className = `material-detail-rarity rarity-${tier}`;
+    mountForgeThumbOrImage(materialDetailThumbEl, item.pixelArt || item.pixel_art, item.emoji || matEmoji(nameStr), 88, 88);
+    materialDetailDlEl.innerHTML = '';
+
+    const smeltMats = (sourceMats || []).filter((m) => m.kind === 'smelt');
+    const catchMats = (sourceMats || []).filter((m) => m.kind === 'catch');
+    if (smeltMats.length > 0) {
+      const names = smeltMats.map((m) => {
+        const meta = smeltProductMeta(m.id);
+        return `${meta.emoji} ${meta.name}`;
+      }).join(', ');
+      appendMaterialDetailRow(materialDetailDlEl, '기초 재료', names);
+    }
+    if (catchMats.length > 0) {
+      appendMaterialDetailRow(materialDetailDlEl, '낚시 재료', `${catchMats.length}종`);
+    }
+    if (smeltMats.length === 0 && catchMats.length === 0) {
+      appendMaterialDetailRow(materialDetailDlEl, '재료 정보', '기록 없음');
+    }
+    const desc = (item.description != null && String(item.description).trim()) || (item.desc != null && String(item.desc).trim()) || '';
+    if (desc) appendMaterialDetailRow(materialDetailDlEl, '설명', desc);
+
+    if (materialDetailHintEl) materialDetailHintEl.textContent = '이 장비를 만들 때 사용된 재료 목록입니다.';
+    materialDetailModalEl.classList.remove('material-detail-modal--hidden');
+    materialDetailModalEl.setAttribute('aria-hidden', 'false');
+    document.documentElement.classList.add('material-detail-open');
+    document.body.classList.add('material-detail-open');
+    if (materialDetailCloseBtn) window.requestAnimationFrame(() => materialDetailCloseBtn.focus());
+  }
+
   function openMaterialDetailModal(m) {
     if (!m || !materialDetailModalEl || !materialDetailThumbEl || !materialDetailTitleEl || !materialDetailRarityEl || !materialDetailDlEl) return;
     materialDetailTitleEl.textContent = m.name != null ? String(m.name) : '이름 없음';
@@ -1831,6 +1893,7 @@
       (m.desc != null && String(m.desc).trim()) ||
       '';
     if (desc) appendMaterialDetailRow(materialDetailDlEl, '설명', desc);
+    if (materialDetailHintEl) materialDetailHintEl.innerHTML = '끌어서 <strong>용광로</strong>에 녹이세요. 산출물이 되면 모루에서 장비를 만들 수 있어요.';
     materialDetailModalEl.classList.remove('material-detail-modal--hidden');
     materialDetailModalEl.setAttribute('aria-hidden', 'false');
     document.documentElement.classList.add('material-detail-open');
@@ -2766,6 +2829,9 @@
             desc: item.desc != null ? String(item.desc) : '',
           };
         });
+      equipSourceMatsMap = new Map(
+        list.map((item) => [String(item.id), Array.isArray(item.sourceMaterials) ? item.sourceMaterials : []])
+      );
       refreshMaterials();
       renderMaterials();
       selected = selected.filter((s) => isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid));
@@ -2776,6 +2842,14 @@
         const c = normalizeCraftedRow(item);
         const row = document.createElement('div');
         row.className = 'crafted-row';
+        const sourceMats = Array.isArray(item.sourceMaterials) ? item.sourceMaterials : [];
+        if (sourceMats.length > 0) {
+          row.classList.add('crafted-row--clickable');
+          row.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            openCraftedEquipmentDetail(item, sourceMats);
+          });
+        }
         const thumb = document.createElement('div');
         mountCraftedThumb(thumb, item);
         row.appendChild(thumb);

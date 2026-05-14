@@ -893,6 +893,13 @@ html.material-detail-open body {
   border-left: 3px solid rgba(255, 193, 7, 0.4);
 }
 
+.crafted-row--clickable {
+  cursor: pointer;
+}
+.crafted-row--clickable:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
 .crafted-row .cr-thumb {
   flex-shrink: 0;
   width: 2.85rem;
