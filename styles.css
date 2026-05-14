@@ -1864,6 +1864,10 @@ body.forge-scroll-lock {
    ════════════════════════════════════════════════ */
 .mobile-tabbar { display: none; }
 
+/* 재료·기초재료 탭 버튼 숨김 (용광로·제련 좌측 패널로 노출) */
+.mobile-tab[data-tab="materials"],
+.mobile-tab[data-tab="stock"] { display: none !important; }
+
 @media (max-width: 639px) {
   :root { --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px)); }
 
