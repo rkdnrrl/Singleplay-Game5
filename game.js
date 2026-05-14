@@ -1130,11 +1130,12 @@
         .map((rule) => `⚡ ${rule.name} (${rule.requires.join(' + ')})`)
         .join('\n');
       pill.title = canAdd
-        ? `[${pillStrInfo.label}] 남은 ${displayQty}개 · 모루로 끌어다 놓기 (모루에 ${onAnvil}개 올려 둠)${synHints ? '\n시너지:\n' + synHints : ''}`
+        ? `[${pillStrInfo.label}] 남은 ${displayQty}개 · 클릭하거나 원하는 슬롯으로 드래그 (모루에 ${onAnvil}개 올려 둠)${synHints ? '\n시너지:\n' + synHints : ''}`
         : `모루에 모두 올려 두었습니다. 「선택 비우기」로 돌려 받을 수 있어요.${synHints ? '\n시너지:\n' + synHints : ''}`;
       pill.innerHTML = `<span aria-hidden="true">${entry.emoji || '◆'}</span> ${escapeHtml(entry.name || '')} <span class="smelt-strength ${pillStrInfo.cls}">${pillStrInfo.label}</span> <strong>${displayQty}</strong>`;
 
       if (canAdd) {
+        pill.addEventListener('click', () => tryAddSmeltToAnvilBySid(sid));
         pill.addEventListener('dragstart', (ev) => {
           if (!ev.dataTransfer) return;
           ev.dataTransfer.setData(FORGE_DRAG_SMELT_UID, sid);
@@ -2142,8 +2143,17 @@
       const { clientX, clientY } = s.lastTouch;
       const panel = forgeDropPanelAtPoint(clientX, clientY, s.kind === 'smelt');
       if (s.kind === 'smelt') {
-        if (panel === 'anvil' && s.smeltSid) tryAddSmeltToAnvilBySid(s.smeltSid);
-        else if (panel === 'furnace' && statusMsgEl) {
+        if (panel === 'anvil' && s.smeltSid) {
+          // 터치 드롭 위치에서 빈 슬롯 셀 감지 → 해당 슬롯에 배치
+          const cellEl = document.elementFromPoint(clientX, clientY);
+          const slotCell = cellEl && cellEl.closest('.forge-grid-cell--empty');
+          const slotIdx = slotCell ? parseInt(slotCell.getAttribute('data-slot'), 10) : NaN;
+          if (!Number.isNaN(slotIdx) && slotIdx >= 0 && slotIdx <= 8) {
+            tryAddSmeltToAnvilAtSlot(s.smeltSid, slotIdx);
+          } else {
+            tryAddSmeltToAnvilBySid(s.smeltSid);
+          }
+        } else if (panel === 'furnace' && statusMsgEl) {
           statusMsgEl.textContent = '기초 재료는 모루로만 끌어다 놓을 수 있어요.';
         }
       } else if (s.kind === 'material' && s.uid) {
@@ -2426,26 +2436,73 @@
     }
   }
 
-  const GRID_SLOT_HINTS = ['공격', '속도', '공격', '방어', '내구', '방어', 'HP', 'HP', 'HP'];
+  // 슬롯 위치별 능력치 힌트 (증가↑ / 감소↓)
+  const GRID_SLOT_HINT_HTML = [
+    '<span class="fgc-h-main">⚔️↑</span><span class="fgc-h-sub">방어·HP↓</span>',
+    '<span class="fgc-h-main">⚡↑</span><span class="fgc-h-sub">방어·HP↓</span>',
+    '<span class="fgc-h-main">⚔️↑</span><span class="fgc-h-sub">방어·HP↓</span>',
+    '<span class="fgc-h-main">🛡️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
+    '<span class="fgc-h-main">⚖️</span><span class="fgc-h-sub">내구↑ 균형</span>',
+    '<span class="fgc-h-main">🛡️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
+    '<span class="fgc-h-main">❤️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
+    '<span class="fgc-h-main">❤️🔩↑</span><span class="fgc-h-sub">공격↓</span>',
+    '<span class="fgc-h-main">❤️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
+  ];
+
+  function tryAddSmeltToAnvilAtSlot(sidRaw, slotIndex) {
+    const sid = String(sidRaw || '').trim();
+    if (!sid) return;
+    if (slotIndex < 0 || slotIndex > 8 || selected[slotIndex] !== null) return;
+    const latestStock = cloneSmeltStock(loadSmeltStock());
+    const latest = latestStock[sid];
+    const maxCount = latest && typeof latest.count === 'number' ? latest.count : 0;
+    const inSelected = countSelectedSmeltById(sid);
+    if (inSelected >= maxCount) {
+      if (statusMsgEl) statusMsgEl.textContent = '해당 기초 재료는 보유 수량만큼만 모루에 올릴 수 있어요.';
+      return;
+    }
+    selected[slotIndex] = makeSmeltSelectionMaterial(latest || { id: sid, name: sid, emoji: '◆' });
+    syncForgeUi();
+  }
 
   function syncForgeUi() {
     if (selectedSlotsEl) {
       selectedSlotsEl.innerHTML = '';
       for (let i = 0; i < 9; i++) {
         const m = selected[i];
-        const cell = document.createElement('button');
-        cell.type = 'button';
+        const cell = document.createElement('div');
+        cell.className = `forge-grid-cell${m ? ' forge-grid-cell--filled' : ' forge-grid-cell--empty'}`;
         cell.setAttribute('data-slot', String(i));
+
         if (m) {
-          cell.className = 'forge-grid-cell forge-grid-cell--filled';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'fgc-remove-btn';
+          btn.title = `${m.name} — 클릭하여 빼기`;
           const label = m.name.length > 5 ? m.name.slice(0, 4) + '…' : m.name;
-          cell.innerHTML = `<span class="fgc-emoji">${escapeHtml(m.emoji || '◆')}</span><span class="fgc-name">${escapeHtml(label)}</span>`;
-          cell.title = `${m.name} (클릭하여 빼기)`;
-          cell.addEventListener('click', () => removeSelectedUid(m.uid));
+          btn.innerHTML = `<span class="fgc-emoji">${escapeHtml(m.emoji || '◆')}</span><span class="fgc-name">${escapeHtml(label)}</span>`;
+          btn.addEventListener('click', () => removeSelectedUid(m.uid));
+          cell.appendChild(btn);
         } else {
-          cell.className = 'forge-grid-cell forge-grid-cell--empty';
-          cell.innerHTML = `<span class="fgc-hint">${GRID_SLOT_HINTS[i]}</span>`;
-          cell.disabled = true;
+          cell.innerHTML = GRID_SLOT_HINT_HTML[i];
+          const slotIdx = i;
+          cell.addEventListener('dragover', (e) => {
+            if (!readSmeltDragSid(e.dataTransfer) && !e.dataTransfer.types.includes('text/plain')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'copy';
+            cell.classList.add('forge-grid-cell--drag-over');
+          });
+          cell.addEventListener('dragleave', (e) => {
+            if (!cell.contains(e.relatedTarget)) cell.classList.remove('forge-grid-cell--drag-over');
+          });
+          cell.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            cell.classList.remove('forge-grid-cell--drag-over');
+            const sid = readSmeltDragSid(e.dataTransfer);
+            if (sid) tryAddSmeltToAnvilAtSlot(sid, slotIdx);
+          });
         }
         selectedSlotsEl.appendChild(cell);
       }
@@ -2465,7 +2522,7 @@
     statusMsgEl.className = 'status-msg';
     const items = selected.filter(Boolean);
     if (items.length === 0) {
-      statusMsgEl.textContent = '기초 재료(산출물)를 슬롯에 클릭해서 넣으세요. 슬롯 위치에 따라 능력치가 달라져요.';
+      statusMsgEl.textContent = '산출물을 클릭하거나 원하는 슬롯으로 드래그하세요. 위치에 따라 능력치가 오르내려요.';
       return;
     }
     if (!alpToken || !platformApi) {
