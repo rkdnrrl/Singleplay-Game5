@@ -4272,7 +4272,7 @@
         const cols=isPerfect?['#ffffff','#e8f4ff','#c8e8ff','#a0d0ff']:['#d0e8ff','#a8c8ee','#ffffff','#e0f0ff'];
         for (let i=0,cnt=isPerfect?30:18; i<cnt; i++) {
           const side=Math.random()>0.5?1:-1;
-          const a=side*(Math.PI*0.08+Math.random()*Math.PI*0.52); // 수평 방향 위주
+          const a=side*(Math.PI*0.08+Math.random()*Math.PI*0.52);
           const spd=3+Math.random()*(isPerfect?7:5);
           repairParticles.push({
             x:hx,y:hy,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-0.8,
@@ -4298,9 +4298,39 @@
         setTimeout(() => confirmRepairSession(), 750);
       }
     } else {
-      // 실패: 콤보 리셋 (속도 변화 없음 — 성공해야만 빨라짐)
+      // 실패: 코인 소모 + 내구도 감소
       repairCombo = 0;
+      repairSpent += cost;
+      repairDur = Math.max(0, repairDur - repairDurPerCrack);
+      // 실패로 내구도가 0 이하면 균열 하나 추가
+      if (repairDur <= 0) repairDur = 0;
       repairFlash = { hit: false, born: performance.now() };
+
+      // 실패 파티클 — 붉은 불꽃
+      if ($repairCanvas) {
+        const ch2=$repairCanvas.height, cw2=$repairCanvas.width;
+        const sY=Math.floor(ch2*0.58), fH=ch2-sY;
+        const pX=cw2*0.5, pY=sY+8;
+        const dR=Math.min(cw2*0.46,fH*1.15), dCy=ch2+dR*0.38;
+        const hL=Math.max(fH*0.28, dCy-dR-pY);
+        const hA=Math.sin(repairHammerT)*Math.PI*0.54;
+        const hx=pX+Math.sin(hA)*hL, hy=pY+Math.cos(hA)*hL;
+        for (let i=0; i<14; i++) {
+          const a=(Math.random()-0.5)*Math.PI*1.2;
+          repairParticles.push({
+            x:hx,y:hy,vx:Math.cos(a)*( 2+Math.random()*4),vy:Math.sin(a)*(2+Math.random()*4)-1,
+            life:1,size:1+Math.random()*2,
+            color:['#f87171','#ef4444','#fca5a5'][Math.floor(Math.random()*3)],grav:0.18,
+          });
+        }
+      }
+
+      const spos = _repairTargetScreenPos();
+      if (spos) {
+        showRepairCoinFx(spos.x+18, spos.y-12, `-${cost}`, '#f87171');
+        showRepairCoinFx(spos.x-10, spos.y-28, `-${repairDurPerCrack}내구도`, '#f87171');
+      }
+      updateRepairHud();
     }
   }
 
@@ -4328,30 +4358,28 @@
 
   async function confirmRepairSession() {
     if (!repairItem) return;
-    const netRepair = repairDur - repairOrigDur;
-    if (netRepair <= 0) { repairMsg('수리한 내용이 없습니다.'); return; }
+    if (repairSpent === 0 && repairDur === repairOrigDur) { repairMsg('수리한 내용이 없습니다.'); return; }
     if (!alpToken || !platformApi) { repairMsg('로그인이 필요합니다.'); return; }
     const btn = document.getElementById('repairConfirmBtn');
     if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
     try {
-      let url, body;
-      if (repairItemIsModule) {
-        url  = `${platformApi}/api/modules/${encodeURIComponent(repairItem._eqId)}/repair`;
-        body = JSON.stringify({ amount: netRepair });
-      } else {
-        url  = `${platformApi}/api/craft/equipment/${encodeURIComponent(repairItem._eqId)}/repair`;
-        body = JSON.stringify({ amount: netRepair });
-      }
+      const url = repairItemIsModule
+        ? `${platformApi}/api/modules/${encodeURIComponent(repairItem._eqId)}/repair`
+        : `${platformApi}/api/craft/equipment/${encodeURIComponent(repairItem._eqId)}/repair`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
-        body,
+        body: JSON.stringify({ finalDur: Math.round(repairDur), totalCost: repairSpent }),
       });
       const d = await res.json();
       if (!res.ok) { repairMsg(d?.error?.message || '수리에 실패했습니다.'); return; }
       totalCoins = Math.max(0, totalCoins - (d.costPaid || 0));
       updateCoinDisplay();
-      repairMsg(`✅ 수리 완료! 🪙-${d.costPaid}`);
+      const netRepair = repairDur - repairOrigDur;
+      const msg = netRepair >= 0
+        ? `✅ 수리 완료! 🪙-${d.costPaid}`
+        : `⚠️ 내구도 -${Math.abs(netRepair)} (실패 페널티) 🪙-${d.costPaid}`;
+      repairMsg(msg);
       const wasModule = repairItemIsModule;
       repairItem = null;
       repairItemIsModule = false;
