@@ -4734,15 +4734,16 @@
     sole:          { label:'밑창',      emoji:'👟',  equipSlots:['boots'] },
     gem:           { label:'보석',      emoji:'💎',  equipSlots:['accessory'] },
     enchant:       { label:'각인',      emoji:'✨',  equipSlots:['accessory'] },
+    buffer:        { label:'완충재',    emoji:'🛡️', equipSlots:['weapon','head','chest','pants','gloves','boots','accessory'] },
   };
   const EQUIP_MODULE_SLOTS_CLIENT = {
-    weapon:    ['barrel','scope','grip','muzzle'],
-    head:      ['padding','visor'],
-    chest:     ['padding','reinforcement','lining'],
-    pants:     ['padding'],
-    gloves:    ['grip','padding'],
-    boots:     ['sole','padding'],
-    accessory: ['gem','enchant'],
+    weapon:    ['barrel','scope','grip','muzzle','buffer'],
+    head:      ['padding','visor','buffer'],
+    chest:     ['padding','reinforcement','lining','buffer'],
+    pants:     ['padding','buffer'],
+    gloves:    ['grip','padding','buffer'],
+    boots:     ['sole','padding','buffer'],
+    accessory: ['gem','enchant','buffer'],
   };
   const TIER_LABEL = { common:'일반', rare:'희귀', epic:'에픽', legendary:'전설' };
 
@@ -4960,25 +4961,14 @@
       if (isEquipped) {
         html += `<div style="font-size:0.68rem;color:rgba(200,190,240,0.4)">장착됨 · 슬롯 ${escHtmlModule(mod.equippedSlot || '')}</div>`;
       }
-      if (!isEquipped && durPct < 100) {
-        html += `<button class="module-inv-repair-btn" data-modid="${escHtmlModule(mod.id)}">🔧 수리</button>`;
-      }
       item.innerHTML = html;
 
       if (!isEquipped) {
-        item.addEventListener('click', (e) => {
-          if (e.target.classList.contains('module-inv-repair-btn')) return;
+        item.addEventListener('click', () => {
           moduleSelectedModId = isSelected ? null : mod.id;
           renderModuleInvList();
           if (moduleSelectedEquip) renderModuleSlots(moduleSelectedEquip);
         });
-        const repBtn = item.querySelector('.module-inv-repair-btn');
-        if (repBtn) {
-          repBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            repairModule(mod.id);
-          });
-        }
       }
       $moduleInvList.appendChild(item);
     });
@@ -5034,29 +5024,6 @@
     }
   }
 
-  async function repairModule(modId) {
-    try {
-      const resp = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/repair`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${alpToken}` },
-      });
-      const json = await resp.json();
-      if (!resp.ok) { alert(json?.error?.message || '수리 실패'); return; }
-      const idx = moduleAllList.findIndex(m => m.id === modId);
-      if (idx !== -1) moduleAllList[idx] = json.module;
-      if (json.cost != null) {
-        // Refresh coin display
-        fetch(`${platformApi}/api/coins`, { headers: { Authorization: `Bearer ${alpToken}` } })
-          .then(r => r.json())
-          .then(d => { if ($coinCount) $coinCount.textContent = (d.coins ?? d.balance ?? 0).toLocaleString(); })
-          .catch(() => {});
-      }
-      renderModuleSlots(moduleSelectedEquip);
-      renderModuleInvList();
-    } catch (e) {
-      alert('오류가 발생했습니다.');
-    }
-  }
 
   function renderModuleCraftTypeList() {
     if (!$moduleCraftTypeList) return;
