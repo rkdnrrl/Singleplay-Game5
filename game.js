@@ -3030,17 +3030,26 @@
     uranium:'우라늄',sodaash:'소다',phosphor:'인',phosphate:'인산염',
     chloride:'염화물',nitrate:'질산염',ammonia:'암모니아',lithiumsalt:'리튬염',
   };
-  const EQUIP_NOUNS = ['검','도끼','창','활','단검','대검','방패','갑옷','투구','장갑','장화','반지','목걸이','지팡이','망치','낫'];
+  const EQUIP_NOUNS_BY_SLOT = {
+    weapon:    ['검','대검','단검','도끼','창','활','지팡이','망치','낫','철퇴','쌍검','방패'],
+    head:      ['투구','헬멧','철모','두구','고깔','왕관','머리띠'],
+    chest:     ['갑옷','흉갑','로브','코트','망토','전투복','판금갑옷'],
+    pants:     ['각반','레깅스','하의','바지','전투복 하의'],
+    gloves:    ['장갑','건틀릿','철장갑','가죽장갑'],
+    boots:     ['장화','부츠','철화','그리브','발목갑옷'],
+    accessory: ['반지','목걸이','귀걸이','팔찌','부적','메달','브로치'],
+  };
 
   let pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
   let pixelArtImageUrl = null; // PixelLab 생성 이미지 URL (base64)
   let pixelColor = '#c0392b'; // 기본: 빨강 (null = 지우개)
   let pixelPainting = false;
 
-  function generateEquipName(mats) {
+  function generateEquipName(mats, slot) {
     const ids = [...new Set(mats.filter(Boolean).map((m) => m.smeltId).filter(Boolean))];
     const words = ids.slice(0, 2).map((id) => SMELT_KO[id] || id);
-    const noun = EQUIP_NOUNS[Math.floor(Math.random() * EQUIP_NOUNS.length)];
+    const pool = EQUIP_NOUNS_BY_SLOT[slot] || EQUIP_NOUNS_BY_SLOT.weapon;
+    const noun = pool[Math.floor(Math.random() * pool.length)];
     if (words.length === 0) return `강철 ${noun}`;
     if (words.length === 1) return `${words[0]} ${noun}`;
     return `${words[0]}·${words[1]} ${noun}`;
@@ -3624,7 +3633,7 @@
     const modal = document.getElementById('equipCustomizeModal');
     const nameInput = document.getElementById('equipNameInput');
     if (!modal) return;
-    const initName = generateEquipName(mats);
+    const initName = generateEquipName(mats, forgeSlot);
     if (nameInput) nameInput.value = initName;
     pixelArtImageUrl = null;
     pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
@@ -3659,7 +3668,7 @@
     const clearBtn = document.getElementById('equipClearBtn');
     const doneBtn = document.getElementById('equipCustomizeDoneBtn');
     const backdrop = document.getElementById('equipCustomizeBackdrop');
-    if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats); };
+    if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats, forgeSlot); };
     if (rndPixelBtn) rndPixelBtn.onclick = () => {
       pixelArtImageUrl = null;
       void _genPixelArtApi(mats, nameInput?.value || '');
