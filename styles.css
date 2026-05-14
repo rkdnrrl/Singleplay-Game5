@@ -1919,16 +1919,17 @@ body.forge-scroll-lock {
     max-height: none; flex: 1; min-height: 0;
   }
   body[data-tab="furnace"] .app {
-    display: flex;
+    display: flex !important;
     position: fixed;
     top: min(38vh, 240px); left: 0; right: 0; bottom: var(--tabbar-h);
-    padding: 0.45rem 0.75rem 0.5rem;
+    padding: 0.45rem 0.75rem 0.5rem !important;
+    min-height: 0 !important;
     overflow-y: auto; overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
   body[data-tab="furnace"] .forge-topbar { padding: 0 0 0.15rem; }
-  body[data-tab="furnace"] .forge-stage  { justify-content: flex-start; }
-  body[data-tab="furnace"] .forge-split  { flex-direction: column; align-items: stretch; }
+  body[data-tab="furnace"] .forge-stage  { justify-content: flex-start !important; padding-bottom: 0; }
+  body[data-tab="furnace"] .forge-split  { flex-direction: column; align-items: stretch; margin-top: 0 !important; }
   body[data-tab="furnace"] .furnace-panel { max-width: 100%; flex: none; border-radius: 12px; }
   body[data-tab="furnace"] .refine-panel  { display: none !important; }
 
@@ -1944,16 +1945,17 @@ body.forge-scroll-lock {
     max-height: none; flex: 1; min-height: 0;
   }
   body[data-tab="forge"] .app {
-    display: flex;
+    display: flex !important;
     position: fixed;
     top: min(38vh, 240px); left: 0; right: 0; bottom: var(--tabbar-h);
-    padding: 0.45rem 0.75rem 0.5rem;
+    padding: 0.45rem 0.75rem 0.5rem !important;
+    min-height: 0 !important;
     overflow-y: auto; overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
   body[data-tab="forge"] .forge-topbar  { padding: 0 0 0.15rem; }
-  body[data-tab="forge"] .forge-stage   { justify-content: flex-start; }
-  body[data-tab="forge"] .forge-split   { flex-direction: column; align-items: stretch; }
+  body[data-tab="forge"] .forge-stage   { justify-content: flex-start !important; padding-bottom: 0; }
+  body[data-tab="forge"] .forge-split   { flex-direction: column; align-items: stretch; margin-top: 0 !important; }
   body[data-tab="forge"] .refine-panel  { max-width: 100%; flex: none; }
   body[data-tab="forge"] .furnace-panel { display: none !important; }
 
