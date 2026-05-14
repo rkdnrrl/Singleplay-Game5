@@ -3042,7 +3042,7 @@
   // ══════════════════════════════════════════════════════════════
   // 수리 탭
   // ══════════════════════════════════════════════════════════════
-  const REPAIR_COLS = 8, REPAIR_ROWS = 10;
+  const REPAIR_COLS = 6, REPAIR_ROWS = 8;
   const REPAIR_COST_TABLE = { common: 5, rare: 12, epic: 30, legendary: 70 };
 
   let repairItem = null;
@@ -3051,10 +3051,7 @@
   let repairZoom = 1.0;
   let repairImg = null;
   let repairSpent = 0;
-  let repairRotateY = 0;      // -60 ~ 60 degrees
-  let repairDragX = null;     // pointer drag start X
-  let repairDragRotY = 0;     // rotateY at drag start
-  let repairDragMoved = false;
+  let repairDurPerCrack = 1; // 칸 하나당 회복 내구도
 
   const $repairCanvas    = document.getElementById('repairCanvas');
   const $repairHint      = document.getElementById('repairDropHint');
@@ -3075,8 +3072,13 @@
   }
 
   function generateCracks(curDur, maxDur, seedStr) {
-    const damagedCount = Math.round(((maxDur - curDur) / maxDur) * (REPAIR_COLS * REPAIR_ROWS));
-    if (damagedCount <= 0) return new Set();
+    const damage = maxDur - curDur;
+    if (damage <= 0) return new Set();
+    const totalCells = REPAIR_COLS * REPAIR_ROWS;
+    // 칸 수는 최대 totalCells, 내구도 차이에 비례
+    const damagedCount = Math.min(totalCells, Math.max(1, Math.round((damage / maxDur) * totalCells)));
+    // 칸 하나당 회복 내구도 (모든 칸을 수리하면 정확히 damage 회복)
+    repairDurPerCrack = Math.max(1, Math.round(damage / damagedCount));
     const rng = seededRng(hashStr(String(seedStr)));
     const cracked = new Set();
     const queue = [];
@@ -3099,6 +3101,26 @@
       }
     }
     return cracked;
+  }
+
+  // 균열 형태 헬퍼 — 인접 셀이 동일 점을 공유해 자연스러운 파편선 생성
+  function hEdgeMid(c, rb, cellW, cellH, ox, oy, eqId) {
+    const rng = seededRng(hashStr(`h${c}_${rb}_${eqId}`));
+    return [ox + (c+0.5)*cellW + (rng()-0.5)*cellW*0.06, oy + rb*cellH + (rng()-0.5)*cellH*0.38];
+  }
+  function vEdgeMid(cb, r, cellW, cellH, ox, oy, eqId) {
+    const rng = seededRng(hashStr(`v${cb}_${r}_${eqId}`));
+    return [ox + cb*cellW + (rng()-0.5)*cellW*0.38, oy + (r+0.5)*cellH + (rng()-0.5)*cellH*0.06];
+  }
+  function drawFractureLine(ctx, p1, mid, p2) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,210,70,1)'; ctx.shadowBlur = 12;
+    ctx.strokeStyle = 'rgba(255,225,90,0.75)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(mid[0],mid[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,220,0.95)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(mid[0],mid[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke();
+    ctx.restore();
   }
 
   function repairMsg(msg) {
@@ -3143,174 +3165,113 @@
 
   function drawRepairCanvas() {
     if (!repairCtx || !repairItem || !repairCracks) return;
-    const canvas = $repairCanvas;
     const ctx = repairCtx;
-    const cw = canvas.width, ch = canvas.height;
-    const midX = cw / 2;
+    const cw = $repairCanvas.width, ch = $repairCanvas.height;
+    const eqId = repairItem._eqId;
 
     ctx.clearRect(0, 0, cw, ch);
 
-    // === 배경 ===
-    const bg = ctx.createRadialGradient(midX, ch * 0.45, 0, midX, ch * 0.45, Math.max(cw, ch) * 0.85);
-    bg.addColorStop(0, '#1c0e30');
-    bg.addColorStop(1, '#05020c');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, cw, ch);
+    // 배경
+    const bg = ctx.createRadialGradient(cw*0.5, ch*0.42, 0, cw*0.5, ch*0.5, Math.max(cw,ch)*0.85);
+    bg.addColorStop(0, '#130920'); bg.addColorStop(1, '#04020a');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, cw, ch);
 
-    // === 원근 변환 (Y축 회전 시뮬레이션) ===
-    const scaleX = Math.max(0.05, Math.cos(repairRotateY * Math.PI / 180));
     const cellW = (cw / REPAIR_COLS) * repairZoom;
     const cellH = (ch / REPAIR_ROWS) * repairZoom;
     const ox = (cw - cellW * REPAIR_COLS) / 2;
     const oy = (ch - cellH * REPAIR_ROWS) / 2;
     const gridW = cellW * REPAIR_COLS, gridH = cellH * REPAIR_ROWS;
 
-    ctx.save();
-    ctx.translate(midX, 0);
-    ctx.transform(scaleX, 0, 0, 1, 0, 0);
-    ctx.translate(-midX, 0);
+    // 셀 경로 헬퍼
+    function applyCellPath(c, r, tgt) {
+      const x0=ox+c*cellW, y0=oy+r*cellH, x1=x0+cellW, y1=y0+cellH;
+      const tM=hEdgeMid(c,r,cellW,cellH,ox,oy,eqId),  bM=hEdgeMid(c,r+1,cellW,cellH,ox,oy,eqId);
+      const lM=vEdgeMid(c,r,cellW,cellH,ox,oy,eqId),  rM=vEdgeMid(c+1,r,cellW,cellH,ox,oy,eqId);
+      tgt.beginPath();
+      tgt.moveTo(x0,y0); tgt.lineTo(tM[0],tM[1]); tgt.lineTo(x1,y0);
+      tgt.lineTo(rM[0],rM[1]); tgt.lineTo(x1,y1);
+      tgt.lineTo(bM[0],bM[1]); tgt.lineTo(x0,y1);
+      tgt.lineTo(lM[0],lM[1]); tgt.closePath();
+    }
 
-    // === 오프스크린: 이미지에서 부서진 칸을 실제로 도려냄 ===
-    const off = (() => { const c = document.createElement('canvas'); c.width = cw; c.height = ch; return c; })();
+    // 오프스크린: 이미지에서 파편 도려내기
+    const off = document.createElement('canvas');
+    off.width = cw; off.height = ch;
     const octx = off.getContext('2d');
 
     if (repairImg) {
       octx.drawImage(repairImg, ox, oy, gridW, gridH);
+      const tintMap = { rare:'rgba(60,160,255,0.09)', epic:'rgba(180,60,255,0.11)', legendary:'rgba(255,170,20,0.12)' };
+      const tint = tintMap[String(repairItem.tier||'').toLowerCase()];
+      if (tint) { octx.fillStyle = tint; octx.fillRect(ox, oy, gridW, gridH); }
     } else {
+      octx.fillStyle = 'rgba(25,12,45,0.9)'; octx.fillRect(ox, oy, gridW, gridH);
       octx.save();
-      octx.shadowColor = 'rgba(160,120,255,0.5)';
-      octx.shadowBlur = 28;
-      octx.font = `${Math.min(gridW, gridH) * 0.62}px serif`;
-      octx.textAlign = 'center'; octx.textBaseline = 'middle';
-      octx.fillStyle = 'rgba(255,255,255,0.88)';
-      octx.fillText(repairItem.emoji || '⚔️', midX, ch / 2);
+      octx.shadowColor='rgba(160,120,255,0.55)'; octx.shadowBlur=36;
+      octx.font=`${Math.min(gridW,gridH)*0.58}px serif`;
+      octx.textAlign='center'; octx.textBaseline='middle'; octx.fillStyle='#fff';
+      octx.fillText(repairItem.emoji||'⚔️', cw/2, ch/2);
       octx.restore();
     }
 
-    // 부서진 칸: 불규칙 다각형으로 도려냄
     octx.globalCompositeOperation = 'destination-out';
     for (const key of repairCracks) {
       const [c, r] = key.split(',').map(Number);
-      const x = ox + c * cellW, y = oy + r * cellH;
-      const rng = seededRng(hashStr(`hole${key}${repairItem._eqId}`));
-      const jag = 0.13;
-      octx.beginPath();
-      octx.moveTo(x + rng() * cellW * jag,                  y + rng() * cellH * jag);
-      octx.lineTo(x + cellW * (0.35 + rng() * 0.3),         y + rng() * cellH * jag);
-      octx.lineTo(x + cellW * (1 - rng() * jag),            y + rng() * cellH * jag);
-      octx.lineTo(x + cellW * (1 - rng() * jag),            y + cellH * (0.35 + rng() * 0.3));
-      octx.lineTo(x + cellW * (1 - rng() * jag),            y + cellH * (1 - rng() * jag));
-      octx.lineTo(x + cellW * (0.35 + rng() * 0.3),         y + cellH * (1 - rng() * jag));
-      octx.lineTo(x + rng() * cellW * jag,                  y + cellH * (1 - rng() * jag));
-      octx.lineTo(x + rng() * cellW * jag,                  y + cellH * (0.35 + rng() * 0.3));
-      octx.closePath();
-      octx.fill();
+      applyCellPath(c, r, octx); octx.fill();
     }
     octx.globalCompositeOperation = 'source-over';
     ctx.drawImage(off, 0, 0);
 
-    // === 구멍 안 빛 (용암/심연 느낌) ===
+    // 구멍 안 심연 글로우
     for (const key of repairCracks) {
       const [c, r] = key.split(',').map(Number);
-      const px = ox + (c + 0.5) * cellW, py = oy + (r + 0.5) * cellH;
-      const vg = ctx.createRadialGradient(px, py, 0, px, py, Math.max(cellW, cellH) * 0.85);
-      vg.addColorStop(0,   'rgba(220, 80, 20, 0.22)');
-      vg.addColorStop(0.5, 'rgba(100, 20, 60, 0.12)');
-      vg.addColorStop(1,   'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = vg;
-      ctx.fillRect(ox + c * cellW - 1, oy + r * cellH - 1, cellW + 2, cellH + 2);
+      const px=ox+(c+0.5)*cellW, py=oy+(r+0.5)*cellH;
+      ctx.save(); applyCellPath(c, r, ctx); ctx.clip();
+      const vg=ctx.createRadialGradient(px,py,0,px,py,Math.max(cellW,cellH)*0.82);
+      vg.addColorStop(0,'rgba(210,80,15,0.22)'); vg.addColorStop(0.5,'rgba(100,15,55,0.13)'); vg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=vg; ctx.fillRect(ox+c*cellW-1,oy+r*cellH-1,cellW+2,cellH+2);
+      ctx.restore();
     }
 
-    // === 균열 경계선 (부서진↔멀쩡한 사이에 불빛) ===
-    for (let c = 0; c < REPAIR_COLS; c++) {
-      for (let r = 0; r < REPAIR_ROWS; r++) {
-        for (const [dc, dr] of [[1,0],[0,1]]) {
-          const nc = c + dc, nr = r + dr;
-          if (nc >= REPAIR_COLS || nr >= REPAIR_ROWS) continue;
-          const aBroken = repairCracks.has(`${c},${r}`);
-          const bBroken = repairCracks.has(`${nc},${nr}`);
-          if (aBroken === bBroken) continue;
-
-          const rng = seededRng(hashStr(`edge${c}${r}${dc}${dr}${repairItem._eqId}`));
-          // 경계 좌표
-          let lx1, ly1, lx2, ly2;
-          if (dc === 1) {
-            lx1 = lx2 = ox + nc * cellW;
-            ly1 = oy + r * cellH; ly2 = ly1 + cellH;
-          } else {
-            ly1 = ly2 = oy + nr * cellH;
-            lx1 = ox + c * cellW; lx2 = lx1 + cellW;
-          }
-          // 중간점 약간 흔들기
-          const mx = (lx1 + lx2) / 2 + (rng() - 0.5) * (dc === 1 ? 0 : cellW * 0.25);
-          const my = (ly1 + ly2) / 2 + (rng() - 0.5) * (dr === 1 ? 0 : cellH * 0.25);
-
-          ctx.save();
-          ctx.shadowColor = 'rgba(255,180,50,1)';
-          ctx.shadowBlur = 8;
-          ctx.strokeStyle = `rgba(255, ${160 + Math.floor(rng()*60)}, 40, 0.9)`;
-          ctx.lineWidth = 1.2;
-          ctx.setLineDash([3 + rng() * 3, 1.5 + rng() * 2]);
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(lx1, ly1);
-          ctx.lineTo(mx, my);
-          ctx.lineTo(lx2, ly2);
-          ctx.stroke();
-          ctx.restore();
+    // 균열선 (부서진↔멀쩡한 경계)
+    for (let c=0; c<REPAIR_COLS; c++) {
+      for (let r=0; r<REPAIR_ROWS; r++) {
+        if (c+1<REPAIR_COLS && repairCracks.has(`${c},${r}`)!==repairCracks.has(`${c+1},${r}`)) {
+          drawFractureLine(ctx,[ox+(c+1)*cellW,oy+r*cellH], vEdgeMid(c+1,r,cellW,cellH,ox,oy,eqId), [ox+(c+1)*cellW,oy+(r+1)*cellH]);
+        }
+        if (r+1<REPAIR_ROWS && repairCracks.has(`${c},${r}`)!==repairCracks.has(`${c},${r+1}`)) {
+          drawFractureLine(ctx,[ox+c*cellW,oy+(r+1)*cellH], hEdgeMid(c,r+1,cellW,cellH,ox,oy,eqId), [ox+(c+1)*cellW,oy+(r+1)*cellH]);
         }
       }
     }
-    ctx.setLineDash([]);
 
-    // === 멀쩡한 칸 테두리 미광 (균열 인접 셀만) ===
-    for (let c = 0; c < REPAIR_COLS; c++) {
-      for (let r = 0; r < REPAIR_ROWS; r++) {
+    // 인접 멀쩡한 파편 미광
+    for (let c=0; c<REPAIR_COLS; c++) {
+      for (let r=0; r<REPAIR_ROWS; r++) {
         if (repairCracks.has(`${c},${r}`)) continue;
-        const near = [[1,0],[-1,0],[0,1],[0,-1]].some(([dc,dr]) => repairCracks.has(`${c+dc},${r+dr}`));
-        if (!near) continue;
-        const x = ox + c * cellW, y = oy + r * cellH;
-        const shine = ctx.createLinearGradient(x, y, x + cellW * 0.4, y + cellH * 0.4);
-        shine.addColorStop(0, 'rgba(255,255,255,0.10)');
-        shine.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = shine;
-        ctx.fillRect(x, y, cellW, cellH);
+        if (![[1,0],[-1,0],[0,1],[0,-1]].some(([dc,dr])=>repairCracks.has(`${c+dc},${r+dr}`))) continue;
+        const x=ox+c*cellW, y=oy+r*cellH;
+        ctx.save(); applyCellPath(c, r, ctx); ctx.clip();
+        const sh=ctx.createLinearGradient(x,y,x+cellW*0.55,y+cellH*0.55);
+        sh.addColorStop(0,'rgba(255,255,255,0.13)'); sh.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=sh; ctx.fillRect(x-1,y-1,cellW+2,cellH+2);
+        ctx.restore();
       }
     }
 
-    // === 외곽 테두리 ===
+    // 외곽 글로우
     ctx.save();
-    ctx.shadowColor = 'rgba(140,80,255,0.45)';
-    ctx.shadowBlur = 18;
-    ctx.strokeStyle = 'rgba(160,100,255,0.55)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(ox, oy, gridW, gridH);
+    ctx.shadowColor='rgba(130,70,255,0.5)'; ctx.shadowBlur=22;
+    ctx.strokeStyle='rgba(155,95,255,0.6)'; ctx.lineWidth=2;
+    ctx.strokeRect(ox,oy,gridW,gridH);
     ctx.restore();
-
-    // === 측면 그림자 (원근감 강조) ===
-    if (Math.abs(repairRotateY) > 5) {
-      const side = repairRotateY > 0 ? 1 : -1;
-      const shadow = ctx.createLinearGradient(
-        side > 0 ? ox : ox + gridW, 0,
-        side > 0 ? ox + gridW * 0.4 : ox + gridW * 0.6, 0
-      );
-      shadow.addColorStop(0, 'rgba(0,0,0,0.55)');
-      shadow.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = shadow;
-      ctx.fillRect(ox, oy, gridW, gridH);
-    }
-
-    ctx.restore(); // 원근 변환 해제
   }
 
   function onRepairTapAt(clientX, clientY) {
     if (!repairItem || !$repairCanvas || !repairCracks) return;
     const rect = $repairCanvas.getBoundingClientRect();
-    let px = (clientX - rect.left) * ($repairCanvas.width / rect.width);
+    const px = (clientX - rect.left) * ($repairCanvas.width / rect.width);
     const py = (clientY - rect.top)  * ($repairCanvas.height / rect.height);
-    // 원근 변환 역산
-    const scaleX = Math.max(0.05, Math.cos(repairRotateY * Math.PI / 180));
-    px = (px - $repairCanvas.width / 2) / scaleX + $repairCanvas.width / 2;
     const cellW = ($repairCanvas.width  / REPAIR_COLS) * repairZoom;
     const cellH = ($repairCanvas.height / REPAIR_ROWS) * repairZoom;
     const ox = ($repairCanvas.width  - cellW * REPAIR_COLS) / 2;
@@ -3320,16 +3281,18 @@
     if (col < 0 || col >= REPAIR_COLS || row < 0 || row >= REPAIR_ROWS) return;
 
     const key = `${col},${row}`;
-    const cost = REPAIR_COST_TABLE[String(repairItem.tier || 'common').toLowerCase()] ?? 5;
+    const costPerTap = REPAIR_COST_TABLE[String(repairItem.tier || 'common').toLowerCase()] ?? 5;
 
     if (repairCracks.has(key)) {
       if (repairDur >= repairMaxDur) return;
-      repairCracks.delete(key); repairDur++; repairSpent += cost;
-      showRepairCoinFx(clientX, clientY, `-${cost}`, '#fbbf24');
+      const amount = Math.min(repairDurPerCrack, repairMaxDur - repairDur);
+      repairCracks.delete(key); repairDur += amount; repairSpent += costPerTap;
+      if (repairDur >= repairMaxDur) repairCracks.clear(); // 내구도 최대 → 잔여 균열 제거
+      showRepairCoinFx(clientX, clientY, `-${costPerTap}`, '#fbbf24');
     } else {
       if (repairDur <= 0) return;
-      repairCracks.add(key); repairDur--; repairSpent += cost;
-      showRepairCoinFx(clientX, clientY, `-${cost}`, '#f87171');
+      repairCracks.add(key); repairDur -= repairDurPerCrack; repairSpent += costPerTap;
+      showRepairCoinFx(clientX, clientY, `-${costPerTap}`, '#f87171');
     }
     drawRepairCanvas(); updateRepairHud();
   }
@@ -3445,26 +3408,12 @@
         if (item) loadRepairItem(item);
       });
     }
-    // ── 마우스 드래그: 회전 또는 탭 ──
-    $repairCanvas.addEventListener('pointerdown', e => {
-      if (e.button !== 0 && e.pointerType === 'mouse') return;
-      repairDragX = e.clientX; repairDragRotY = repairRotateY; repairDragMoved = false;
-      $repairCanvas.setPointerCapture(e.pointerId);
-    });
-    $repairCanvas.addEventListener('pointermove', e => {
-      if (repairDragX === null) return;
-      const dx = e.clientX - repairDragX;
-      if (Math.abs(dx) > 4) repairDragMoved = true;
-      repairRotateY = Math.max(-65, Math.min(65, repairDragRotY - dx * 0.4));
-      drawRepairCanvas();
-    });
-    $repairCanvas.addEventListener('pointerup', e => {
-      if (repairDragX === null) return;
-      const wasDrag = repairDragMoved;
-      repairDragX = null; repairDragMoved = false;
-      if (!wasDrag) onRepairTapAt(e.clientX, e.clientY);
-    });
-    $repairCanvas.addEventListener('pointercancel', () => { repairDragX = null; repairDragMoved = false; });
+    $repairCanvas.addEventListener('click', e => onRepairTapAt(e.clientX, e.clientY));
+    $repairCanvas.addEventListener('touchend', e => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      onRepairTapAt(t.clientX, t.clientY);
+    }, { passive: false });
     document.getElementById('repairZoomIn')?.addEventListener('click', () => {
       repairZoom = Math.min(3, repairZoom + 0.25); drawRepairCanvas();
     });
