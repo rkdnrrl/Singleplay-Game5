@@ -167,6 +167,8 @@
   const furnaceMsgEl = document.getElementById('furnaceMsg');
   const furnaceEquipWarnEl = document.getElementById('furnaceEquipWarn');
   const coinCountEl = document.getElementById('coinCount');
+  const forgeDiscoveryBannerEl = document.getElementById('forgeDiscoveryBanner');
+  const forgeOverlayTitleEl = document.getElementById('forgeOverlayTitle');
   const smeltStockListEl = document.getElementById('smeltStockList');
   const smeltCategoryFiltersEl = document.getElementById('smeltCategoryFilters');
   const materialDockFiltersEl = document.getElementById('materialDockFilters');
@@ -2607,15 +2609,15 @@
       await refreshCraftedList();
       void syncSmeltFromServer();
 
-      // 첫 조합이면 오버레이에 발견 메시지 표시
+      // 첫 조합이면 오버레이에 발견 배너 표시
       if (data.firstDiscovery) {
         stopForgeOverlayTimer();
-        if (forgeOverlayTimerEl) forgeOverlayTimerEl.textContent = '🎉 도감에 없는 첫 조합!';
-        if (forgeOverlayBonusEl) {
-          forgeOverlayBonusEl.textContent = '✨ 세계 최초 조합입니다! 축하합니다!';
-          forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
+        if (forgeOverlayTitleEl) forgeOverlayTitleEl.textContent = '🎉 첫 조합 발견!';
+        if (forgeDiscoveryBannerEl) {
+          forgeDiscoveryBannerEl.textContent = '✨ 도감에 없는 조합입니다! 축하합니다!';
+          forgeDiscoveryBannerEl.classList.remove('forge-discovery-banner--hidden');
         }
-        await new Promise((r) => window.setTimeout(r, 2000));
+        await new Promise((r) => window.setTimeout(r, 2200));
       }
 
       // 실제 경과 시간으로 게임머니 지급
