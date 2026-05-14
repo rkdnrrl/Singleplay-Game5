@@ -1906,27 +1906,45 @@ body.forge-scroll-lock {
   flex: 1;
 }
 
-.equip-palette {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
+.equip-color-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
-
-.equip-palette-swatch {
-  aspect-ratio: 1;
-  border-radius: 5px;
+.equip-color-label-text {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.55);
+}
+.equip-color-picker {
+  width: 100%;
+  height: 42px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  background: none;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.12s, transform 0.1s;
-  min-width: 0;
+  padding: 2px;
 }
-.equip-palette-swatch:hover { transform: scale(1.18); }
-.equip-palette-swatch.is-selected {
+.equip-color-picker::-webkit-color-swatch-wrapper { padding: 0; border-radius: 6px; }
+.equip-color-picker::-webkit-color-swatch { border: none; border-radius: 6px; }
+.equip-color-picker::-moz-color-swatch { border: none; border-radius: 6px; }
+
+.equip-eraser-btn {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: #ccc;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.equip-eraser-btn:hover { background: rgba(255,255,255,0.15); }
+.equip-eraser-btn.is-active {
+  background: rgba(255,255,255,0.2);
   border-color: #fff;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.4);
-}
-.equip-palette-swatch--eraser {
-  background: repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 0 0 / 10px 10px;
+  color: #fff;
 }
 
 .equip-clear-btn {
@@ -1934,8 +1952,8 @@ body.forge-scroll-lock {
   border: 1px solid rgba(255, 80, 80, 0.35);
   border-radius: 6px;
   color: #ff9090;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
   cursor: pointer;
   font-family: inherit;
 }

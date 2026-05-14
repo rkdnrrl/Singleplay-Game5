@@ -2990,13 +2990,6 @@
   }
   // ── 픽셀 에디터 / 장비 커스터마이즈 ───────────────────────────
   const PIXEL_G = 32; // 32×32 격자
-  const PIXEL_PALETTE = [
-    null,       // 지우개
-    '#1a1a2e', '#2d2d2d', '#5a5a5a', '#9e9e9e', '#f5f5f5',
-    '#5c2300', '#a0522d', '#c0392b', '#e67e22', '#f1c40f',
-    '#f0d060', '#27ae60', '#2980b9', '#3498db', '#8e44ad',
-    '#e91e8c', '#ffffff',
-  ];
   const SMELT_KO = {
     iron:'철',copper:'구리',gold:'금',silver:'은',aluminum:'알루미늄',
     nickel:'니켈',zinc:'아연',tin:'주석',lead:'납',manganese:'망간',
@@ -3027,7 +3020,7 @@
   const EQUIP_NOUNS = ['검','도끼','창','활','단검','대검','방패','갑옷','투구','장갑','장화','반지','목걸이','지팡이','망치','낫'];
 
   let pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
-  let pixelColor = PIXEL_PALETTE[8]; // 기본: 빨강
+  let pixelColor = '#c0392b'; // 기본: 빨강 (null = 지우개)
   let pixelPainting = false;
 
   function generateEquipName(mats) {
@@ -3126,26 +3119,6 @@
     renderPixelCanvas();
   }
 
-  function buildPalette() {
-    const palette = document.getElementById('equipPalette');
-    if (!palette) return;
-    palette.innerHTML = '';
-    PIXEL_PALETTE.forEach((color, i) => {
-      const sw = document.createElement('button');
-      sw.type = 'button';
-      sw.className = 'equip-palette-swatch' + (color === null ? ' equip-palette-swatch--eraser' : '');
-      if (color) sw.style.background = color;
-      if (color === pixelColor || (color === null && pixelColor === null)) sw.classList.add('is-selected');
-      sw.title = color === null ? '지우개' : color;
-      sw.addEventListener('click', () => {
-        pixelColor = color;
-        palette.querySelectorAll('.equip-palette-swatch').forEach((s) => s.classList.remove('is-selected'));
-        sw.classList.add('is-selected');
-      });
-      palette.appendChild(sw);
-    });
-  }
-
   function showCustomizeModal(mats) {
     const modal = document.getElementById('equipCustomizeModal');
     const nameInput = document.getElementById('equipNameInput');
@@ -3154,7 +3127,6 @@
     if (nameInput) nameInput.value = generateEquipName(mats);
     modal.classList.remove('equip-customize-modal--hidden');
     modal.setAttribute('aria-hidden', 'false');
-    buildPalette();
     renderPixelCanvas();
     nameInput && nameInput.focus();
 
@@ -3163,6 +3135,23 @@
       canvas.onpointerdown = (e) => { e.preventDefault(); pixelPainting = true; paintPixelAt(e); };
       canvas.onpointermove = (e) => { if (pixelPainting) { e.preventDefault(); paintPixelAt(e); } };
       canvas.onpointerup = canvas.onpointerleave = canvas.onpointercancel = () => { pixelPainting = false; };
+    }
+
+    const colorPicker = document.getElementById('equipColorPicker');
+    const eraserBtn = document.getElementById('equipEraserBtn');
+    if (colorPicker) {
+      colorPicker.value = pixelColor || '#c0392b';
+      colorPicker.oninput = () => {
+        pixelColor = colorPicker.value;
+        eraserBtn && eraserBtn.classList.remove('is-active');
+      };
+    }
+    if (eraserBtn) {
+      eraserBtn.classList.toggle('is-active', pixelColor === null);
+      eraserBtn.onclick = () => {
+        pixelColor = null;
+        eraserBtn.classList.add('is-active');
+      };
     }
 
     const rndNameBtn = document.getElementById('equipRandomNameBtn');
