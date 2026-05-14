@@ -3135,7 +3135,7 @@
     const eqId = item.equipmentId || item.id || '';
     repairItem = { ...item, _eqId: eqId };
     repairMaxDur = maxDur; repairOrigDur = curDur;
-    repairDur = curDur; repairSpent = 0; repairZoom = 1.0; repairRotateY = 0;
+    repairDur = curDur; repairSpent = 0; repairZoom = 1.0;
     repairCracks = generateCracks(curDur, maxDur, eqId);
     $repairEquipList?.querySelectorAll('.repair-equip-item')
       .forEach(el => el.classList.toggle('is-selected', el.dataset.id === eqId));
