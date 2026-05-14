@@ -2284,3 +2284,39 @@ body.forge-scroll-lock {
 .proficiency-bar.prof-level-up {
   animation: profGainPulse 1.2s ease-out forwards;
 }
+
+/* ── PC 글자 크기 보정 (min-width: 640px) ─────────────────────── */
+@media (min-width: 640px) {
+  .furnace-hint           { font-size: 0.88rem; }
+  .furnace-chip           { font-size: 0.82rem; }
+  .furnace-msg            { font-size: 0.88rem; }
+  .furnace-preview        { font-size: 0.88rem; }
+  .furnace-result-label   { font-size: 0.78rem; }
+  .furnace-result-chip    { font-size: 0.88rem; }
+  .furnace-equip-warn     { font-size: 0.82rem; }
+  .smelt-stock-title      { font-size: 0.85rem; }
+  .smelt-filter,
+  .material-dock-filter   { font-size: 0.78rem; }
+  .smelt-pill             { font-size: 0.88rem; }
+  .smelt-strength         { font-size: 0.75rem; }
+  .forge-slots-label      { font-size: 0.88rem; }
+  .anvil-chip             { font-size: 0.9rem; }
+  .forge-slot-btn         { font-size: 0.92rem; }
+  .log-title              { font-size: 1.08rem; }
+  .mat-badge              { font-size: 0.82rem; }
+  .crafted-row            { font-size: 0.92rem; }
+  .cr-desc,
+  .cr-stats               { font-size: 0.82rem; }
+  .crafted-repair-btn     { font-size: 0.82rem; }
+  .inventory-dock .inv-item { font-size: 0.9rem; }
+  .inv-tag                { font-size: 0.8rem; }
+  .inventory-dock .log-title { font-size: 0.98rem; }
+  .material-detail-dl     { font-size: 0.88rem; }
+  .material-detail-hint   { font-size: 0.85rem; }
+  .mobile-tab-label       { font-size: 0.75rem; }
+  .prof-label             { font-size: 0.95rem; }
+  .prof-count             { font-size: 0.82rem; }
+  .result-rarity          { font-size: 0.82rem; }
+  .result-size            { font-size: 0.88rem; }
+  .result-added           { font-size: 0.82rem; }
+}
