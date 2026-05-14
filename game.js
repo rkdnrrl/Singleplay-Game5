@@ -1263,9 +1263,8 @@
         msg += ` ⚠️ 소실: ${lostText}`;
       }
       setFurnaceMsg(msg);
-      const msgDelay = serverMeltLost.length > 0 ? 2200 : 1400;
       serverMeltLost = [];
-      window.setTimeout(() => window.location.reload(), msgDelay);
+      window.location.reload();
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
       window.setTimeout(() => setFurnaceMsg(''), 4200);
