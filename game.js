@@ -3121,6 +3121,8 @@
       renderPixelCanvas();
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = '랜덤도안'; }
+      const loadingEl = document.getElementById('equipCustomizeLoading');
+      if (loadingEl) loadingEl.classList.add('ecl-overlay--hidden');
     }
   }
 
@@ -3634,9 +3636,19 @@
     const modal = document.getElementById('equipCustomizeModal');
     const nameInput = document.getElementById('equipNameInput');
     if (!modal) return;
-    // 첫 번째 재료가 놓인 슬롯 위치에서 명사 결정 (슬롯마다 장비 종류 고정)
+    // 등급 기준 슬롯 결정: 가장 높은 티어 재료의 슬롯 → 동등級이면 먼저 놓인 슬롯
+    const TIER_RANK = { legendary: 4, epic: 3, rare: 2, common: 1 };
+    let primaryIdx = Array.isArray(slotIndices) && slotIndices.length > 0 ? slotIndices[0] : 0;
+    let primaryRank = 0;
+    mats.forEach((m, j) => {
+      const rank = TIER_RANK[m?.rarity || m?.tier || 'common'] || 1;
+      const idx = slotIndices?.[j] ?? j;
+      if (rank > primaryRank || (rank === primaryRank && idx < primaryIdx)) {
+        primaryRank = rank;
+        primaryIdx = idx;
+      }
+    });
     const nouns = SLOT_ITEM_NOUNS[forgeSlot] || SLOT_ITEM_NOUNS.weapon;
-    const primaryIdx = Array.isArray(slotIndices) && slotIndices.length > 0 ? slotIndices[0] : 0;
     const fixedNoun = nouns[primaryIdx] || nouns[0];
     const initName = generateEquipName(mats, fixedNoun);
     if (nameInput) nameInput.value = initName;
@@ -3646,6 +3658,9 @@
     modal.setAttribute('aria-hidden', 'false');
     renderPixelCanvas();
     nameInput && nameInput.focus();
+    // 로딩 오버레이 표시
+    const _loadingEl = document.getElementById('equipCustomizeLoading');
+    if (_loadingEl) _loadingEl.classList.remove('ecl-overlay--hidden');
     void _genPixelArtApi(mats, initName);
 
     const canvas = document.getElementById('equipPixelCanvas');

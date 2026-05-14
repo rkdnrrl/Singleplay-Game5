@@ -207,6 +207,12 @@
   >
     <div class="equip-customize-backdrop" id="equipCustomizeBackdrop"></div>
     <div class="equip-customize-card">
+      <!-- 도안 생성 대기 오버레이 -->
+      <div id="equipCustomizeLoading" class="ecl-overlay ecl-overlay--hidden">
+        <div class="ecl-spinner"></div>
+        <p class="ecl-congrats">✨ 축하합니다!<br>처음 만든 레시피입니다!</p>
+        <p class="ecl-wait">잠시만 기다려주세요…</p>
+      </div>
       <h2 class="equip-customize-title" id="equipCustomizeTitle">🔨 장비 이름 &amp; 도안 설정</h2>
       <div class="equip-customize-name-row">
         <input id="equipNameInput" class="equip-name-input" type="text" maxlength="24" placeholder="장비 이름 입력" />
