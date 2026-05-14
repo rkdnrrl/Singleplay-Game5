@@ -365,6 +365,53 @@ html.material-detail-open body {
   padding: 0 0.25rem;
 }
 
+.furnace-preview {
+  font-size: 0.68rem;
+  color: #b0bec5;
+  text-align: center;
+  min-height: 1.2em;
+  padding: 0 0.25rem;
+}
+
+.furnace-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.4rem;
+  margin: 0.3rem 0 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.furnace-result-label {
+  font-size: 0.62rem;
+  color: #90a4ae;
+  width: 100%;
+}
+
+.furnace-result-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.furnace-result-chip--gain {
+  background: rgba(76, 175, 80, 0.2);
+  color: #a5d6a7;
+  border: 1px solid rgba(76, 175, 80, 0.35);
+}
+
+.furnace-result-chip--lost {
+  background: rgba(244, 67, 54, 0.15);
+  color: #ef9a9a;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
 .furnace-equip-warn {
   margin: 0.25rem 0 0;
   font-size: 0.68rem;

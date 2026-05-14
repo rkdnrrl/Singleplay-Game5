@@ -166,6 +166,8 @@
   const btnClearFurnace = document.getElementById('btnClearFurnace');
   const furnaceMsgEl = document.getElementById('furnaceMsg');
   const furnaceEquipWarnEl = document.getElementById('furnaceEquipWarn');
+  const furnacePreviewEl = document.getElementById('furnacePreview');
+  const furnaceResultEl = document.getElementById('furnaceResult');
   const coinCountEl = document.getElementById('coinCount');
   const forgeDiscoveryBannerEl = document.getElementById('forgeDiscoveryBanner');
   const forgeOverlayTitleEl = document.getElementById('forgeOverlayTitle');
@@ -1011,6 +1013,39 @@
     if (furnaceMsgEl) furnaceMsgEl.textContent = msg || '';
   }
 
+  let furnaceResultTimer = 0;
+  function showSmeltResult(gains, lost) {
+    if (!furnaceResultEl) return;
+    if (furnaceResultTimer) { window.clearTimeout(furnaceResultTimer); furnaceResultTimer = 0; }
+    furnaceResultEl.innerHTML = '';
+    if (gains.length === 0 && lost.length === 0) {
+      furnaceResultEl.classList.add('hidden');
+      return;
+    }
+    const label = document.createElement('span');
+    label.className = 'furnace-result-label';
+    label.textContent = '녹인 결과';
+    furnaceResultEl.appendChild(label);
+    for (const g of gains) {
+      const chip = document.createElement('span');
+      chip.className = 'furnace-result-chip furnace-result-chip--gain';
+      chip.textContent = `${g.emoji} ${g.name} +${g.count}`;
+      furnaceResultEl.appendChild(chip);
+    }
+    for (const l of lost) {
+      const chip = document.createElement('span');
+      chip.className = 'furnace-result-chip furnace-result-chip--lost';
+      chip.textContent = `${l.emoji || ''}${l.name} ×${l.count} 소실`;
+      furnaceResultEl.appendChild(chip);
+    }
+    furnaceResultEl.classList.remove('hidden');
+    furnaceResultTimer = window.setTimeout(() => {
+      furnaceResultEl.classList.add('hidden');
+      furnaceResultEl.innerHTML = '';
+      furnaceResultTimer = 0;
+    }, 6000);
+  }
+
   function updateCoinDisplay() {
     if (!coinCountEl) return;
     coinCountEl.textContent = totalCoins.toLocaleString();
@@ -1159,27 +1194,24 @@
       }
     }
     if (btnSmelt) btnSmelt.disabled = furnaceSelected.length === 0;
-    // 장비가 있으면 소실 경고 표시 + 산출물 예상 미리보기
-    if (furnaceEquipWarnEl) {
-      const equipItems = furnaceSelected.filter((m) => isEquipmentMaterial(m));
-      furnaceEquipWarnEl.classList.toggle('hidden', equipItems.length === 0);
+    // 장비가 있으면 소실 경고 + 산출물 미리보기
+    const equipItems = furnaceSelected.filter((m) => isEquipmentMaterial(m));
+    if (furnaceEquipWarnEl) furnaceEquipWarnEl.classList.toggle('hidden', equipItems.length === 0);
+    if (furnacePreviewEl) {
       if (equipItems.length > 0) {
         const previewParts = [];
         for (const m of equipItems) {
           const mats = equipSourceMatsMap.get(String(m.equipmentId)) || [];
-          const smeltMats = mats.filter((x) => x.kind === 'smelt');
-          for (const sm of smeltMats) {
+          for (const sm of mats.filter((x) => x.kind === 'smelt')) {
             const meta = smeltProductMeta(sm.id);
             previewParts.push(`${meta.emoji} ${meta.name}`);
           }
         }
-        if (previewParts.length > 0 && furnaceMsgEl) {
-          furnaceMsgEl.textContent = `녹이면 나올 수 있는 재료: ${previewParts.join(', ')}`;
-        } else if (furnaceMsgEl) {
-          furnaceMsgEl.textContent = '';
-        }
-      } else if (furnaceMsgEl) {
-        furnaceMsgEl.textContent = '';
+        furnacePreviewEl.textContent = previewParts.length > 0
+          ? `예상 산출물: ${previewParts.join(', ')}`
+          : '';
+      } else {
+        furnacePreviewEl.textContent = '';
       }
     }
     renderSmeltStock();
@@ -1275,19 +1307,12 @@
       syncFurnaceUi();
       syncForgeUi();
       const gains = getSmeltGainSummary(beforeStock, stock);
-      const gainText = formatSmeltGainSummary(gains);
-      let msg = gainText
-        ? `${toMelt.length}개를 녹였습니다. 기초 재료: ${gainText}`
-        : `${toMelt.length}개를 녹였습니다.`;
-      if (serverMeltLost.length > 0) {
-        const lostText = serverMeltLost.map((m) => `${m.emoji}${m.name}×${m.count}`).join(' ');
-        msg += ` ⚠️ 소실: ${lostText}`;
-      }
-      setFurnaceMsg(msg);
+      showSmeltResult(gains, serverMeltLost);
+      setFurnaceMsg(`${toMelt.length}개를 녹였습니다.`);
       serverMeltLost = [];
       renderSmeltStock();
       void refreshCraftedList();
-      window.setTimeout(() => setFurnaceMsg(''), 4200);
+      window.setTimeout(() => setFurnaceMsg(''), 3000);
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
       window.setTimeout(() => setFurnaceMsg(''), 4200);
