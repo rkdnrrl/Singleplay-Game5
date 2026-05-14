@@ -1142,10 +1142,21 @@
           ev.dataTransfer.setData('text/plain', `forge-smelt:${sid}`);
           ev.dataTransfer.effectAllowed = 'copyMove';
           pill.classList.add('smelt-pill--dragging');
+          // 선호 슬롯 하이라이트
+          const pref = preferredSlotFromId(sid);
+          if (selectedSlotsEl) {
+            const prefCell = selectedSlotsEl.querySelector(`[data-slot="${pref}"]`);
+            if (prefCell && prefCell.classList.contains('forge-grid-cell--empty')) {
+              prefCell.classList.add('forge-grid-cell--preferred-target');
+            }
+          }
         });
         pill.addEventListener('dragend', () => {
           pill.classList.remove('smelt-pill--dragging');
           clearForgeDnDHover();
+          document.querySelectorAll('.forge-grid-cell--preferred-target').forEach((el) => {
+            el.classList.remove('forge-grid-cell--preferred-target');
+          });
         });
 
         pill.addEventListener(
@@ -2436,18 +2447,12 @@
     }
   }
 
-  // 슬롯 위치별 능력치 힌트 (증가↑ / 감소↓)
-  const GRID_SLOT_HINT_HTML = [
-    '<span class="fgc-h-main">⚔️↑</span><span class="fgc-h-sub">방어·HP↓</span>',
-    '<span class="fgc-h-main">⚡↑</span><span class="fgc-h-sub">방어·HP↓</span>',
-    '<span class="fgc-h-main">⚔️↑</span><span class="fgc-h-sub">방어·HP↓</span>',
-    '<span class="fgc-h-main">🛡️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
-    '<span class="fgc-h-main">⚖️</span><span class="fgc-h-sub">내구↑ 균형</span>',
-    '<span class="fgc-h-main">🛡️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
-    '<span class="fgc-h-main">❤️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
-    '<span class="fgc-h-main">❤️🔩↑</span><span class="fgc-h-sub">공격↓</span>',
-    '<span class="fgc-h-main">❤️↑</span><span class="fgc-h-sub">공격·속도↓</span>',
-  ];
+  /** 서버와 동일한 해시: 산출물 ID → 선호 슬롯 (0~8) */
+  function preferredSlotFromId(id) {
+    let h = 0;
+    for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return h % 9;
+  }
 
   function tryAddSmeltToAnvilAtSlot(sidRaw, slotIndex) {
     const sid = String(sidRaw || '').trim();
@@ -2471,20 +2476,24 @@
       for (let i = 0; i < 9; i++) {
         const m = selected[i];
         const cell = document.createElement('div');
-        cell.className = `forge-grid-cell${m ? ' forge-grid-cell--filled' : ' forge-grid-cell--empty'}`;
         cell.setAttribute('data-slot', String(i));
 
         if (m) {
+          const isCorrect = preferredSlotFromId(m.smeltId) === i;
+          cell.className = `forge-grid-cell forge-grid-cell--filled${isCorrect ? ' forge-grid-cell--fit' : ' forge-grid-cell--misfit'}`;
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'fgc-remove-btn';
-          btn.title = `${m.name} — 클릭하여 빼기`;
           const label = m.name.length > 5 ? m.name.slice(0, 4) + '…' : m.name;
-          btn.innerHTML = `<span class="fgc-emoji">${escapeHtml(m.emoji || '◆')}</span><span class="fgc-name">${escapeHtml(label)}</span>`;
+          btn.title = `${m.name} — ${isCorrect ? '✓ 선호 슬롯' : '✗ 비선호 슬롯 (스탯↓)'}  클릭하여 빼기`;
+          btn.innerHTML = `<span class="fgc-emoji">${escapeHtml(m.emoji || '◆')}</span>`
+            + `<span class="fgc-name">${escapeHtml(label)}</span>`
+            + `<span class="fgc-fit-badge">${isCorrect ? '✓' : '✗'}</span>`;
           btn.addEventListener('click', () => removeSelectedUid(m.uid));
           cell.appendChild(btn);
         } else {
-          cell.innerHTML = GRID_SLOT_HINT_HTML[i];
+          cell.className = 'forge-grid-cell forge-grid-cell--empty';
+          cell.innerHTML = `<span class="fgc-slot-num">${i + 1}</span>`;
           const slotIdx = i;
           cell.addEventListener('dragover', (e) => {
             if (!readSmeltDragSid(e.dataTransfer) && !e.dataTransfer.types.includes('text/plain')) return;
@@ -2540,6 +2549,7 @@
       const harmLabel = clientHarmonyLabel(uniqueTiers);
       const successPct = Math.round(clientSuccessRate(smithingProficiency, avgStr) * 100);
       const activeSyn = detectClientSynergies(items);
+      const correctFit = selected.filter((m, i) => m && isSmeltMaterial(m) && preferredSlotFromId(m.smeltId) === i).length;
       const harmCls = activeSyn.length > 0 ? 'strength--legendary'
         : uniqueTiers >= 4 ? 'strength--legendary'
         : uniqueTiers >= 3 ? 'strength--strong'
@@ -2548,7 +2558,8 @@
       const synLine = activeSyn.length > 0
         ? `  ⚡ ${activeSyn.map((s) => s.name).join(' · ')}`
         : '';
-      statusMsgEl.textContent = `재료 ${items.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${synLine}`;
+      const fitLine = `  · 적합 ${correctFit}/${items.length}`;
+      statusMsgEl.textContent = `재료 ${items.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${fitLine}${synLine}`;
       statusMsgEl.className = `status-msg ${harmCls}`;
       return;
     }
@@ -2625,7 +2636,7 @@
     }, 5000);
   }
 
-  function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel, materialHarmonyLabel, activeSynergies) {
+  function showResultFromServer(eq, stats, nameSource, nameAiMeta, materialStrengthLabel, materialHarmonyLabel, activeSynergies, fitScore) {
     if (!resultCard || !resultName || !resultDesc || !resultRarity || !resultSpriteHost) return;
     window.clearTimeout(resultHideTimer);
     const tier = String(eq.tier || eq.rarity || 'rare').toLowerCase();
@@ -2634,32 +2645,18 @@
     resultRarity.textContent = tierLabel(tier);
     resultName.textContent = eq.name || eq.displayName || '장비';
     const baseDesc = eq.description || eq.desc || '';
-    const skipHint =
-      nameAiMeta && nameAiMeta.nameAiRequested && nameAiMeta.nameAiUsed === false
-        ? nameAiSkipHintKo(nameAiMeta.nameAiSkipReason)
-        : '';
-    let aiLine = '';
-    if (skipHint) {
-      aiLine = `${skipHint}\n`;
-    } else if (nameSource === 'ai') {
-      aiLine = '이름·능력치·내구도 · Gemini\n';
-    } else if (nameSource === 'client_fallback') {
-      aiLine = '이름 · 로컬 규칙(AI 응답 없음)\n';
-    } else if (nameSource === 'smelt_procedural') {
-      const harmBadge = materialHarmonyLabel || materialStrengthLabel || '';
-      const synArr = Array.isArray(activeSynergies) ? activeSynergies : [];
-      const synText = synArr.length > 0 ? `  ⚡ ${synArr.map((s) => s.name).join(' · ')}` : '';
-      aiLine = harmBadge ? `[${harmBadge}]${synText} 절차 생성\n` : `절차 생성${synText}\n`;
-    }
+    const fitLine = fitScore
+      ? `적합 슬롯 ${fitScore.correct}/${fitScore.total}${fitScore.correct === fitScore.total ? ' 🌟 완벽!' : ''}\n`
+      : '';
     if (stats && typeof stats.attackBonus === 'number') {
       const spdPct = ((stats.speedBonus != null ? Number(stats.speedBonus) : 0) * 100).toFixed(1);
       const dur =
         stats.durabilityMax != null && Number.isFinite(Number(stats.durabilityMax))
           ? ` · 내구 ${stats.durability != null ? stats.durability : stats.durabilityMax}/${stats.durabilityMax}`
           : '';
-      resultDesc.textContent = `${aiLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${dur}`;
+      resultDesc.textContent = `${fitLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${dur}`;
     } else {
-      resultDesc.textContent = `${aiLine}${baseDesc}`;
+      resultDesc.textContent = `${fitLine}${baseDesc}`;
     }
     if (resultSpriteHost) resultSpriteHost.innerHTML = '';
     resultCard.classList.remove('hidden');
@@ -2769,7 +2766,7 @@
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
         nameAiSkipReason: data.nameAiSkipReason,
-      }, data.materialStrengthLabel || null, data.materialHarmonyLabel || null, data.activeSynergies || []);
+      }, data.materialStrengthLabel || null, data.materialHarmonyLabel || null, data.activeSynergies || [], data.fitScore || null);
       if (data.nameSource === 'ai' && data.nameClass === 'signature') {
         pendingSignatureCelebrateName = String(serverEquipment.name || '').trim() || '장비';
       }

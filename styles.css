@@ -781,6 +781,31 @@ html.material-detail-open body {
   border-style: solid;
 }
 
+/* 선호 슬롯에 배치됨 — 초록 테두리 */
+.forge-grid-cell--fit {
+  border-color: #4ecb71;
+  box-shadow: 0 0 8px rgba(78, 203, 113, 0.45);
+}
+
+/* 비선호 슬롯 — 주황 테두리 */
+.forge-grid-cell--misfit {
+  border-color: #e07040;
+  box-shadow: 0 0 6px rgba(224, 112, 64, 0.35);
+}
+
+/* 드래그 중 선호 슬롯 강조 — 황금 테두리 */
+.forge-grid-cell--preferred-target {
+  background: rgba(255, 210, 60, 0.2);
+  border-color: #ffd23c;
+  border-style: solid;
+  animation: fgc-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes fgc-pulse {
+  from { box-shadow: 0 0 6px rgba(255, 210, 60, 0.4); }
+  to   { box-shadow: 0 0 16px rgba(255, 210, 60, 0.9); }
+}
+
 /* 재료 빼기 버튼 (채워진 슬롯 전체) */
 .fgc-remove-btn {
   display: flex;
@@ -824,23 +849,27 @@ html.material-detail-open body {
   font-weight: 600;
 }
 
-/* 빈 슬롯 힌트 텍스트 */
-.fgc-h-main {
+/* 빈 슬롯 번호 */
+.fgc-slot-num {
   display: block;
-  font-size: 0.72rem;
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
   font-weight: 700;
+  color: rgba(255, 255, 255, 0.2);
+  text-align: center;
+  line-height: 1;
+}
+
+/* 적합 여부 배지 (✓ / ✗) */
+.fgc-fit-badge {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
   text-align: center;
 }
 
-.fgc-h-sub {
-  display: block;
-  font-size: 0.52rem;
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.3);
-  text-align: center;
-}
+.forge-grid-cell--fit .fgc-fit-badge  { color: #4ecb71; }
+.forge-grid-cell--misfit .fgc-fit-badge { color: #e07040; }
 
 .anvil-empty {
   width: 100%;
