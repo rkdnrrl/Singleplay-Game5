@@ -3821,11 +3821,14 @@
     modal.setAttribute('aria-hidden', 'false');
     renderPixelCanvas();
     nameInput && nameInput.focus();
-    // 로딩 오버레이 표시 + 타이머 시작
-    const _loadingEl = document.getElementById('equipCustomizeLoading');
-    if (_loadingEl) _loadingEl.classList.remove('ecl-overlay--hidden');
-    _startEclTimer();
-    void _genPixelArtApi(mats, initName);
+    // 자동 이미지 생성 여부 확인 (취소 → 빈 이미지 유지)
+    const _skipAutoGen = window.confirm('이미지 자동생성을 취소하겠습니까?');
+    if (!_skipAutoGen) {
+      const _loadingEl = document.getElementById('equipCustomizeLoading');
+      if (_loadingEl) _loadingEl.classList.remove('ecl-overlay--hidden');
+      _startEclTimer();
+      void _genPixelArtApi(mats, initName);
+    }
 
     const canvas = document.getElementById('equipPixelCanvas');
     if (canvas) {
