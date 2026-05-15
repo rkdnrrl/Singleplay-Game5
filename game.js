@@ -4800,31 +4800,38 @@
   const $moduleCraftPanel     = document.getElementById('moduleCraftPanel');
   const $moduleCraftToggleBtn = document.getElementById('moduleCraftToggleBtn');
   const $moduleCraftTypeList  = document.getElementById('moduleCraftTypeList');
-  const $moduleCraftCount     = document.getElementById('moduleCraftCount');
   const $moduleCraftTierPreview = document.getElementById('moduleCraftTierPreview');
-  const $moduleCraftBtn       = document.getElementById('moduleCraftBtn');
-  const $moduleCraftMsg       = document.getElementById('moduleCraftMsg');
+  const $moduleCraftBtn         = document.getElementById('moduleCraftBtn');
+  const $moduleCraftMsg         = document.getElementById('moduleCraftMsg');
 
   let moduleCraftSelectedType = null;
+  let moduleCraftSlots        = [];   // { productId, name, emoji } — 슬롯에 담긴 재료
+  let moduleCraftStockCache   = {};   // productId → { productId, name, emoji, count(남은) }
 
   async function loadModuleTab() {
     if (!$moduleEquipList) return;
     try {
-      const [eqRes, modRes] = await Promise.all([
-        fetch(`${platformApi}/api/craft/equipment?limit=40`, {
-          headers: { Authorization: `Bearer ${alpToken}` },
-        }),
-        fetch(`${platformApi}/api/modules`, {
-          headers: { Authorization: `Bearer ${alpToken}` },
-        }),
+      const [eqRes, modRes, stockRes] = await Promise.all([
+        fetch(`${platformApi}/api/craft/equipment?limit=40`, { headers: { Authorization: `Bearer ${alpToken}` } }),
+        fetch(`${platformApi}/api/modules`,                  { headers: { Authorization: `Bearer ${alpToken}` } }),
+        fetch(`${platformApi}/api/smelt/stock`,              { headers: { Authorization: `Bearer ${alpToken}` } }),
       ]);
-      const eqData  = eqRes.ok  ? await eqRes.json()  : {};
-      const modData = modRes.ok ? await modRes.json() : {};
+      const eqData    = eqRes.ok    ? await eqRes.json()    : {};
+      const modData   = modRes.ok   ? await modRes.json()   : {};
+      const stockData = stockRes.ok ? await stockRes.json() : {};
       const eqPool  = (eqData.equipment || []).filter(e => e && e.stats);
       moduleAllList = modData.modules || [];
+      // 캐시 초기화 (슬롯 초기화는 하지 않음 — 열어둔 상태 유지)
+      const raw = stockData.stock || {};
+      moduleCraftStockCache = {};
+      Object.values(raw).forEach(s => {
+        if ((s.count || 0) > 0) moduleCraftStockCache[s.id || s.productId] = { ...s, productId: s.id || s.productId };
+      });
       renderModuleEquipList(eqPool);
       renderModuleInvList();
       renderModuleCraftTypeList();
+      renderModuleCraftSlots();
+      renderModuleCraftStock();
     } catch (e) {
       if ($moduleEquipList) $moduleEquipList.innerHTML = '<p style="color:rgba(200,180,240,0.4);font-size:0.78rem;padding:0.5rem">불러오기 실패</p>';
     }
@@ -5063,22 +5070,96 @@
     }
   }
 
+  const MAX_CRAFT_SLOTS = 8;
+
+  function renderModuleCraftSlots() {
+    const $slots = document.getElementById('moduleCraftSlots');
+    const $count = document.getElementById('moduleCraftSlotCount');
+    if ($slots) {
+      $slots.innerHTML = '';
+      for (let i = 0; i < MAX_CRAFT_SLOTS; i++) {
+        const cell = document.createElement('div');
+        const item = moduleCraftSlots[i];
+        if (item) {
+          cell.className = 'mcw-slot mcw-slot--filled';
+          cell.textContent = item.emoji || '📦';
+          cell.title = item.name || '';
+          cell.addEventListener('click', () => {
+            // 슬롯에서 제거 → 스톡으로 반환
+            const removed = moduleCraftSlots.splice(i, 1)[0];
+            if (removed) {
+              const pid = removed.productId;
+              if (moduleCraftStockCache[pid]) moduleCraftStockCache[pid].count++;
+              else moduleCraftStockCache[pid] = { ...removed, count: 1 };
+            }
+            renderModuleCraftSlots();
+            renderModuleCraftStock();
+            updateModuleCraftBtn();
+          });
+        } else {
+          cell.className = 'mcw-slot mcw-slot--empty';
+          cell.textContent = '+';
+        }
+        $slots.appendChild(cell);
+      }
+    }
+    if ($count) $count.textContent = `${moduleCraftSlots.length}/${MAX_CRAFT_SLOTS}`;
+    updateModuleCraftBtn();
+  }
+
+  function renderModuleCraftStock() {
+    const $list = document.getElementById('moduleCraftStockList');
+    if (!$list) return;
+    $list.innerHTML = '';
+    const items = Object.values(moduleCraftStockCache).filter(s => (s.count || 0) > 0);
+    if (items.length === 0) {
+      $list.innerHTML = '<span style="font-size:0.72rem;color:rgba(200,190,240,0.4)">산출물 없음</span>';
+      return;
+    }
+    items.forEach(s => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'mcw-stock-pill';
+      const full = moduleCraftSlots.length >= MAX_CRAFT_SLOTS;
+      if (full) pill.disabled = true;
+      pill.innerHTML = `<span class="mcw-stock-emoji">${s.emoji || '📦'}</span><span class="mcw-stock-name">${escHtmlModule(s.name || '')}</span><span class="mcw-stock-cnt">×${s.count}</span>`;
+      pill.addEventListener('click', () => {
+        if (moduleCraftSlots.length >= MAX_CRAFT_SLOTS) return;
+        moduleCraftSlots.push({ productId: s.productId, name: s.name, emoji: s.emoji });
+        s.count--;
+        renderModuleCraftSlots();
+        renderModuleCraftStock();
+      });
+      $list.appendChild(pill);
+    });
+  }
+
   function updateModuleCraftBtn() {
     if (!$moduleCraftBtn) return;
-    const cnt = parseInt($moduleCraftCount?.value || '1', 10);
+    const cnt = moduleCraftSlots.length;
     let tierLabel = '일반';
     if (cnt >= 5) tierLabel = '전설';
     else if (cnt >= 3) tierLabel = '에픽';
     else if (cnt >= 2) tierLabel = '희귀';
     if ($moduleCraftTierPreview) {
-      $moduleCraftTierPreview.textContent = `예상 등급: ${tierLabel} (재료 ${cnt}개)`;
+      $moduleCraftTierPreview.textContent = cnt > 0
+        ? `예상 등급: ${tierLabel} (재료 ${cnt}개)`
+        : '재료를 슬롯에 넣어주세요';
     }
-    $moduleCraftBtn.disabled = !moduleCraftSelectedType;
+    $moduleCraftBtn.disabled = !moduleCraftSelectedType || cnt === 0;
   }
 
-  if ($moduleCraftCount) {
-    $moduleCraftCount.addEventListener('input', updateModuleCraftBtn);
-  }
+  document.getElementById('moduleCraftClearBtn')?.addEventListener('click', () => {
+    // 슬롯 비우기 → 스톡으로 전부 반환
+    for (const item of moduleCraftSlots) {
+      const pid = item.productId;
+      if (moduleCraftStockCache[pid]) moduleCraftStockCache[pid].count++;
+      else moduleCraftStockCache[pid] = { ...item, count: 1 };
+    }
+    moduleCraftSlots = [];
+    renderModuleCraftSlots();
+    renderModuleCraftStock();
+  });
 
   if ($moduleCraftToggleBtn) {
     $moduleCraftToggleBtn.addEventListener('click', () => {
@@ -5090,42 +5171,18 @@
 
   if ($moduleCraftBtn) {
     $moduleCraftBtn.addEventListener('click', async () => {
-      if (!moduleCraftSelectedType || $moduleCraftBtn.disabled) return;
-      const cnt = Math.max(1, Math.min(8, parseInt($moduleCraftCount?.value || '1', 10)));
+      if (!moduleCraftSelectedType || moduleCraftSlots.length === 0 || $moduleCraftBtn.disabled) return;
       if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '제작 중…'; $moduleCraftMsg.style.color = 'rgba(200,190,240,0.6)'; }
       $moduleCraftBtn.disabled = true;
 
-      // Use the first available smelt product as material (simplified: just use whatever is in stock)
-      // Get smelt stock first
+      // 슬롯 재료를 productId별로 집계
+      const countMap = {};
+      for (const item of moduleCraftSlots) {
+        countMap[item.productId] = (countMap[item.productId] || 0) + 1;
+      }
+      const smeltMaterials = Object.entries(countMap).map(([productId, count]) => ({ productId, count }));
+
       try {
-        const stockRes = await fetch(`${platformApi}/api/smelt/stock`, {
-          headers: { Authorization: `Bearer ${alpToken}` },
-        });
-        const stockData = stockRes.ok ? await stockRes.json() : {};
-        // stock is { productId: { id, name, emoji, count } }
-        const stockObj = stockData.stock || {};
-        const stock = Object.values(stockObj).filter(s => (s.count || 0) > 0);
-        if (stock.length === 0) {
-          if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '용광로 산출물이 없습니다.'; $moduleCraftMsg.style.color = '#fca5a5'; }
-          $moduleCraftBtn.disabled = false;
-          return;
-        }
-
-        // Build smeltMaterials: consume cnt items from available stock
-        let remaining = cnt;
-        const smeltMaterials = [];
-        for (const s of stock) {
-          if (remaining <= 0) break;
-          const use = Math.min(remaining, s.count);
-          smeltMaterials.push({ productId: s.id || s.productId, count: use });
-          remaining -= use;
-        }
-        if (remaining > 0) {
-          if ($moduleCraftMsg) { $moduleCraftMsg.textContent = `재료가 부족합니다 (${cnt - remaining}/${cnt}개 확보).`; $moduleCraftMsg.style.color = '#fca5a5'; }
-          $moduleCraftBtn.disabled = false;
-          return;
-        }
-
         const resp = await fetch(`${platformApi}/api/modules/craft`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
@@ -5133,13 +5190,18 @@
         });
         const json = await resp.json();
         if (!resp.ok) {
+          // 실패 시 재료 슬롯 복구
           if ($moduleCraftMsg) { $moduleCraftMsg.textContent = json?.error?.message || '제작 실패'; $moduleCraftMsg.style.color = '#fca5a5'; }
           $moduleCraftBtn.disabled = false;
           return;
         }
+        // 성공: 슬롯 비우기 (서버에서 이미 소모됨)
+        moduleCraftSlots = [];
         moduleAllList.push(json.module);
         if ($moduleCraftMsg) { $moduleCraftMsg.textContent = `✅ ${json.module.name} 제작 완료!`; $moduleCraftMsg.style.color = '#6ee7b7'; }
         renderModuleInvList();
+        renderModuleCraftSlots();
+        renderModuleCraftStock();
         $moduleCraftBtn.disabled = false;
       } catch (e) {
         if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '오류가 발생했습니다.'; $moduleCraftMsg.style.color = '#fca5a5'; }

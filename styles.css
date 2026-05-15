@@ -3586,27 +3586,92 @@ body.forge-scroll-lock {
   margin: 0.25rem 0 0.1rem;
   line-height: 1.45;
 }
-.module-craft-material-row {
+/* 모듈 제작 작업대 */
+.module-craft-workspace {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
+  gap: 0.6rem;
+  margin: 0.4rem 0;
+  min-height: 0;
 }
-.module-craft-label {
-  font-size: 0.75rem;
-  color: rgba(200,190,240,0.6);
-  flex: 1;
+.module-craft-slots-area,
+.module-craft-stock-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
 }
-.module-craft-count-input {
-  width: 56px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 0.3rem;
+.module-craft-slots-area { flex: 0 0 auto; }
+.module-craft-stock-area { flex: 1; min-width: 0; }
+.module-craft-area-label {
+  font-size: 0.7rem;
+  color: rgba(200,190,240,0.55);
+  margin: 0;
+  display: flex; align-items: center; gap: 0.3rem;
+}
+.module-craft-slot-count {
+  font-size: 0.65rem;
+  color: rgba(160,180,255,0.5);
+}
+/* 슬롯 그리드 (4×2) */
+.module-craft-slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+}
+.mcw-slot {
+  width: 36px; height: 36px;
+  border-radius: 0.35rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.mcw-slot--empty {
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.18);
+  font-size: 1rem;
+  cursor: default;
+}
+.mcw-slot--filled {
+  background: rgba(80,60,160,0.35);
+  border-color: rgba(140,120,220,0.4);
+}
+.mcw-slot--filled:hover { background: rgba(100,70,200,0.45); border-color: rgba(180,140,255,0.6); }
+/* 산출물 목록 */
+.module-craft-stock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  max-height: 112px;
+}
+.mcw-stock-pill {
+  display: flex; align-items: center; gap: 0.35rem;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0.35rem;
+  padding: 0.22rem 0.5rem;
+  cursor: pointer;
   color: var(--text);
-  font-size: 0.82rem;
-  padding: 0.2rem 0.35rem;
-  text-align: center;
+  text-align: left;
+  transition: background 0.12s;
 }
+.mcw-stock-pill:hover:not(:disabled) { background: rgba(100,140,255,0.15); border-color: rgba(100,140,255,0.35); }
+.mcw-stock-pill:disabled { opacity: 0.35; cursor: not-allowed; }
+.mcw-stock-emoji { font-size: 1rem; flex-shrink: 0; }
+.mcw-stock-name  { font-size: 0.72rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcw-stock-cnt   { font-size: 0.68rem; color: rgba(160,200,255,0.7); flex-shrink: 0; }
+/* 전체 비우기 버튼 */
+.module-craft-clear-btn {
+  font-size: 0.68rem;
+  color: rgba(200,190,240,0.5);
+  background: none; border: none;
+  cursor: pointer; padding: 0.1rem 0;
+  text-align: left;
+}
+.module-craft-clear-btn:hover { color: rgba(240,180,180,0.8); }
 .module-craft-tier-preview {
   font-size: 0.75rem;
   color: rgba(200,190,240,0.6);

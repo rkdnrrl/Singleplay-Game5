@@ -289,9 +289,16 @@
       <p class="module-section-title">⚒️ 모듈 제작</p>
       <div class="module-craft-type-list" id="moduleCraftTypeList"></div>
       <div class="module-craft-type-desc" id="moduleCraftTypeDesc"></div>
-      <div class="module-craft-material-row">
-        <label class="module-craft-label">용광로 산출물 개수 (1-8)</label>
-        <input type="number" id="moduleCraftCount" min="1" max="8" value="1" class="module-craft-count-input" />
+      <div class="module-craft-workspace">
+        <div class="module-craft-slots-area">
+          <p class="module-craft-area-label">재료 슬롯 <span class="module-craft-slot-count" id="moduleCraftSlotCount">0/8</span></p>
+          <div class="module-craft-slots" id="moduleCraftSlots"></div>
+          <button type="button" class="module-craft-clear-btn" id="moduleCraftClearBtn">전체 비우기</button>
+        </div>
+        <div class="module-craft-stock-area">
+          <p class="module-craft-area-label">보유 산출물</p>
+          <div class="module-craft-stock-list" id="moduleCraftStockList"></div>
+        </div>
       </div>
       <div class="module-craft-tier-preview" id="moduleCraftTierPreview"></div>
       <button type="button" class="module-craft-btn" id="moduleCraftBtn" disabled>✨ 제작</button>
