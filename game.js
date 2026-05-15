@@ -3928,6 +3928,7 @@
   const REPAIR_COLS = 6, REPAIR_ROWS = 8;
   const REPAIR_COST_TABLE = { common: 5, rare: 12, epic: 30, legendary: 70 };
   let repairItem = null;
+  let repairConfirmInFlight = false;  // 중복 확인 방지
   let repairItemIsModule = false;  // true면 모듈 수리
   let repairModulePool = [];  // 수리 탭용 모듈 캐시
   let repairMaxDur = 0, repairOrigDur = 0, repairDur = 0;
@@ -4458,9 +4459,11 @@
   }
 
   async function confirmRepairSession() {
+    if (repairConfirmInFlight) return;
     if (!repairItem) return;
     if (repairSpent === 0 && repairDur === repairOrigDur) { repairMsg('수리한 내용이 없습니다.'); return; }
     if (!alpToken || !platformApi) { repairMsg('로그인이 필요합니다.'); return; }
+    repairConfirmInFlight = true;
     const btn = document.getElementById('repairConfirmBtn');
     if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
     try {
@@ -4491,6 +4494,7 @@
       refreshRepairEquipList();
     } catch { repairMsg('수리 중 오류가 발생했습니다.'); }
     finally {
+      repairConfirmInFlight = false;
       if (btn) { btn.disabled = false; btn.textContent = '✅ 수리 완료'; }
     }
   }
