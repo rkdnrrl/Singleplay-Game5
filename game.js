@@ -218,7 +218,7 @@
   const MAT_DOCK_SOUL_TYPES = new Set(['fish', 'creature', 'cosmic', 'crystal', 'artifact']);
   const MAT_DOCK_MATERIAL_TYPES = new Set(['scrap', 'debris']);
 
-  const SMELT_STOCK_KEY = 'WEB_ALP_FORGE_SMELT_STOCK_V1';
+  let smeltStockCache = {}; // 서버에서 가져온 재료 재고 (localStorage 사용 안 함)
   const FORGE_DRAG_MATERIAL_UID = 'application/x-forge-material-uid';
   const FORGE_DRAG_SMELT_UID = 'application/x-forge-smelt-id';
   const FORGE_DRAG_MODULE_ID = 'application/x-forge-module-id';
@@ -841,21 +841,11 @@
   }
 
   function loadSmeltStock() {
-    try {
-      const raw = localStorage.getItem(SMELT_STOCK_KEY);
-      const o = raw ? JSON.parse(raw) : {};
-      return o && typeof o === 'object' ? o : {};
-    } catch {
-      return {};
-    }
+    return smeltStockCache;
   }
 
   function saveSmeltStock(stock) {
-    try {
-      localStorage.setItem(SMELT_STOCK_KEY, JSON.stringify(stock));
-    } catch {
-      /* ignore */
-    }
+    smeltStockCache = (stock && typeof stock === 'object') ? stock : {};
   }
 
   /** 서버/로컬 공통: 기초 재료(용광로 재고) 맵 복사 (표시용 엔트리만) */
@@ -974,40 +964,7 @@
           data = null;
         }
       }
-      let serverStock = data && data.stock && typeof data.stock === 'object' ? data.stock : {};
-      const serverHasAny = Object.keys(serverStock).some((k) => {
-        const v = serverStock[k];
-        return v && typeof v.count === 'number' && v.count > 0;
-      });
-      if (!serverHasAny) {
-        const local = loadSmeltStock();
-        const localHasAny = Object.keys(local).some((k) => {
-          const v = local[k];
-          return v && typeof v.count === 'number' && v.count > 0;
-        });
-        if (localHasAny) {
-          const boot = await fetch(`${platformApi}/api/smelt/bootstrap`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${alpToken}`,
-            },
-            body: JSON.stringify({ stock: local }),
-          });
-          if (boot.ok) {
-            const bt = await boot.text();
-            let bd = null;
-            if (bt) {
-              try {
-                bd = JSON.parse(bt);
-              } catch {
-                bd = null;
-              }
-            }
-            if (bd && bd.stock && typeof bd.stock === 'object') serverStock = bd.stock;
-          }
-        }
-      }
+      const serverStock = data && data.stock && typeof data.stock === 'object' ? data.stock : {};
       saveSmeltStock(serverStock);
       renderSmeltStock();
     } catch {
@@ -3123,7 +3080,7 @@
   }
 
   function onStorage(e) {
-    if (e.key !== FORGE_MATERIALS_KEY && e.key !== FORGE_SPENT_UIDS_KEY && e.key !== SMELT_STOCK_KEY) return;
+    if (e.key !== FORGE_MATERIALS_KEY && e.key !== FORGE_SPENT_UIDS_KEY) return;
     refreshMaterials();
     selected = selected.map((s) => (s && (isSmeltMaterial(s) || materials.some((m) => m.uid === s.uid))) ? s : null);
     furnaceSelected = furnaceSelected.filter((s) => materials.some((m) => m.uid === s.uid));
