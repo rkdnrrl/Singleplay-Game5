@@ -5040,8 +5040,6 @@
     buffer:        '모든 장비에 장착. 장비 내구도가 닳을 때 대신 모듈 내구도가 감소해 장비를 보호합니다.',
   };
 
-  const $moduleCraftTypeDesc = document.getElementById('moduleCraftTypeDesc');
-
   function renderModuleCraftTypeList() {
     if (!$moduleCraftTypeList) return;
     $moduleCraftTypeList.innerHTML = '';
@@ -5057,10 +5055,11 @@
       });
       $moduleCraftTypeList.appendChild(btn);
     });
-    if ($moduleCraftTypeDesc) {
-      const desc = moduleCraftSelectedType ? MODULE_TYPE_DESC[moduleCraftSelectedType] : '';
-      $moduleCraftTypeDesc.textContent = desc || '';
-      $moduleCraftTypeDesc.style.display = desc ? '' : 'none';
+    const $desc = document.getElementById('moduleCraftTypeDesc');
+    if ($desc) {
+      const desc = moduleCraftSelectedType ? (MODULE_TYPE_DESC[moduleCraftSelectedType] || '') : '';
+      $desc.textContent = desc;
+      $desc.style.display = desc ? '' : 'none';
     }
   }
 
