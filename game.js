@@ -3244,48 +3244,24 @@
     if (_eclTimerRef) { clearInterval(_eclTimerRef); _eclTimerRef = null; }
   }
 
-  // PixelLab API로 픽셀아트 생성 (캐시 있으면 즉시 반환)
-  async function _genPixelArtApi(mats, name) {
-    const btn = document.getElementById('equipRandomPixelBtn');
-    if (btn) { btn.disabled = true; btn.textContent = '생성중…'; }
+  // DB 캐시에서 장비 이미지 조회 (noun = 장비 명사, 없으면 빈 이미지)
+  async function _fetchEquipArtFromDb(noun) {
+    if (!alpToken || !platformApi || !noun) return;
     try {
-      if (!alpToken || !platformApi) throw new Error('no-token');
-      const tiers = mats.filter(Boolean).map((m) => m.tier || 'common');
-      const tier = tiers.includes('legendary') ? 'legendary' : tiers.includes('epic') ? 'epic' : tiers.includes('rare') ? 'rare' : 'common';
-      const res = await fetch(`${platformApi}/api/craft/generate-pixel-art`, {
+      const res = await fetch(`${platformApi}/api/craft/equip-pixel-art`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
-        body: JSON.stringify({ name, tier }),
+        body: JSON.stringify({ noun }),
       });
-      if (!res.ok) throw new Error(`status ${res.status}`);
+      if (!res.ok) return;
       const data = await res.json();
       if (data.imageDataUrl) {
         pixelArtImageUrl = data.imageDataUrl;
         await _imageUrlToPixelGrid(data.imageDataUrl);
         renderPixelCanvas();
-        // 코인 보상 지급 (서버가 실제 지급, 클라이언트는 표시만 동기화)
-        if (data.coinReward && data.coinReward > 0) {
-          totalCoins += data.coinReward;
-          updateCoinDisplay();
-          if (statusMsgEl) {
-            statusMsgEl.textContent = `🪙 대기 보상 +${data.coinReward} 코인 획득!`;
-            window.setTimeout(() => { if (statusMsgEl) statusMsgEl.textContent = ''; }, 3000);
-          }
-        }
-        return;
       }
-      throw new Error('no imageDataUrl');
     } catch (e) {
-      console.warn('[pixel-art] PixelLab 실패, 로컬 생성으로 대체:', e?.message || e);
-      // 폴백: 로컬 마스크 기반 생성
-      pixelArtImageUrl = null;
-      pixelGrid = generateRandomPixels(mats, name);
-      renderPixelCanvas();
-    } finally {
-      _stopEclTimer();
-      if (btn) { btn.disabled = false; btn.textContent = '랜덤도안'; }
-      const loadingEl = document.getElementById('equipCustomizeLoading');
-      if (loadingEl) loadingEl.classList.add('ecl-overlay--hidden');
+      console.warn('[equip-art] DB 조회 실패:', e?.message || e);
     }
   }
 
@@ -3821,14 +3797,8 @@
     modal.setAttribute('aria-hidden', 'false');
     renderPixelCanvas();
     nameInput && nameInput.focus();
-    // 자동 이미지 생성 여부 확인 (취소 → 빈 이미지 유지)
-    const _skipAutoGen = window.confirm('이미지 자동생성을 취소하겠습니까?');
-    if (!_skipAutoGen) {
-      const _loadingEl = document.getElementById('equipCustomizeLoading');
-      if (_loadingEl) _loadingEl.classList.remove('ecl-overlay--hidden');
-      _startEclTimer();
-      void _genPixelArtApi(mats, initName);
-    }
+    // DB에서 명사 기반 이미지 조회 (없으면 빈 이미지)
+    void _fetchEquipArtFromDb(fixedNoun);
 
     const canvas = document.getElementById('equipPixelCanvas');
     if (canvas) {
@@ -3858,7 +3828,9 @@
     if (rndNameBtn) rndNameBtn.onclick = () => { if (nameInput) nameInput.value = generateEquipName(mats, fixedNoun); };
     if (rndPixelBtn) rndPixelBtn.onclick = () => {
       pixelArtImageUrl = null;
-      void _genPixelArtApi(mats, nameInput?.value || '');
+      pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null);
+      renderPixelCanvas();
+      void _fetchEquipArtFromDb(fixedNoun);
     };
     if (clearBtn) clearBtn.onclick = () => { pixelArtImageUrl = null; pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null); renderPixelCanvas(); };
     if (doneBtn) doneBtn.onclick = () => {
