@@ -422,6 +422,70 @@ html.material-detail-open body {
 }
 .furnace-equip-warn.hidden { display: none; }
 
+/* 용광로 탭 */
+.furnace-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+.furnace-tab {
+  flex: 1;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid #444;
+  border-radius: 0.35rem;
+  background: #1e1e2e;
+  color: #90a4ae;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.furnace-tab:hover { background: #263040; color: #cdd; }
+.furnace-tab.is-active {
+  background: #e65c00;
+  color: #fff;
+  border-color: #e65c00;
+}
+
+/* 모듈 탭 패널 */
+.furnace-module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: 0.2rem 0;
+}
+.furnace-module-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.5rem;
+  border: 1px solid #333;
+  border-radius: 0.4rem;
+  background: #1a1a2a;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.furnace-module-item:hover { background: #222235; }
+.furnace-module-item.is-selected {
+  background: rgba(230, 92, 0, 0.18);
+  border-color: #e65c00;
+}
+.furnace-module-item__emoji { font-size: 1.1rem; flex-shrink: 0; }
+.furnace-module-item__info  { flex: 1; min-width: 0; }
+.furnace-module-item__name  { font-size: 0.72rem; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.furnace-module-item__meta  { font-size: 0.6rem; color: #888; }
+.furnace-module-item__dur   { font-size: 0.6rem; color: #aaa; flex-shrink: 0; }
+.furnace-module-empty { font-size: 0.72rem; color: #666; text-align: center; padding: 1rem 0; }
+.furnace-module-selected-label {
+  font-size: 0.68rem;
+  color: #ffb74d;
+  margin: 0.35rem 0 0;
+  text-align: center;
+}
+.furnace-module-selected-label.hidden { display: none; }
+
 .forge-topbar {
   display: flex;
   justify-content: flex-end;
