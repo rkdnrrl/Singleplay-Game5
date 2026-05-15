@@ -5110,6 +5110,13 @@
     { type:'combo', cats:['chemical','organic'],  name:'독성 오염',   desc:'전체 스탯 -18%', muls:{ allMul:0.82 }, penalty:true },
     { type:'combo', cats:['electronic','mineral'],name:'전기 단락',   desc:'이속 -12%',      muls:{ spdMul:0.88 }, penalty:true },
     { type:'combo', cats:['metal','chemical'],    name:'금속 부식',   desc:'방어력 -10%',    muls:{ defMul:0.90 }, penalty:true },
+    // 분산 패널티 — 마구잡이 혼합 시 악화
+    { type:'scatter', minCats:3, maxEach:1, name:'재료 불안정',
+      desc:'다른 재료가 너무 많아 불안정: 전체 -12%',         muls:{ allMul:0.88 }, penalty:true },
+    { type:'scatter', minCats:4,            name:'혼합 혼돈',
+      desc:'재료가 서로 반발함: 전체 -25%',                   muls:{ allMul:0.75 }, penalty:true, overrides:'재료 불안정' },
+    { type:'scatter', minCats:5,            name:'극한 혼돈',
+      desc:'재료가 서로 충돌해 붕괴: 전체 -42%',              muls:{ allMul:0.58 }, penalty:true, overrides:'혼합 혼돈' },
   ];
 
   // ── 슬롯 위치 보너스 (4×2 그리드) ─────────────────────────────
@@ -5139,6 +5146,11 @@
     const active = [];
     const overridden = new Set();
 
+    // 분산 패널티 계산용: 카테고리별 개수 (misc 제외)
+    const realCats = Object.entries(catCount).filter(([c]) => c !== 'misc');
+    const distinctCats = realCats.length;
+    const singletonCats = realCats.filter(([, n]) => n === 1).length;
+
     // 시너지 규칙 적용
     CRAFT_SYNERGIES.forEach(rule => {
       if (overridden.has(rule.name)) return;
@@ -5147,6 +5159,11 @@
         match = (catCount[rule.cat] || 0) >= rule.min;
       } else if (rule.type === 'combo') {
         match = rule.cats.every(c => (catCount[c] || 0) >= 1);
+      } else if (rule.type === 'scatter') {
+        // minCats: 최소 카테고리 수, maxEach: 각 카테고리가 최대 이 수 이하일 때만 발동
+        const meetsMin = distinctCats >= rule.minCats;
+        const meetsMax = rule.maxEach == null || singletonCats >= rule.minCats;
+        match = meetsMin && meetsMax;
       }
       if (match) {
         active.push({ ...rule });
