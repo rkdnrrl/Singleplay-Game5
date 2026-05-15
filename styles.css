@@ -271,6 +271,12 @@ html.material-detail-open body {
   transform: scale(0.97);
 }
 
+.furnace-chip--module {
+  background: linear-gradient(180deg, #2a3545 0%, #1a2230 100%);
+  color: #90caf9;
+  border-color: rgba(100, 160, 255, 0.35);
+}
+
 .furnace-empty {
   color: rgba(255, 200, 180, 0.35);
   font-size: 1rem;

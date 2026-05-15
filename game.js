@@ -200,12 +200,10 @@
   let selected = new Array(9).fill(null);
   /** 용광로에 넣은 재료 (낚시 재료·장비) */
   let furnaceSelected = [];
-  /** 용광로 활성 탭: 'material' | 'module' */
-  let furnaceTab = 'material';
-  /** 용광로 모듈 탭 — 로드된 모듈 풀 */
-  let furnaceModulePool = [];
-  /** 용광로 모듈 탭 — 선택된 모듈 id 세트 */
-  let furnaceModuleSelected = new Set();
+  /** 용광로에 드래그된 모듈 목록 */
+  let furnaceModulesPending = [];
+  /** 보관함 모듈 탭 — API에서 로드한 풀 */
+  let dockModulePool = [];
   let resultHideTimer = 0;
   let signatureCelebrateTimer = 0;
   let pendingSignatureCelebrateName = null;
@@ -223,6 +221,7 @@
   const SMELT_STOCK_KEY = 'WEB_ALP_FORGE_SMELT_STOCK_V1';
   const FORGE_DRAG_MATERIAL_UID = 'application/x-forge-material-uid';
   const FORGE_DRAG_SMELT_UID = 'application/x-forge-smelt-id';
+  const FORGE_DRAG_MODULE_ID = 'application/x-forge-module-id';
   const SMELT_CATEGORY_NAMES = {
     all: '전체',
     metal: '금속',
@@ -1175,93 +1174,96 @@
     });
   }
 
-  // ── 용광로 모듈 탭 ────────────────────────────────────────────
+  // ── 보관함 모듈 필터 ──────────────────────────────────────────
   const MODULE_TIER_LABEL = { common: '일반', rare: '희귀', epic: '에픽', legendary: '전설' };
   const MODULE_TIER_YIELD = { common: 1, rare: 2, epic: 3, legendary: 5 };
 
-  async function loadFurnaceModules() {
-    const $list = document.getElementById('furnaceModuleList');
-    if (!$list) return;
-    $list.innerHTML = '<span class="furnace-module-empty">불러오는 중…</span>';
+  async function fetchDockModules() {
     try {
       const res = await fetch(`${platformApi}/api/modules`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       const data = await res.json();
-      // 장비에 부착되지 않은 모듈만 표시
-      furnaceModulePool = (data.modules || []).filter((m) => !m.equippedTo);
+      dockModulePool = (data.modules || []);
     } catch {
-      furnaceModulePool = [];
+      dockModulePool = [];
     }
-    renderFurnaceModuleList();
   }
 
-  function renderFurnaceModuleList() {
-    const $list = document.getElementById('furnaceModuleList');
-    if (!$list) return;
-    $list.innerHTML = '';
-    if (furnaceModulePool.length === 0) {
-      $list.innerHTML = '<span class="furnace-module-empty">분리된 모듈이 없습니다.</span>';
+  function renderDockModules() {
+    if (!materialListEl) return;
+    if (matCountBadge) matCountBadge.textContent = String(dockModulePool.length);
+    materialListEl.innerHTML = '';
+    if (dockModulePool.length === 0) {
+      materialListEl.innerHTML = '<p class="log-empty">모듈이 없습니다.</p>';
+      renderMaterialDockFilterUi();
+      syncScrollOverflow();
       return;
     }
-    furnaceModulePool.forEach((mod) => {
-      const isSel = furnaceModuleSelected.has(mod.id);
-      const item = document.createElement('div');
-      item.className = 'furnace-module-item' + (isSel ? ' is-selected' : '');
+    renderMaterialDockFilterUi();
+    dockModulePool.forEach((mod) => {
+      const isPending = furnaceModulesPending.some((m) => m.id === mod.id);
+      const row = document.createElement('div');
+      row.className = 'inv-item inv-item--draggable' + (isPending ? ' inv-item--furnace' : '');
+      row.draggable = !mod.equippedTo; // 부착 중이면 드래그 불가
       const tierLabel = MODULE_TIER_LABEL[mod.tier] || mod.tier;
-      const yield_ = MODULE_TIER_YIELD[mod.tier] || 1;
-      item.innerHTML = `
-        <span class="furnace-module-item__emoji">🔩</span>
-        <span class="furnace-module-item__info">
-          <span class="furnace-module-item__name">${mod.name}</span>
-          <span class="furnace-module-item__meta">${tierLabel} · 예상 ${yield_}개 회수</span>
-        </span>
-        <span class="furnace-module-item__dur">${mod.durability}/${mod.durabilityMax}</span>
-      `;
-      item.addEventListener('click', () => {
-        if (furnaceModuleSelected.has(mod.id)) furnaceModuleSelected.delete(mod.id);
-        else furnaceModuleSelected.add(mod.id);
-        renderFurnaceModuleList();
-        syncFurnaceModuleSel();
-      });
-      $list.appendChild(item);
+      const thumb = document.createElement('div');
+      thumb.className = 'inv-thumb';
+      thumb.textContent = '🔩';
+      thumb.style.fontSize = '1.4rem';
+      thumb.style.display = 'flex';
+      thumb.style.alignItems = 'center';
+      thumb.style.justifyContent = 'center';
+      row.appendChild(thumb);
+      const nameEl = document.createElement('span');
+      nameEl.className = 'inv-name';
+      nameEl.textContent = mod.name;
+      row.appendChild(nameEl);
+      const tagEl = document.createElement('span');
+      tagEl.className = 'inv-tag';
+      tagEl.textContent = mod.equippedTo ? `${tierLabel} · 장착중` : tierLabel;
+      row.appendChild(tagEl);
+
+      if (mod.equippedTo) {
+        row.title = '장비에서 분리해야 녹일 수 있습니다';
+        row.style.opacity = '0.45';
+      } else {
+        row.title = '끌어서 용광로에 놓아 녹이세요';
+        row.addEventListener('dragstart', (e) => {
+          if (!e.dataTransfer) return;
+          e.dataTransfer.setData(FORGE_DRAG_MODULE_ID, mod.id);
+          e.dataTransfer.setData('text/plain', `module:${mod.id}`);
+          e.dataTransfer.effectAllowed = 'move';
+          row.classList.add('inv-item--dragging');
+        });
+        row.addEventListener('dragend', () => {
+          row.classList.remove('inv-item--dragging');
+          clearForgeDnDHover();
+        });
+        // 클릭으로도 용광로 토글
+        row.addEventListener('click', () => {
+          if (isPending) {
+            furnaceModulesPending = furnaceModulesPending.filter((m) => m.id !== mod.id);
+          } else {
+            if (!furnaceModulesPending.some((m) => m.id === mod.id)) {
+              furnaceModulesPending.push(mod);
+            }
+          }
+          syncFurnaceUi();
+          renderDockModules();
+        });
+      }
+      materialListEl.appendChild(row);
     });
-  }
-
-  function syncFurnaceModuleSel() {
-    const $label = document.getElementById('furnaceModuleSelLabel');
-    const $count = document.getElementById('furnaceModuleSelCount');
-    const n = furnaceModuleSelected.size;
-    if ($label) $label.classList.toggle('hidden', n === 0);
-    if ($count) $count.textContent = n;
-    const $btn = document.getElementById('btnSmelt');
-    if ($btn) $btn.disabled = n === 0;
-  }
-
-  function switchFurnaceTab(tab) {
-    furnaceTab = tab;
-    const $matPanel = document.getElementById('furnaceMaterialPanel');
-    const $modPanel = document.getElementById('furnaceModulePanel');
-    document.querySelectorAll('.furnace-tab').forEach((b) => {
-      b.classList.toggle('is-active', b.dataset.furnaceTab === tab);
-    });
-    if ($matPanel) $matPanel.classList.toggle('hidden', tab !== 'material');
-    if ($modPanel) $modPanel.classList.toggle('hidden', tab !== 'module');
-
-    if (tab === 'module') {
-      loadFurnaceModules();
-      syncFurnaceModuleSel();
-    } else {
-      syncFurnaceUi();
-    }
+    syncScrollOverflow();
   }
   // ─────────────────────────────────────────────────────────────
 
   function syncFurnaceUi() {
-    if (furnaceTab === 'module') return; // 모듈 탭 활성 중엔 재료 UI 건드리지 않음
     if (furnaceSlotsEl) {
       furnaceSlotsEl.innerHTML = '';
-      if (furnaceSelected.length === 0) {
+      const totalItems = furnaceSelected.length + furnaceModulesPending.length;
+      if (totalItems === 0) {
         const empty = document.createElement('span');
         empty.className = 'furnace-empty';
         empty.textContent = '—';
@@ -1282,9 +1284,25 @@
           });
           furnaceSlotsEl.appendChild(chip);
         });
+        // 모듈 칩
+        furnaceModulesPending.forEach((mod) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'furnace-chip furnace-chip--module';
+          chip.title = '클릭하여 빼기';
+          const label = mod.name.length > 18 ? `${mod.name.slice(0, 16)}…` : mod.name;
+          chip.textContent = `🔩 ${label}`;
+          chip.addEventListener('click', () => {
+            furnaceModulesPending = furnaceModulesPending.filter((x) => x.id !== mod.id);
+            syncFurnaceUi();
+            if (materialDockFilter === 'module') renderDockModules();
+          });
+          furnaceSlotsEl.appendChild(chip);
+        });
       }
     }
-    if (btnSmelt) btnSmelt.disabled = furnaceSelected.length === 0;
+    const hasAnything = furnaceSelected.length > 0 || furnaceModulesPending.length > 0;
+    if (btnSmelt) btnSmelt.disabled = !hasAnything;
     // 장비가 있으면 소실 경고 + 산출물 미리보기
     const equipItems = furnaceSelected.filter((m) => isEquipmentMaterial(m));
     if (furnaceEquipWarnEl) furnaceEquipWarnEl.classList.toggle('hidden', equipItems.length === 0);
@@ -1308,55 +1326,9 @@
     renderSmeltStock();
   }
 
-  async function smeltModules() {
-    if (furnaceModuleSelected.size === 0 || smeltInFlight) return;
-    smeltInFlight = true;
-    const $btn = document.getElementById('btnSmelt');
-    if ($btn) $btn.disabled = true;
-    const $msg = furnaceMsgEl;
-    const $result = furnaceResultEl;
-    try {
-      const res = await fetch(`${platformApi}/api/smelt/melt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
-        body: JSON.stringify({ moduleIds: [...furnaceModuleSelected] }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if ($msg) $msg.textContent = data?.error?.message || '녹이기 실패';
-        return;
-      }
-      // 결과 표시
-      const recovered = data.recovered || [];
-      if ($result) {
-        $result.classList.remove('hidden');
-        const parts = recovered.map((r) => `<span class="furnace-result-chip furnace-result-chip--gain">${r.emoji} ${r.name} ×${r.count}</span>`).join('');
-        $result.innerHTML = `<span class="furnace-result-label">회수:</span> ${parts || '없음'}`;
-        clearTimeout(resultHideTimer);
-        resultHideTimer = setTimeout(() => $result.classList.add('hidden'), 5000);
-      }
-      if ($msg) $msg.textContent = `✅ 모듈 ${furnaceModuleSelected.size}개를 녹였습니다.`;
-      // 상태 초기화
-      furnaceModuleSelected.clear();
-      saveSmeltStock(data.stock || {});
-      // 모듈 목록 새로고침
-      await loadFurnaceModules();
-      syncFurnaceModuleSel();
-    } catch (e) {
-      if ($msg) $msg.textContent = '오류가 발생했습니다.';
-    } finally {
-      smeltInFlight = false;
-      syncFurnaceModuleSel();
-    }
-  }
-
   async function smeltFurnace() {
-    // 모듈 탭에서 실행 시 별도 처리
-    if (furnaceTab === 'module') {
-      await smeltModules();
-      return;
-    }
-    if (furnaceSelected.length === 0 || smeltInFlight) return;
+    const hasAnything = furnaceSelected.length > 0 || furnaceModulesPending.length > 0;
+    if (!hasAnything || smeltInFlight) return;
     const toMelt = furnaceSelected.slice();
 
     const serverCatches = toMelt.filter(
@@ -1380,9 +1352,10 @@
     );
     const localInfer = localOnly.concat(localEquipmentOrphans);
 
-    const needsServer = serverCatches.length > 0 || serverEquipment.length > 0;
+    const moduleIds = furnaceModulesPending.map((m) => m.id);
+    const needsServer = serverCatches.length > 0 || serverEquipment.length > 0 || moduleIds.length > 0;
     if (needsServer && (!alpToken || !platformApi)) {
-      setFurnaceMsg('낚시 재료·장비를 녹이려면 게임에서 이 화면을 연 상태여야 해요.');
+      setFurnaceMsg('낚시 재료·장비·모듈을 녹이려면 게임에서 이 화면을 연 상태여야 해요.');
       window.setTimeout(() => setFurnaceMsg(''), 3600);
       return;
     }
@@ -1403,7 +1376,7 @@
             'Content-Type': 'application/json',
             Authorization: `Bearer ${alpToken}`,
           },
-          body: JSON.stringify({ catchIds, equipmentIds }),
+          body: JSON.stringify({ catchIds, equipmentIds, moduleIds }),
         });
         const text = await res.text();
         let data = null;
@@ -1424,11 +1397,18 @@
           return;
         }
         stock = cloneSmeltStock(data.stock);
-        // 장비 녹임 소실 정보 저장
         if (Array.isArray(data.lost) && data.lost.length > 0) {
           serverMeltLost = data.lost;
         } else {
           serverMeltLost = [];
+        }
+        // 모듈 녹임 성공 → 목록 정리
+        if (moduleIds.length > 0) {
+          furnaceModulesPending = [];
+          if (materialDockFilter === 'module') {
+            await fetchDockModules();
+            renderDockModules();
+          }
         }
       }
 
@@ -1446,7 +1426,8 @@
       syncForgeUi();
       const gains = getSmeltGainSummary(beforeStock, stock);
       showSmeltResult(gains, serverMeltLost);
-      setFurnaceMsg(`${toMelt.length}개를 녹였습니다.`);
+      const meltCount = toMelt.length + moduleIds.length;
+      setFurnaceMsg(`${meltCount}개를 녹였습니다.`);
       serverMeltLost = [];
       renderSmeltStock();
       void refreshCraftedList();
@@ -1456,7 +1437,8 @@
       window.setTimeout(() => setFurnaceMsg(''), 4200);
     } finally {
       smeltInFlight = false;
-      if (btnSmelt) btnSmelt.disabled = furnaceSelected.length === 0;
+      const stillHas = furnaceSelected.length > 0 || furnaceModulesPending.length > 0;
+      if (btnSmelt) btnSmelt.disabled = !stillHas;
       syncFurnaceUi();
     }
   }
@@ -1912,7 +1894,18 @@
   function forgeDockDragPayloadPresent(dt) {
     if (!dt || !dt.types) return false;
     const types = Array.from(dt.types);
-    return types.includes(FORGE_DRAG_MATERIAL_UID) || types.includes(FORGE_DRAG_SMELT_UID) || types.includes('text/plain');
+    return types.includes(FORGE_DRAG_MATERIAL_UID) || types.includes(FORGE_DRAG_SMELT_UID) || types.includes(FORGE_DRAG_MODULE_ID) || types.includes('text/plain');
+  }
+
+  function readModuleDragId(dt) {
+    if (!dt) return '';
+    try {
+      const a = dt.getData(FORGE_DRAG_MODULE_ID);
+      if (a) return String(a).trim();
+      const plain = dt.getData('text/plain') || '';
+      if (plain.startsWith('module:')) return plain.slice(7).trim();
+    } catch { /* ignore */ }
+    return '';
   }
 
   function readMaterialDragUid(dt) {
@@ -2408,6 +2401,17 @@
             if (statusMsgEl) statusMsgEl.textContent = '기초 재료는 모루로만 끌어다 놓을 수 있어요.';
             return;
           }
+          // 모듈 드롭 처리
+          const modId = readModuleDragId(e.dataTransfer);
+          if (modId) {
+            const mod = dockModulePool.find((m) => m.id === modId);
+            if (mod && !furnaceModulesPending.some((m) => m.id === modId)) {
+              furnaceModulesPending.push(mod);
+              syncFurnaceUi();
+              if (materialDockFilter === 'module') renderDockModules();
+            }
+            return;
+          }
           const uid = readMaterialDragUid(e.dataTransfer);
           if (uid) applyMaterialToFurnaceByUid(uid);
         } else {
@@ -2439,6 +2443,11 @@
 
   function renderMaterials() {
     if (!materialListEl) return;
+    // 모듈 필터는 별도 렌더러 사용
+    if (materialDockFilter === 'module') {
+      renderDockModules();
+      return;
+    }
     const visible = materials.filter((m) => materialMatchesDockFilter(m, materialDockFilter));
     if (matCountBadge) {
       matCountBadge.textContent =
@@ -3110,20 +3119,10 @@
       syncForgeUi();
     });
   }
-  // 용광로 탭 전환
-  document.querySelectorAll('.furnace-tab').forEach((btn) => {
-    btn.addEventListener('click', () => switchFurnaceTab(btn.dataset.furnaceTab));
-  });
-
   if (btnClearFurnace) {
     btnClearFurnace.addEventListener('click', () => {
-      if (furnaceTab === 'module') {
-        furnaceModuleSelected.clear();
-        renderFurnaceModuleList();
-        syncFurnaceModuleSel();
-        return;
-      }
       furnaceSelected = [];
+      furnaceModulesPending = [];
       syncFurnaceUi();
       renderMaterials();
     });
@@ -3141,10 +3140,15 @@
   }
   if (materialDockFiltersEl) {
     materialDockFiltersEl.querySelectorAll('.material-dock-filter').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const next = btn.getAttribute('data-filter') || 'all';
         if (next === materialDockFilter) return;
         materialDockFilter = next;
+        if (next === 'module') {
+          renderMaterialDockFilterUi();
+          materialListEl.innerHTML = '<p class="log-empty">불러오는 중…</p>';
+          await fetchDockModules();
+        }
         renderMaterials();
       });
     });
