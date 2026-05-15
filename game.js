@@ -5025,6 +5025,23 @@
   }
 
 
+  const MODULE_TYPE_DESC = {
+    barrel:        '무기에 장착. 공격 시 내구도가 닳고 공격력을 올립니다.',
+    scope:         '무기에 장착. 공격 시 내구도가 닳고 공격력·이속을 올립니다.',
+    grip:          '무기·장갑에 장착. 공격 시 내구도가 닳고 공격력·이속을 올립니다.',
+    muzzle:        '무기에 장착. 공격 시 내구도가 닳고 공격력을 올립니다.',
+    padding:       '방어구에 장착. 피격 시 내구도가 닳고 방어력·HP를 올립니다.',
+    reinforcement: '상체에 장착. 피격 시 내구도가 닳고 방어력을 크게 올립니다.',
+    visor:         '머리에 장착. 피격 시 내구도가 닳고 이속·HP를 올립니다.',
+    lining:        '상체에 장착. 피격 시 내구도가 닳고 HP를 크게 올립니다.',
+    sole:          '신발에 장착. 피격 시 내구도가 닳고 이동 속도를 올립니다.',
+    gem:           '장신구에 장착. 공격 시 내구도가 닳고 공격력을 크게 올립니다.',
+    enchant:       '장신구에 장착. 피격 시 내구도가 닳고 HP·방어력을 올립니다.',
+    buffer:        '모든 장비에 장착. 장비 내구도가 닳을 때 대신 모듈 내구도가 감소해 장비를 보호합니다.',
+  };
+
+  const $moduleCraftTypeDesc = document.getElementById('moduleCraftTypeDesc');
+
   function renderModuleCraftTypeList() {
     if (!$moduleCraftTypeList) return;
     $moduleCraftTypeList.innerHTML = '';
@@ -5040,6 +5057,11 @@
       });
       $moduleCraftTypeList.appendChild(btn);
     });
+    if ($moduleCraftTypeDesc) {
+      const desc = moduleCraftSelectedType ? MODULE_TYPE_DESC[moduleCraftSelectedType] : '';
+      $moduleCraftTypeDesc.textContent = desc || '';
+      $moduleCraftTypeDesc.style.display = desc ? '' : 'none';
+    }
   }
 
   function updateModuleCraftBtn() {

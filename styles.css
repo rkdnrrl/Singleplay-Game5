@@ -3576,6 +3576,16 @@ body.forge-scroll-lock {
 }
 .module-craft-type-btn:hover { background: rgba(255,255,255,0.1); }
 .module-craft-type-btn.is-selected { border-color: rgba(100,180,255,0.5); background: rgba(60,120,220,0.25); }
+.module-craft-type-desc {
+  font-size: 0.72rem;
+  color: rgba(200,210,255,0.65);
+  background: rgba(255,255,255,0.04);
+  border-left: 2px solid rgba(100,160,255,0.35);
+  border-radius: 0.3rem;
+  padding: 0.35rem 0.55rem;
+  margin: 0.25rem 0 0.1rem;
+  line-height: 1.45;
+}
 .module-craft-material-row {
   display: flex;
   align-items: center;
