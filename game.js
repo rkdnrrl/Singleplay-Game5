@@ -4392,6 +4392,14 @@
       repairStrikeThresh = Math.max(repairStrikeThreshMin, repairStrikeThresh - 0.0072);
       updateRepairHud();
 
+      // 코인 소진 시 자동 완료
+      if (totalCoins - repairSpent <= 0) {
+        repairTargetCrack = null;
+        stopRepairHammer();
+        setTimeout(() => confirmRepairSession(), 750);
+        return;
+      }
+
       if (repairCracks.size > 0) {
         repairTargetCrack = [...repairCracks][Math.floor(Math.random()*repairCracks.size)];
       } else {
@@ -4433,6 +4441,13 @@
         showRepairCoinFx(spos.x-10, spos.y-28, `-${repairDurPerCrack}내구도`, '#f87171');
       }
       updateRepairHud();
+
+      // 코인 소진 시 자동 완료
+      if (totalCoins - repairSpent <= 0) {
+        repairTargetCrack = null;
+        stopRepairHammer();
+        setTimeout(() => confirmRepairSession(), 750);
+      }
     }
   }
 
