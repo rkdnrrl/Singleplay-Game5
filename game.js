@@ -1303,15 +1303,26 @@
     }
     const hasAnything = furnaceSelected.length > 0 || furnaceModulesPending.length > 0;
     if (btnSmelt) btnSmelt.disabled = !hasAnything;
-    // 장비가 있으면 소실 경고 + 산출물 미리보기
+    // 소실 경고: 장비 또는 모듈이 있으면 표시
     const equipItems = furnaceSelected.filter((m) => isEquipmentMaterial(m));
-    if (furnaceEquipWarnEl) furnaceEquipWarnEl.classList.toggle('hidden', equipItems.length === 0);
+    const hasLossRisk = equipItems.length > 0 || furnaceModulesPending.length > 0;
+    if (furnaceEquipWarnEl) {
+      furnaceEquipWarnEl.classList.toggle('hidden', !hasLossRisk);
+      if (hasLossRisk) {
+        const parts = [];
+        if (equipItems.length > 0) parts.push('장비');
+        if (furnaceModulesPending.length > 0) parts.push('모듈');
+        furnaceEquipWarnEl.textContent = `⚠️ ${parts.join('·')}을 녹이면 재료 일부가 소실될 수 있습니다 (회수율 약 70%).`;
+      }
+    }
     if (furnacePreviewEl) {
-      const catchItems = furnaceSelected.filter((m) => !isEquipmentMaterial(m));
-      if (furnaceSelected.length === 0) {
+      const totalItems = furnaceSelected.length + furnaceModulesPending.length;
+      if (totalItems === 0) {
         furnacePreviewEl.textContent = '';
       } else {
         const parts = [];
+        // 장비 예상 재료
+        const catchItems = furnaceSelected.filter((m) => !isEquipmentMaterial(m));
         for (const m of equipItems) {
           const mats = equipSourceMatsMap.get(String(m.equipmentId)) || [];
           for (const sm of mats.filter((x) => x.kind === 'smelt')) {
@@ -1320,6 +1331,13 @@
           }
         }
         if (catchItems.length > 0) parts.push('?');
+        // 모듈 예상 재료
+        const MODULE_YIELD = { common: 1, rare: 2, epic: 3, legendary: 5 };
+        for (const mod of furnaceModulesPending) {
+          const y = MODULE_YIELD[mod.tier] || 1;
+          const expected = Math.round(y * 0.7); // 70% 회수율 적용
+          parts.push(`🔩 ${mod.name} (~${expected}개)`);
+        }
         furnacePreviewEl.textContent = parts.length > 0 ? `예상: ${parts.join(', ')}` : '🎲 무엇이 나올지 알 수 없어요';
       }
     }
