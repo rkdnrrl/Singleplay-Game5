@@ -3631,7 +3631,7 @@ body.forge-scroll-lock {
 .mcw-slot--empty {
   background: rgba(255,255,255,0.04);
   color: rgba(255,255,255,0.18);
-  font-size: 1rem;
+  font-size: 0.85rem;
   cursor: default;
 }
 .mcw-slot--filled {
@@ -3639,6 +3639,8 @@ body.forge-scroll-lock {
   border-color: rgba(140,120,220,0.4);
 }
 .mcw-slot--filled:hover { background: rgba(100,70,200,0.45); border-color: rgba(180,140,255,0.6); }
+.mcw-slot.drag-over { background: rgba(100,160,255,0.25); border-color: rgba(100,160,255,0.7); }
+.mcw-slot.is-dragging { opacity: 0.4; }
 /* 산출물 목록 */
 .module-craft-stock-list {
   display: flex;
@@ -3658,11 +3660,34 @@ body.forge-scroll-lock {
   text-align: left;
   transition: background 0.12s;
 }
-.mcw-stock-pill:hover:not(:disabled) { background: rgba(100,140,255,0.15); border-color: rgba(100,140,255,0.35); }
-.mcw-stock-pill:disabled { opacity: 0.35; cursor: not-allowed; }
+.mcw-stock-pill:hover:not(.is-full) { background: rgba(100,140,255,0.15); border-color: rgba(100,140,255,0.35); }
+.mcw-stock-pill.is-full { opacity: 0.35; cursor: not-allowed; }
+.mcw-stock-pill[draggable=true] { cursor: grab; }
+.mcw-stock-list.drag-over { background: rgba(100,160,255,0.08); border-radius: 0.35rem; }
 .mcw-stock-emoji { font-size: 1rem; flex-shrink: 0; }
 .mcw-stock-name  { font-size: 0.72rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcw-stock-cat   { font-size: 0.6rem; flex-shrink: 0; }
 .mcw-stock-cnt   { font-size: 0.68rem; color: rgba(160,200,255,0.7); flex-shrink: 0; }
+/* 시너지 표시 */
+.module-craft-synergy {
+  display: flex; flex-wrap: wrap; gap: 0.3rem;
+  margin: 0.3rem 0 0.1rem;
+  min-height: 0;
+}
+.mcw-syn-tag {
+  font-size: 0.68rem; padding: 0.2rem 0.45rem;
+  border-radius: 0.3rem; border: 1px solid;
+  line-height: 1.4;
+}
+.mcw-syn-tag.is-good { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.35); color: #86efac; }
+.mcw-syn-tag.is-bad  { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.35);  color: #fca5a5; }
+.mcw-syn-total {
+  font-size: 0.72rem; font-family: Jua,sans-serif;
+  padding: 0.2rem 0.5rem; border-radius: 0.3rem;
+  border: 1px solid; margin-left: auto;
+}
+.mcw-syn-total.is-good { color: #4ade80; border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.1); }
+.mcw-syn-total.is-bad  { color: #f87171; border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.1); }
 /* 전체 비우기 버튼 */
 .module-craft-clear-btn {
   font-size: 0.68rem;

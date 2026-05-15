@@ -4805,7 +4805,8 @@
   const $moduleCraftMsg         = document.getElementById('moduleCraftMsg');
 
   let moduleCraftSelectedType = null;
-  let moduleCraftSlots        = [];   // { productId, name, emoji } — 슬롯에 담긴 재료
+  const MAX_CRAFT_SLOTS = 8;
+  let moduleCraftSlots        = Array(MAX_CRAFT_SLOTS).fill(null);  // 인덱스 고정 슬롯
   let moduleCraftStockCache   = {};   // productId → { productId, name, emoji, count(남은) }
 
   async function loadModuleTab() {
@@ -5070,7 +5071,135 @@
     }
   }
 
-  const MAX_CRAFT_SLOTS = 8;
+  // ── 재료 카테고리 맵 (smelt product id → category) ──────────────
+  const CRAFT_MAT_CAT = (() => {
+    const metal    = ['platinum','palladium','rhodium','iridium','tungsten','titanium','molybdenum','chromium','vanadium','niobium','cobalt','nickel','manganese','zinc','tin','lead','bismuth','antimony','magnesium','aluminum','copper','silver','gold','iron','slag'];
+    const elec     = ['circuit','rareearth','neodymium','lanthanum','cerium','samarium','yttrium','gallium','germanium','indium','selenium','tellurium','hafnium','tantalum','zirconium','silicon','wafer','graphite','graphene','lithiumsalt','plasma','battery','lithium'];
+    const chem     = ['sulfur','salt','sodaash','phosphor','phosphate','chloride','nitrate','ammonia','hydrogen','oxygen','nitrogen','helium','argon','uranium'];
+    const organic  = ['rubber','plastic','resin','glass','fiber','leather','textile','fabric','wood'];
+    const mineral  = ['silica','carbon','ceramic','cement','concrete','sand','limestone','granite','basalt','asphalt'];
+    const map = {};
+    metal.forEach(id   => { map[id] = 'metal'; });
+    elec.forEach(id    => { map[id] = 'electronic'; });
+    chem.forEach(id    => { map[id] = 'chemical'; });
+    organic.forEach(id => { map[id] = 'organic'; });
+    mineral.forEach(id => { map[id] = 'mineral'; });
+    return map;
+  })();
+
+  const CAT_LABEL = { metal:'금속', electronic:'전자', chemical:'화학', organic:'유기물', mineral:'광물' };
+  const CAT_COLOR = { metal:'#94a3b8', electronic:'#60a5fa', chemical:'#facc15', organic:'#86efac', mineral:'#d8b4fe' };
+
+  // ── 시너지 규칙 ────────────────────────────────────────────────
+  // type:'same' = 단일 카테고리 다수, type:'combo' = 두 카테고리 조합
+  const CRAFT_SYNERGIES = [
+    // 단일 카테고리 시너지
+    { type:'same', cat:'metal',      min:2, name:'강철 공명',   desc:'방어력 +12%',        muls:{ defMul:1.12 } },
+    { type:'same', cat:'metal',      min:4, name:'강철 요새',   desc:'방어력 +28%',        muls:{ defMul:1.28 }, overrides:'강철 공명' },
+    { type:'same', cat:'electronic', min:2, name:'전기 공명',   desc:'이속 +10%',          muls:{ spdMul:1.10 } },
+    { type:'same', cat:'electronic', min:4, name:'사이버 강화', desc:'이속 +22%',          muls:{ spdMul:1.22 }, overrides:'전기 공명' },
+    { type:'same', cat:'chemical',   min:2, name:'화학 반응',   desc:'공격력 +12%',        muls:{ atkMul:1.12 } },
+    { type:'same', cat:'organic',    min:2, name:'생체 강화',   desc:'HP +15%',            muls:{ hpMul:1.15 } },
+    { type:'same', cat:'mineral',    min:2, name:'암반 강화',   desc:'내구도 +18%',        muls:{ durMul:1.18 } },
+    // 조합 시너지 (보너스)
+    { type:'combo', cats:['metal','electronic'],  name:'기계 공명',    desc:'전체 스탯 +8%',      muls:{ allMul:1.08 } },
+    { type:'combo', cats:['metal','mineral'],     name:'강화 광물',    desc:'방어력 +10%',        muls:{ defMul:1.10 } },
+    { type:'combo', cats:['electronic','chemical'],name:'에너지 폭발', desc:'공격력 +10%, 이속 +5%', muls:{ atkMul:1.10, spdMul:1.05 } },
+    { type:'combo', cats:['organic','mineral'],   name:'자연 조화',    desc:'HP +8%, 내구도 +8%', muls:{ hpMul:1.08, durMul:1.08 } },
+    // 조합 패널티
+    { type:'combo', cats:['chemical','organic'],  name:'독성 오염',   desc:'전체 스탯 -18%', muls:{ allMul:0.82 }, penalty:true },
+    { type:'combo', cats:['electronic','mineral'],name:'전기 단락',   desc:'이속 -12%',      muls:{ spdMul:0.88 }, penalty:true },
+    { type:'combo', cats:['metal','chemical'],    name:'금속 부식',   desc:'방어력 -10%',    muls:{ defMul:0.90 }, penalty:true },
+  ];
+
+  // ── 슬롯 위치 보너스 (4×2 그리드) ─────────────────────────────
+  // 윗줄(0-3): 공격/이속 계열, 아랫줄(4-7): 방어/HP 계열
+  const SLOT_ZONE_TOP    = new Set([0,1,2,3]);
+  const SLOT_ZONE_BOTTOM = new Set([4,5,6,7]);
+  const ZONE_BONUS_CATS  = {
+    top:    new Set(['metal','electronic','chemical']),   // 공격 계열
+    bottom: new Set(['organic','mineral']),               // 방어 계열
+  };
+
+  // 인접 슬롯 쌍 (가로/세로)
+  const ADJACENT_PAIRS = [[0,1],[1,2],[2,3],[4,5],[5,6],[6,7],[0,4],[1,5],[2,6],[3,7]];
+
+  function getCraftItemCat(item) {
+    return item ? (CRAFT_MAT_CAT[item.productId] || 'misc') : null;
+  }
+
+  function calcCraftSynergy(slots) {
+    // 카테고리 카운트
+    const catCount = {};
+    slots.forEach(item => {
+      const c = getCraftItemCat(item);
+      if (c) catCount[c] = (catCount[c] || 0) + 1;
+    });
+
+    const active = [];
+    const overridden = new Set();
+
+    // 시너지 규칙 적용
+    CRAFT_SYNERGIES.forEach(rule => {
+      if (overridden.has(rule.name)) return;
+      let match = false;
+      if (rule.type === 'same') {
+        match = (catCount[rule.cat] || 0) >= rule.min;
+      } else if (rule.type === 'combo') {
+        match = rule.cats.every(c => (catCount[c] || 0) >= 1);
+      }
+      if (match) {
+        active.push({ ...rule });
+        if (rule.overrides) overridden.add(rule.overrides);
+      }
+    });
+
+    // 슬롯 위치 보너스
+    let zoneBonusAtk = 0, zoneBonusDef = 0;
+    slots.forEach((item, idx) => {
+      const cat = getCraftItemCat(item);
+      if (!cat) return;
+      if (SLOT_ZONE_TOP.has(idx) && ZONE_BONUS_CATS.top.has(cat))    zoneBonusAtk++;
+      if (SLOT_ZONE_BOTTOM.has(idx) && ZONE_BONUS_CATS.bottom.has(cat)) zoneBonusDef++;
+    });
+    if (zoneBonusAtk > 0) active.push({ name:'공격 배치', desc:`공격력 +${zoneBonusAtk * 4}% (윗줄 배치 보너스)`, muls:{ atkMul: 1 + zoneBonusAtk * 0.04 } });
+    if (zoneBonusDef > 0) active.push({ name:'방어 배치', desc:`방어/HP +${zoneBonusDef * 4}% (아랫줄 배치 보너스)`, muls:{ defMul: 1 + zoneBonusDef * 0.04, hpMul: 1 + zoneBonusDef * 0.04 } });
+
+    // 인접 같은 카테고리 보너스
+    let adjBonus = 0;
+    ADJACENT_PAIRS.forEach(([a, b]) => {
+      const ca = slots[a] ? getCraftItemCat(slots[a]) : null;
+      const cb = slots[b] ? getCraftItemCat(slots[b]) : null;
+      if (ca && ca === cb && ca !== 'misc') adjBonus++;
+    });
+    if (adjBonus > 0) active.push({ name:'인접 공명', desc:`전체 +${adjBonus * 3}% (같은 재료 인접 배치)`, muls:{ allMul: 1 + adjBonus * 0.03 } });
+
+    // 최종 합산
+    const totalMuls = { allMul:1, atkMul:1, defMul:1, spdMul:1, hpMul:1, durMul:1 };
+    active.forEach(s => {
+      Object.entries(s.muls || {}).forEach(([k, v]) => {
+        totalMuls[k] = (totalMuls[k] || 1) * v;
+      });
+    });
+
+    return { active, totalMuls };
+  }
+
+  function renderCraftSynergy(slots) {
+    const $syn = document.getElementById('moduleCraftSynergy');
+    if (!$syn) return;
+    if (slots.length === 0) { $syn.innerHTML = ''; return; }
+    const { active, totalMuls } = calcCraftSynergy(slots);
+    if (active.length === 0) { $syn.innerHTML = ''; return; }
+    const allNet = Object.values(totalMuls).reduce((p, v) => p * v, 1);
+    const sign = allNet >= 1 ? '+' : '';
+    const pct  = Math.round((allNet - 1) * 100);
+    $syn.innerHTML = active.map(s => `
+      <span class="mcw-syn-tag ${s.penalty ? 'is-bad' : 'is-good'}">
+        ${s.penalty ? '⚠️' : '✨'} <strong>${escHtmlModule(s.name)}</strong> ${escHtmlModule(s.desc)}
+      </span>`).join('') +
+      `<span class="mcw-syn-total ${allNet >= 1 ? 'is-good' : 'is-bad'}">종합 스탯 ${sign}${pct}%</span>`;
+  }
 
   function renderModuleCraftSlots() {
     const $slots = document.getElementById('moduleCraftSlots');
@@ -5080,12 +5209,20 @@
       for (let i = 0; i < MAX_CRAFT_SLOTS; i++) {
         const cell = document.createElement('div');
         const item = moduleCraftSlots[i];
+        const zone = i < 4 ? 'top' : 'bottom';
         if (item) {
+          const cat = getCraftItemCat(item);
           cell.className = 'mcw-slot mcw-slot--filled';
           cell.textContent = item.emoji || '📦';
-          cell.title = item.name || '';
+          cell.title = `${item.name || ''}\n[${CAT_LABEL[cat] || cat}] — 클릭: 제거`;
+          if (cat && CAT_COLOR[cat]) cell.style.borderColor = CAT_COLOR[cat] + '88';
+          cell.draggable = true;
+          cell.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/plain', 'slot:' + i);
+            cell.classList.add('is-dragging');
+          });
+          cell.addEventListener('dragend', () => cell.classList.remove('is-dragging'));
           cell.addEventListener('click', () => {
-            // 슬롯에서 제거 → 스톡으로 반환
             const removed = moduleCraftSlots.splice(i, 1)[0];
             if (removed) {
               const pid = removed.productId;
@@ -5094,16 +5231,44 @@
             }
             renderModuleCraftSlots();
             renderModuleCraftStock();
-            updateModuleCraftBtn();
           });
         } else {
+          const inZone = zone === 'top' ? '공격' : '방어';
           cell.className = 'mcw-slot mcw-slot--empty';
-          cell.textContent = '+';
+          cell.title = `빈 슬롯 (${inZone} 구역)`;
+          cell.textContent = i < 4 ? '⚔' : '🛡';
         }
+        // 드롭 수신
+        cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('drag-over'); });
+        cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+        cell.addEventListener('drop', e => {
+          e.preventDefault(); cell.classList.remove('drag-over');
+          const raw = e.dataTransfer.getData('text/plain');
+          if (raw.startsWith('stock:')) {
+            const pid = raw.slice(6);
+            if (item) return; // 빈 슬롯에만
+            const s = moduleCraftStockCache[pid];
+            if (!s || s.count <= 0) return;
+            moduleCraftSlots[i] = { productId: s.productId, name: s.name, emoji: s.emoji };
+            s.count--;
+          } else if (raw.startsWith('slot:')) {
+            const from = parseInt(raw.slice(5), 10);
+            if (from === i) return;
+            const tmp = moduleCraftSlots[i] || null;
+            moduleCraftSlots[i]    = moduleCraftSlots[from] || null;
+            moduleCraftSlots[from] = tmp;
+            // null이면 배열 정리 불필요 — 인덱스 직접 접근
+          }
+          renderModuleCraftSlots();
+          renderModuleCraftStock();
+          renderCraftSynergy(moduleCraftSlots.filter(Boolean));
+          updateModuleCraftBtn();
+        });
         $slots.appendChild(cell);
       }
     }
-    if ($count) $count.textContent = `${moduleCraftSlots.length}/${MAX_CRAFT_SLOTS}`;
+    if ($count) $count.textContent = `${moduleCraftSlots.filter(Boolean).length}/${MAX_CRAFT_SLOTS}`;
+    renderCraftSynergy(moduleCraftSlots.filter(Boolean));
     updateModuleCraftBtn();
   }
 
@@ -5116,27 +5281,60 @@
       $list.innerHTML = '<span style="font-size:0.72rem;color:rgba(200,190,240,0.4)">산출물 없음</span>';
       return;
     }
+    const full = moduleCraftSlots.filter(Boolean).length >= MAX_CRAFT_SLOTS;
     items.forEach(s => {
-      const pill = document.createElement('button');
-      pill.type = 'button';
-      pill.className = 'mcw-stock-pill';
-      const full = moduleCraftSlots.length >= MAX_CRAFT_SLOTS;
-      if (full) pill.disabled = true;
-      pill.innerHTML = `<span class="mcw-stock-emoji">${s.emoji || '📦'}</span><span class="mcw-stock-name">${escHtmlModule(s.name || '')}</span><span class="mcw-stock-cnt">×${s.count}</span>`;
+      const cat = CRAFT_MAT_CAT[s.productId] || 'misc';
+      const pill = document.createElement('div');
+      pill.className = 'mcw-stock-pill' + (full ? ' is-full' : '');
+      pill.draggable = !full;
+      pill.title = `${s.name} [${CAT_LABEL[cat] || cat}] — 클릭 or 드래그해서 슬롯에 배치`;
+      pill.style.borderColor = (CAT_COLOR[cat] || '#fff') + '55';
+      pill.innerHTML = `<span class="mcw-stock-emoji">${s.emoji || '📦'}</span>`+
+        `<span class="mcw-stock-name">${escHtmlModule(s.name || '')}</span>`+
+        `<span class="mcw-stock-cat" style="color:${CAT_COLOR[cat] || '#aaa'}">${CAT_LABEL[cat] || ''}</span>`+
+        `<span class="mcw-stock-cnt">×${s.count}</span>`;
+      pill.addEventListener('dragstart', e => {
+        if (full) { e.preventDefault(); return; }
+        e.dataTransfer.setData('text/plain', 'stock:' + s.productId);
+      });
       pill.addEventListener('click', () => {
-        if (moduleCraftSlots.length >= MAX_CRAFT_SLOTS) return;
-        moduleCraftSlots.push({ productId: s.productId, name: s.name, emoji: s.emoji });
+        if (full) return;
+        // 첫 번째 빈 슬롯에 배치
+        const idx = moduleCraftSlots.findIndex(x => x == null);
+        if (idx === -1 && moduleCraftSlots.length < MAX_CRAFT_SLOTS) {
+          moduleCraftSlots.push({ productId: s.productId, name: s.name, emoji: s.emoji });
+        } else if (idx !== -1) {
+          moduleCraftSlots[idx] = { productId: s.productId, name: s.name, emoji: s.emoji };
+        } else return;
         s.count--;
         renderModuleCraftSlots();
         renderModuleCraftStock();
       });
       $list.appendChild(pill);
     });
+
+    // 스톡 영역도 드롭 수신 (슬롯→스톡 드래그)
+    $list.addEventListener('dragover', e => { e.preventDefault(); $list.classList.add('drag-over'); });
+    $list.addEventListener('dragleave', () => $list.classList.remove('drag-over'));
+    $list.addEventListener('drop', e => {
+      e.preventDefault(); $list.classList.remove('drag-over');
+      const raw = e.dataTransfer.getData('text/plain');
+      if (!raw.startsWith('slot:')) return;
+      const from = parseInt(raw.slice(5), 10);
+      const removed = moduleCraftSlots[from];
+      if (!removed) return;
+      moduleCraftSlots[from] = null;
+      const pid = removed.productId;
+      if (moduleCraftStockCache[pid]) moduleCraftStockCache[pid].count++;
+      else moduleCraftStockCache[pid] = { ...removed, count: 1 };
+      renderModuleCraftSlots();
+      renderModuleCraftStock();
+    });
   }
 
   function updateModuleCraftBtn() {
     if (!$moduleCraftBtn) return;
-    const cnt = moduleCraftSlots.length;
+    const cnt = moduleCraftSlots.filter(Boolean).length;
     let tierLabel = '일반';
     if (cnt >= 5) tierLabel = '전설';
     else if (cnt >= 3) tierLabel = '에픽';
@@ -5156,7 +5354,7 @@
       if (moduleCraftStockCache[pid]) moduleCraftStockCache[pid].count++;
       else moduleCraftStockCache[pid] = { ...item, count: 1 };
     }
-    moduleCraftSlots = [];
+    moduleCraftSlots = Array(MAX_CRAFT_SLOTS).fill(null);
     renderModuleCraftSlots();
     renderModuleCraftStock();
   });
@@ -5171,22 +5369,24 @@
 
   if ($moduleCraftBtn) {
     $moduleCraftBtn.addEventListener('click', async () => {
-      if (!moduleCraftSelectedType || moduleCraftSlots.length === 0 || $moduleCraftBtn.disabled) return;
+      const filledSlots = moduleCraftSlots.filter(Boolean);
+      if (!moduleCraftSelectedType || filledSlots.length === 0 || $moduleCraftBtn.disabled) return;
       if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '제작 중…'; $moduleCraftMsg.style.color = 'rgba(200,190,240,0.6)'; }
       $moduleCraftBtn.disabled = true;
 
       // 슬롯 재료를 productId별로 집계
       const countMap = {};
-      for (const item of moduleCraftSlots) {
+      for (const item of filledSlots) {
         countMap[item.productId] = (countMap[item.productId] || 0) + 1;
       }
       const smeltMaterials = Object.entries(countMap).map(([productId, count]) => ({ productId, count }));
+      const { totalMuls: statMuls } = calcCraftSynergy(filledSlots);
 
       try {
         const resp = await fetch(`${platformApi}/api/modules/craft`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
-          body: JSON.stringify({ moduleType: moduleCraftSelectedType, smeltMaterials }),
+          body: JSON.stringify({ moduleType: moduleCraftSelectedType, smeltMaterials, statMuls }),
         });
         const json = await resp.json();
         if (!resp.ok) {
@@ -5196,7 +5396,7 @@
           return;
         }
         // 성공: 슬롯 비우기 (서버에서 이미 소모됨)
-        moduleCraftSlots = [];
+        moduleCraftSlots = Array(MAX_CRAFT_SLOTS).fill(null);
         moduleAllList.push(json.module);
         if ($moduleCraftMsg) { $moduleCraftMsg.textContent = `✅ ${json.module.name} 제작 완료!`; $moduleCraftMsg.style.color = '#6ee7b7'; }
         renderModuleInvList();
