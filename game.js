@@ -1441,9 +1441,9 @@
     forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
   }
 
-  /** 경과 초 → 예상 코인 (서버와 동일 공식: 20초당 100코인, 최대 900) */
+  /** 경과 초 → 예상 코인 (서버와 동일 공식: 20초당 100코인, 최대 200) */
   function calcForgeExpectedCoins(elapsedSec) {
-    return Math.min(900, Math.round((Math.min(elapsedSec, 180) / 20) * 100));
+    return Math.min(200, Math.round((elapsedSec / 20) * 100));
   }
 
   function updateForgeOverlayBonusEstimate(elapsedSec) {
