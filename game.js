@@ -8,6 +8,24 @@
   const alpToken = urlParams.get('token');
   const platformApi = window.__ALP_PLATFORM_API__ || '';
 
+  let _sessionExpiredShown = false;
+  function showSessionExpiredBanner() {
+    if (_sessionExpiredShown) return;
+    _sessionExpiredShown = true;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;inset:0 0 auto;z-index:99999;background:#dc2626;color:#fff;' +
+      'padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.4)';
+    el.innerHTML = '<span>🔒 로그인이 만료됐습니다. 다시 로그인해 주세요.</span>' +
+      '<a href="/ko/login" style="background:#fff;color:#dc2626;padding:4px 12px;border-radius:6px;font-weight:600;text-decoration:none">로그인</a>';
+    document.body.prepend(el);
+  }
+  function apiFetch(url, init) {
+    return fetch(url, init).then(res => {
+      if (res.status === 401 && alpToken) showSessionExpiredBanner();
+      return res;
+    });
+  }
+
   let forgeInFlight = false;
   let smeltInFlight = false;
   let serverMeltLost = []; // 마지막 장비 녹임에서 소실된 재료 목록
@@ -948,7 +966,7 @@
       return;
     }
     try {
-      const res = await fetch(`${platformApi}/api/smelt/stock`, {
+      const res = await apiFetch(`${platformApi}/api/smelt/stock`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       if (!res.ok) {
@@ -1017,7 +1035,7 @@
   async function loadCoins() {
     if (!alpToken || !platformApi) return;
     try {
-      const res = await fetch(`${platformApi}/api/coins`, {
+      const res = await apiFetch(`${platformApi}/api/coins`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       if (res.ok) {
@@ -1030,7 +1048,7 @@
   async function grantForgeBonus(elapsedMs) {
     if (!alpToken || !platformApi || elapsedMs <= 0) return 0;
     try {
-      const res = await fetch(`${platformApi}/api/ai/fishing-scan-bonus`, {
+      const res = await apiFetch(`${platformApi}/api/ai/fishing-scan-bonus`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
         body: JSON.stringify({ scanElapsedMs: elapsedMs }),
@@ -1137,7 +1155,7 @@
 
   async function fetchDockModules() {
     try {
-      const res = await fetch(`${platformApi}/api/modules`, {
+      const res = await apiFetch(`${platformApi}/api/modules`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       const data = await res.json();
@@ -1345,7 +1363,7 @@
       if (needsServer) {
         const catchIds = serverCatches.map((m) => String(m.serverId).trim());
         const equipmentIds = serverEquipment.map((m) => String(m.equipmentId).trim());
-        const res = await fetch(`${platformApi}/api/smelt/melt`, {
+        const res = await apiFetch(`${platformApi}/api/smelt/melt`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1724,7 +1742,7 @@
   async function syncForgeMaterialsFromServer() {
     if (!alpToken || !platformApi) return;
     try {
-      const res = await fetch(`${platformApi}/api/catches/inventory?limit=200`, {
+      const res = await apiFetch(`${platformApi}/api/catches/inventory?limit=200`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       if (!res.ok) return;
@@ -2541,7 +2559,7 @@
   async function loadProficiency() {
     if (!alpToken || !platformApi) return;
     try {
-      const res = await fetch(`${platformApi}/api/craft/proficiency`, {
+      const res = await apiFetch(`${platformApi}/api/craft/proficiency`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       if (!res.ok) return;
@@ -2801,7 +2819,7 @@
     }
 
     try {
-      const res = await fetch(`${platformApi}/api/craft/equipment`, {
+      const res = await apiFetch(`${platformApi}/api/craft/equipment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2937,7 +2955,7 @@
     }
     craftedListEl.innerHTML = '<p class="log-empty">불러오는 중…</p>';
     try {
-      const res = await fetch(`${platformApi}/api/craft/equipment`, {
+      const res = await apiFetch(`${platformApi}/api/craft/equipment`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       if (res.status === 404 || res.status === 405) {
@@ -3234,7 +3252,7 @@
   async function _fetchEquipArtFromDb(noun) {
     if (!alpToken || !platformApi || !noun) return;
     try {
-      const res = await fetch(`${platformApi}/api/craft/equip-pixel-art`, {
+      const res = await apiFetch(`${platformApi}/api/craft/equip-pixel-art`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
         body: JSON.stringify({ noun }),
@@ -4553,7 +4571,7 @@
 
     // 모듈 섹션
     try {
-      const modRes = await fetch(`${platformApi}/api/modules`, {
+      const modRes = await apiFetch(`${platformApi}/api/modules`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       if (!modRes.ok) return;
@@ -4779,7 +4797,7 @@
   async function loadEnhancementTab() {
     if (!$enhanceStoneGrid) return;
     try {
-      const resp = await fetch(`${platformApi}/api/craft/enhancement-stock`, {
+      const resp = await apiFetch(`${platformApi}/api/craft/enhancement-stock`, {
         headers: { Authorization: `Bearer ${alpToken}` },
       });
       if (resp.ok) {
@@ -4799,7 +4817,7 @@
       $enhanceBtn.disabled = true;
       if ($enhanceResult) { $enhanceResult.textContent = '강화 중…'; $enhanceResult.className = 'enhance-result'; }
       try {
-        const resp = await fetch(`${platformApi}/api/craft/equipment/${equipId}/enhance`, {
+        const resp = await apiFetch(`${platformApi}/api/craft/equipment/${equipId}/enhance`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
           body: JSON.stringify({ itemType: enhanceSelectedStone }),
@@ -4926,9 +4944,9 @@
     if (!$moduleEquipList) return;
     try {
       const [eqRes, modRes, stockRes] = await Promise.all([
-        fetch(`${platformApi}/api/craft/equipment?limit=40`, { headers: { Authorization: `Bearer ${alpToken}` } }),
-        fetch(`${platformApi}/api/modules`,                  { headers: { Authorization: `Bearer ${alpToken}` } }),
-        fetch(`${platformApi}/api/smelt/stock`,              { headers: { Authorization: `Bearer ${alpToken}` } }),
+        apiFetch(`${platformApi}/api/craft/equipment?limit=40`, { headers: { Authorization: `Bearer ${alpToken}` } }),
+        apiFetch(`${platformApi}/api/modules`,                  { headers: { Authorization: `Bearer ${alpToken}` } }),
+        apiFetch(`${platformApi}/api/smelt/stock`,              { headers: { Authorization: `Bearer ${alpToken}` } }),
       ]);
       const eqData    = eqRes.ok    ? await eqRes.json()    : {};
       const modData   = modRes.ok   ? await modRes.json()   : {};
@@ -5107,7 +5125,7 @@
 
   async function attachModule(modId, equipId, slot) {
     try {
-      const resp = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/attach`, {
+      const resp = await apiFetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/attach`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
         body: JSON.stringify({ equipmentId: equipId, slot }),
@@ -5130,7 +5148,7 @@
 
   async function detachModule(modId) {
     try {
-      const resp = await fetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/detach`, {
+      const resp = await apiFetch(`${platformApi}/api/modules/${encodeURIComponent(modId)}/detach`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${alpToken}` },
       });
@@ -5512,7 +5530,7 @@
       const { totalMuls: statMuls } = calcCraftSynergy(filledSlots);
 
       try {
-        const resp = await fetch(`${platformApi}/api/modules/craft`, {
+        const resp = await apiFetch(`${platformApi}/api/modules/craft`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
           body: JSON.stringify({ moduleType: moduleCraftSelectedType, smeltMaterials, statMuls }),
