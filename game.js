@@ -2763,28 +2763,7 @@
       resultDesc.textContent = `${fitLine}${baseDesc}`;
     }
     if (resultSpriteHost) {
-      resultSpriteHost.innerHTML = '';
-      const pa = eq.pixelArt;
-      if (pa && typeof pa === 'object' && !Array.isArray(pa) && pa.imageDataUrl) {
-        const im = document.createElement('img');
-        im.src = pa.imageDataUrl;
-        im.alt = '';
-        im.decoding = 'async';
-        im.style.cssText = 'width:88px;height:88px;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:4px;object-fit:contain';
-        resultSpriteHost.appendChild(im);
-      } else if (Array.isArray(pa) && pa.length === 1024) {
-        const cv = document.createElement('canvas');
-        cv.width = 128; cv.height = 128;
-        cv.style.cssText = 'width:88px;height:88px;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:4px';
-        const ctx = cv.getContext('2d');
-        const cell = 4;
-        for (let i = 0; i < 1024; i++) {
-          if (!pa[i]) continue;
-          ctx.fillStyle = pa[i];
-          ctx.fillRect((i % 32) * cell, Math.floor(i / 32) * cell, cell, cell);
-        }
-        resultSpriteHost.appendChild(cv);
-      }
+      mountForgeThumbOrImage(resultSpriteHost, eq.pixelArt, eq.emoji || '⚒️', 88, 88);
     }
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
