@@ -2783,11 +2783,133 @@
     if (resultSpriteHost) {
       mountForgeThumbOrImage(resultSpriteHost, eq.pixelArt, eq.emoji || '⚒️', 88, 88);
     }
+
+    // 던전으로 바로 가기 버튼
+    const $dungeonBtn = document.getElementById('btn-go-dungeon');
+    if ($dungeonBtn) {
+      const dungeonBase = window.__ALP_DUNGEON_URL__ || '../Singleplay-Game7/';
+      $dungeonBtn.href = alpToken
+        ? `${dungeonBase}?token=${encodeURIComponent(alpToken)}`
+        : dungeonBase;
+      $dungeonBtn.classList.remove('hidden');
+    }
+
     resultCard.classList.remove('hidden');
     resultHideTimer = window.setTimeout(hideResultCard, 3800);
   }
 
-  async function forge(customName, pixelArtData, pixelArtUrl) {
+  // ── 타이밍 미니게임 ───────────────────────────────────────────
+  function showTimingBar(onResult) {
+    // 오버레이 생성
+    const overlay = document.createElement('div');
+    overlay.style.cssText = [
+      'position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column',
+      'align-items:center;justify-content:center;background:rgba(0,0,0,.78);gap:20px',
+    ].join(';');
+
+    const title = document.createElement('div');
+    title.style.cssText = 'color:#fff;font-size:1.1rem;font-weight:700;text-align:center';
+    title.textContent = '⚒️ 타이밍을 맞춰 제련하세요!';
+
+    const sub = document.createElement('div');
+    sub.style.cssText = 'color:#aaa;font-size:.85rem;text-align:center';
+    sub.textContent = '클릭 또는 스페이스바로 멈추세요';
+
+    // 게이지 바
+    const track = document.createElement('div');
+    track.style.cssText = [
+      'position:relative;width:min(420px,90vw);height:52px;border-radius:12px;overflow:hidden',
+      'border:2px solid #555;background:#1a1a2e',
+    ].join(';');
+
+    // 구간 색상 (왼→오)
+    const zones = [
+      { pct: 0,   width: 15, color: '#c0392b' }, // 빨강 (나쁨)
+      { pct: 15,  width: 20, color: '#e67e22' }, // 주황
+      { pct: 35,  width: 30, color: '#27ae60' }, // 초록 (좋음)
+      { pct: 65,  width: 20, color: '#e67e22' }, // 주황
+      { pct: 85,  width: 15, color: '#c0392b' }, // 빨강
+    ];
+    zones.forEach(({ pct, width, color }) => {
+      const seg = document.createElement('div');
+      seg.style.cssText = `position:absolute;top:0;left:${pct}%;width:${width}%;height:100%;background:${color};opacity:.55`;
+      track.appendChild(seg);
+    });
+    // 중앙 완벽 구간 (15px 폭)
+    const perfect = document.createElement('div');
+    perfect.style.cssText = 'position:absolute;top:0;left:calc(50% - 7px);width:14px;height:100%;background:#f1c40f;opacity:.9;border-radius:3px';
+    track.appendChild(perfect);
+
+    // 커서
+    const cursor = document.createElement('div');
+    cursor.style.cssText = [
+      'position:absolute;top:4px;bottom:4px;width:8px;border-radius:4px',
+      'background:#fff;box-shadow:0 0 8px #fff;left:0%;transition:none',
+    ].join(';');
+    track.appendChild(cursor);
+
+    // 결과 표시
+    const resultEl = document.createElement('div');
+    resultEl.style.cssText = 'color:#f1c40f;font-size:1.2rem;font-weight:800;text-align:center;min-height:1.5em';
+
+    overlay.appendChild(title);
+    overlay.appendChild(track);
+    overlay.appendChild(sub);
+    overlay.appendChild(resultEl);
+    document.body.appendChild(overlay);
+
+    let pos = 0;       // 0~100
+    let dir = 1;
+    const speed = 1.4; // %/frame
+    let stopped = false;
+    let rafId;
+
+    function posToBonus(p) {
+      const dist = Math.abs(p - 50); // 0 = center (perfect)
+      if (dist <  8) return { bonus: 1.5, label: '🌟 완벽!',    color: '#f1c40f' };
+      if (dist < 18) return { bonus: 1.3, label: '✅ 좋아요!',   color: '#27ae60' };
+      if (dist < 32) return { bonus: 1.1, label: '🟡 괜찮아요',  color: '#e67e22' };
+      if (dist < 42) return { bonus: 0.9, label: '🟠 아쉬워요',  color: '#e67e22' };
+      return           { bonus: 0.7, label: '❌ 실패',          color: '#c0392b' };
+    }
+
+    function step() {
+      if (stopped) return;
+      pos += dir * speed;
+      if (pos >= 100) { pos = 100; dir = -1; }
+      if (pos <= 0)   { pos = 0;   dir =  1; }
+      cursor.style.left = `calc(${pos}% - 4px)`;
+      rafId = requestAnimationFrame(step);
+    }
+    rafId = requestAnimationFrame(step);
+
+    function stop() {
+      if (stopped) return;
+      stopped = true;
+      cancelAnimationFrame(rafId);
+      const { bonus, label, color } = posToBonus(pos);
+      resultEl.textContent = label;
+      resultEl.style.color = color;
+      cursor.style.background = color;
+      cursor.style.boxShadow = `0 0 12px ${color}`;
+      setTimeout(() => {
+        document.body.removeChild(overlay);
+        onResult(bonus);
+      }, 900);
+    }
+
+    overlay.addEventListener('click', stop);
+    function onKey(e) {
+      if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); stop(); }
+    }
+    document.addEventListener('keydown', onKey);
+    // cleanup key listener after done
+    const _origStop = stop;
+    Object.defineProperty(overlay, '_cleanup', { value: () => document.removeEventListener('keydown', onKey) });
+    overlay.addEventListener('click', () => document.removeEventListener('keydown', onKey), { once: true });
+  }
+
+  async function forge(customName, pixelArtData, pixelArtUrl, timingBonus) {
     if (forgeInFlight) return;
     const usedSlots = selected.map((m, i) => m ? { m, i } : null).filter(Boolean);
     if (usedSlots.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
@@ -2831,6 +2953,7 @@
           equipSlot: forgeSlot || 'weapon',
           pixelArtUrl: pixelArtUrl || undefined,
           pixelArtData: (!pixelArtUrl && pixelArtData) ? pixelArtData : undefined,
+          timingBonus: (timingBonus != null && Number.isFinite(timingBonus)) ? timingBonus : 1.0,
         }),
       });
       const text = await res.text();
@@ -3849,7 +3972,7 @@
         if (cv) finalUrl = cv.toDataURL('image/png');
       }
       hideCustomizeModal();
-      void forge(name, null, finalUrl);
+      showTimingBar((bonus) => forge(name, null, finalUrl, bonus));
     };
     if (backdrop) backdrop.onclick = () => { hideCustomizeModal(); };
   }

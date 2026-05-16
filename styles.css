@@ -1685,6 +1685,20 @@ html.material-detail-open body {
   margin-top: 0.1rem;
 }
 
+.result-dungeon-btn {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.9rem;
+  background: rgba(124, 77, 255, 0.25);
+  border: 1px solid rgba(124, 77, 255, 0.6);
+  border-radius: 8px;
+  color: #c4b0ff;
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.result-dungeon-btn:hover { background: rgba(124, 77, 255, 0.45); }
+
 .hidden {
   display: none !important;
 }
