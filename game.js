@@ -3823,28 +3823,14 @@
     if (clearBtn) clearBtn.onclick = () => { pixelArtImageUrl = null; pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null); renderPixelCanvas(); };
     if (doneBtn) doneBtn.onclick = () => {
       const name = (nameInput?.value || '').trim() || generateEquipName(mats);
-      const urlCopy = pixelArtImageUrl;
-      let artCopy = null;
-      if (!urlCopy && pixelGrid.some(Boolean)) {
-        // palette 인덱스: 0=투명, 1~=실제 색상
-        // sanitizeForgePixelArt가 앞에 PIXEL_MAT을 prepend하므로
-        // palette 배열엔 실제 색상만 넣고 cells는 1부터 시작
-        const palette = [];
-        const colorMap = {};
-        const cells = pixelGrid.map(color => {
-          if (!color) return 0;
-          if (colorMap[color] === undefined) {
-            palette.push(color);
-            colorMap[color] = palette.length; // 1-indexed
-          }
-          return colorMap[color];
-        });
-        artCopy = { w: PIXEL_G, h: PIXEL_G, palette, cells };
-      } else if (urlCopy) {
-        artCopy = null; // URL은 별도로 전송
+      // 유저가 직접 그린 경우: 캔버스 PNG → dataURL로 전송 (가장 단순하고 확실)
+      let finalUrl = pixelArtImageUrl;
+      if (!finalUrl && pixelGrid.some(Boolean)) {
+        const cv = document.getElementById('equipPixelCanvas');
+        if (cv) finalUrl = cv.toDataURL('image/png');
       }
       hideCustomizeModal();
-      void forge(name, artCopy, urlCopy);
+      void forge(name, null, finalUrl);
     };
     if (backdrop) backdrop.onclick = () => { hideCustomizeModal(); };
   }
