@@ -3582,6 +3582,7 @@
     const idx = row * PIXEL_G + col;
     if (pixelGrid[idx] === pixelColor) return;
     pixelGrid[idx] = pixelColor;
+    pixelArtImageUrl = null; // 직접 그리면 DB 이미지 URL 초기화
     renderPixelCanvas();
   }
 
