@@ -3262,6 +3262,8 @@
       if (!res.ok) return;
       const data = await res.json();
       if (data.imageDataUrl) {
+        // 유저가 이미 그리기 시작했으면 덮어쓰지 않음
+        if (pixelGrid.some(Boolean)) return;
         pixelArtImageUrl = data.imageDataUrl;
         await _imageUrlToPixelGrid(data.imageDataUrl);
         renderPixelCanvas();
@@ -3843,19 +3845,24 @@
     if (doneBtn) doneBtn.onclick = () => {
       const name = (nameInput?.value || '').trim() || generateEquipName(mats);
       const urlCopy = pixelArtImageUrl;
-      // 유저가 직접 그린 경우 palette/cells 형식으로 변환
       let artCopy = null;
       if (!urlCopy && pixelGrid.some(Boolean)) {
-        const palette = ['#000000'];
+        // palette 인덱스: 0=투명, 1~=실제 색상
+        // sanitizeForgePixelArt가 앞에 PIXEL_MAT을 prepend하므로
+        // palette 배열엔 실제 색상만 넣고 cells는 1부터 시작
+        const palette = [];
+        const colorMap = {};
         const cells = pixelGrid.map(color => {
           if (!color) return 0;
-          let idx = palette.indexOf(color);
-          if (idx === -1) { palette.push(color); idx = palette.length - 1; }
-          return idx;
+          if (colorMap[color] === undefined) {
+            palette.push(color);
+            colorMap[color] = palette.length; // 1-indexed
+          }
+          return colorMap[color];
         });
         artCopy = { w: PIXEL_G, h: PIXEL_G, palette, cells };
-      } else {
-        artCopy = [...pixelGrid];
+      } else if (urlCopy) {
+        artCopy = null; // URL은 별도로 전송
       }
       hideCustomizeModal();
       void forge(name, artCopy, urlCopy);
