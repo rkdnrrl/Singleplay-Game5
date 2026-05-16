@@ -2894,6 +2894,14 @@
       const forgeBonus = await grantForgeBonus(Date.now() - forgeStartAt);
       if (forgeBonus > 0) showForgeCoinBonus(forgeBonus);
 
+      // 서버가 pixelArt를 돌려주지 않으면 유저가 직접 그린 그림을 사용
+      if (!serverEquipment.pixelArt) {
+        if (pixelArtUrl) {
+          serverEquipment.pixelArt = { imageDataUrl: pixelArtUrl };
+        } else if (Array.isArray(pixelArtData) && pixelArtData.some(Boolean)) {
+          serverEquipment.pixelArt = pixelArtData;
+        }
+      }
       showResultFromServer(serverEquipment, serverStats, data.nameSource, {
         nameAiRequested: data.nameAiRequested,
         nameAiUsed: data.nameAiUsed,
