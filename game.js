@@ -2832,7 +2832,7 @@
           materials: materialsPayload,
           customName: customName || undefined,
           pixelArtUrl: pixelArtUrl || undefined,
-          pixelArtData: (!pixelArtUrl && Array.isArray(pixelArtData) && pixelArtData.some(Boolean)) ? pixelArtData : undefined,
+          pixelArtData: (!pixelArtUrl && pixelArtData) ? pixelArtData : undefined,
         }),
       });
       const text = await res.text();
@@ -2897,7 +2897,7 @@
       // 유저가 직접 그린 그림이 있으면 서버 응답보다 항상 우선 사용
       if (pixelArtUrl) {
         serverEquipment.pixelArt = { imageDataUrl: pixelArtUrl };
-      } else if (Array.isArray(pixelArtData) && pixelArtData.some(Boolean)) {
+      } else if (pixelArtData) {
         serverEquipment.pixelArt = pixelArtData;
       }
       showResultFromServer(serverEquipment, serverStats, data.nameSource, {
@@ -3842,10 +3842,23 @@
     if (clearBtn) clearBtn.onclick = () => { pixelArtImageUrl = null; pixelGrid = Array(PIXEL_G * PIXEL_G).fill(null); renderPixelCanvas(); };
     if (doneBtn) doneBtn.onclick = () => {
       const name = (nameInput?.value || '').trim() || generateEquipName(mats);
-      const gridCopy = [...pixelGrid];
       const urlCopy = pixelArtImageUrl;
+      // 유저가 직접 그린 경우 palette/cells 형식으로 변환
+      let artCopy = null;
+      if (!urlCopy && pixelGrid.some(Boolean)) {
+        const palette = ['#000000'];
+        const cells = pixelGrid.map(color => {
+          if (!color) return 0;
+          let idx = palette.indexOf(color);
+          if (idx === -1) { palette.push(color); idx = palette.length - 1; }
+          return idx;
+        });
+        artCopy = { w: PIXEL_G, h: PIXEL_G, palette, cells };
+      } else {
+        artCopy = [...pixelGrid];
+      }
       hideCustomizeModal();
-      void forge(name, gridCopy, urlCopy);
+      void forge(name, artCopy, urlCopy);
     };
     if (backdrop) backdrop.onclick = () => { hideCustomizeModal(); };
   }
