@@ -2810,6 +2810,7 @@
         body: JSON.stringify({
           materials: materialsPayload,
           customName: customName || undefined,
+          equipSlot: forgeSlot || 'weapon',
           pixelArtUrl: pixelArtUrl || undefined,
           pixelArtData: (!pixelArtUrl && pixelArtData) ? pixelArtData : undefined,
         }),
