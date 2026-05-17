@@ -3029,6 +3029,15 @@
       await refreshCraftedList();
       void syncSmeltFromServer();
 
+      // 일일 미션: 장비 제련
+      if (alpToken && platformApi) {
+        apiFetch(`${platformApi}/api/missions/daily/progress`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+          body: JSON.stringify({ missionId: 'forge_1', increment: 1 }),
+        }).catch(() => {});
+      }
+
       // 실제 경과 시간으로 게임머니 지급
       const forgeBonus = await grantForgeBonus(Date.now() - forgeStartAt);
       if (forgeBonus > 0) showForgeCoinBonus(forgeBonus);
