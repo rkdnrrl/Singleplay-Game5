@@ -1061,6 +1061,24 @@
         if (typeof d.coins === 'number') { totalCoins = d.coins; updateCoinDisplay(); }
       }
     } catch { /* 비치명 */ }
+    // 캐릭터 iframe 삽입 (1회)
+    if (!document.getElementById('_assistantIframe')) {
+      try {
+        const meRes = await apiFetch(`${platformApi}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${alpToken}` },
+        });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          if (me?.user?.id) {
+            const iframe = document.createElement('iframe');
+            iframe.id = '_assistantIframe';
+            iframe.src = `https://assistant-chi-two.vercel.app?userId=${me.user.id}&app=platform`;
+            iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:220px;height:300px;border:none;background:transparent;z-index:9999;pointer-events:none;';
+            document.body.appendChild(iframe);
+          }
+        }
+      } catch { /* 비치명 */ }
+    }
   }
 
   async function grantForgeBonus(elapsedMs) {
