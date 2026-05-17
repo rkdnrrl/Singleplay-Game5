@@ -1062,7 +1062,7 @@
       }
     } catch { /* 비치명 */ }
     // 캐릭터 iframe 삽입 (1회)
-    if (!document.getElementById('_assistantIframe')) {
+    if (!document.getElementById('assistant-iframe')) {
       try {
         const meRes = await apiFetch(`${platformApi}/api/auth/me`, {
           headers: { Authorization: `Bearer ${alpToken}` },
@@ -1073,10 +1073,16 @@
           const cuid = me?.user?.commonUserId || me?.user?.id;
           if (cuid) {
             const iframe = document.createElement('iframe');
-            iframe.id = '_assistantIframe';
+            iframe.id = 'assistant-iframe';
             iframe.src = `https://assistant-chi-two.vercel.app?userId=${cuid}&app=platform`;
-            iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:220px;height:300px;border:none;background:transparent;z-index:9999;pointer-events:none;';
+            iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:220px;height:300px;border:none;background:transparent;z-index:9999;';
             document.body.appendChild(iframe);
+            window.addEventListener('message', (e) => {
+              if (e.data?.type === 'assistant:resize') {
+                iframe.style.width  = e.data.width  + 'px';
+                iframe.style.height = e.data.height + 'px';
+              }
+            });
           }
         }
       } catch { /* 비치명 */ }
