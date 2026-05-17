@@ -1069,10 +1069,12 @@
         });
         if (meRes.ok) {
           const me = await meRes.json();
-          if (me?.user?.id) {
+          // commonUserId 우선 — CommonDB 기준 ID
+          const cuid = me?.user?.commonUserId || me?.user?.id;
+          if (cuid) {
             const iframe = document.createElement('iframe');
             iframe.id = '_assistantIframe';
-            iframe.src = `https://assistant-chi-two.vercel.app?userId=${me.user.id}&app=platform`;
+            iframe.src = `https://assistant-chi-two.vercel.app?userId=${cuid}&app=platform`;
             iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:220px;height:300px;border:none;background:transparent;z-index:9999;pointer-events:none;';
             document.body.appendChild(iframe);
           }
