@@ -3966,15 +3966,48 @@
 
     const eraserBtn = document.getElementById('equipEraserBtn');
     const colorBtn = document.getElementById('equipColorBtn');
-    if (colorBtn) colorBtn.onclick = () => cpkOpen(pixelColor || '#c0392b');
+    const eyedropperBtn = document.getElementById('equipEyedropperBtn');
+    const pixelCanvas = document.getElementById('equipPixelCanvas');
+
+    let eyedropperMode = false;
+    function setEyedropperMode(on) {
+      eyedropperMode = on;
+      if (eyedropperBtn) eyedropperBtn.classList.toggle('is-active', on);
+      if (pixelCanvas) pixelCanvas.classList.toggle('eyedropper-mode', on);
+    }
+
+    if (colorBtn) colorBtn.onclick = () => { setEyedropperMode(false); cpkOpen(pixelColor || '#c0392b'); };
     if (eraserBtn) {
       eraserBtn.classList.toggle('is-active', pixelColor === null);
       eraserBtn.onclick = () => {
+        setEyedropperMode(false);
         pixelColor = null;
         eraserBtn.classList.add('is-active');
         const sw = document.getElementById('equipColorSwatch');
         if (sw) sw.style.background = 'repeating-conic-gradient(#555 0% 25%,#333 0% 50%) 0 0/10px 10px';
       };
+    }
+    if (eyedropperBtn) {
+      eyedropperBtn.onclick = () => setEyedropperMode(!eyedropperMode);
+    }
+    // 스포이드 모드: 캔버스 클릭 시 색상 추출
+    if (pixelCanvas) {
+      pixelCanvas.addEventListener('pointerdown', (e) => {
+        if (!eyedropperMode) return;
+        e.preventDefault(); e.stopPropagation();
+        const rect = pixelCanvas.getBoundingClientRect();
+        const col = Math.floor((e.clientX - rect.left) / rect.width * PIXEL_G);
+        const row = Math.floor((e.clientY - rect.top) / rect.height * PIXEL_G);
+        if (col < 0 || col >= PIXEL_G || row < 0 || row >= PIXEL_G) return;
+        const picked = pixelGrid[row * PIXEL_G + col];
+        if (!picked) return; // 빈 셀은 무시
+        pixelColor = picked;
+        // 색상 스와치 갱신
+        const sw = document.getElementById('equipColorSwatch');
+        if (sw) sw.style.background = picked;
+        if (eraserBtn) eraserBtn.classList.remove('is-active');
+        setEyedropperMode(false); // 추출 후 바로 그리기 모드로 전환
+      }, true);
     }
 
     const rndNameBtn = document.getElementById('equipRandomNameBtn');
