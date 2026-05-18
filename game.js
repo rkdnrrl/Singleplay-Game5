@@ -1,5 +1,353 @@
-(function () {
+﻿(function () {
   'use strict';
+
+  /* ── i18n ── */
+  const _LANG = (function() {
+    try { const p = new URLSearchParams(location.search).get('lang'); return (p || 'ko').toLowerCase().split('-')[0]; } catch { return 'ko'; }
+  })();
+  const _I18N = {
+    ko: {
+      cancel: '취소', confirm: '확인', close: '닫기', back_to_games: '← 게임 목록',
+      tutorial_help: '튜토리얼 다시 보기', t_prev: '이전', t_next: '다음', t_skip: '건너뛰기', t_start: '시작!', t_dont_show: '다시 보지 않기',
+      page_title: '왕국의 대장간',
+      // 용광로
+      furnace_title: '용광로', furnace_hint: '재료를 <strong>끌어다</strong> 이 칸에 놓고 녹이면 괴·유리 등이 나옵니다.',
+      furnace_smelt: '🔥 녹이기', furnace_clear: '용광로 비우기',
+      furnace_equip_warn: '⚠️ 장비를 녹이면 재료 일부가 소실될 수 있습니다.',
+      // 모루/제련
+      anvil_aria: '모루·제련', forge_label: '<strong>기초 재료(산출물)</strong> 클릭 → 빈 슬롯 자동 배치 · 드래그 → 슬롯 선택 (드래그 시 선호 슬롯 표시)',
+      anvil_aria_only: '모루', forge_btn: '⚒️ 제련하기', forge_clear: '선택 비우기',
+      status_msg_default: '기초 재료(산출물)를 끌어 모루에 놓으세요. 낚시·장비는 먼저 용광로에 녹이세요.',
+      prof_label: '견습 대장장이', prof_count: '{n}회',
+      // 제작 장비
+      crafted_title: '🛡️ 제작한 장비',
+      // 수리
+      repair_aria: '장비 수리', repair_drop_hint: '← 오른쪽 장비를 클릭하거나<br>드래그해서 놓으세요',
+      repair_dur_info: '내구도 --/--', repair_guide_tip: '프레스가 빛나는 구역에 올 때 탭!',
+      repair_confirm: '✅ 저장', repair_sidebar_title: '🛡️ 장비 목록',
+      // 재료
+      material_aria: '재료 보관함', material_count_title: '📦 재료',
+      filter_all: '전체', filter_material: '재료', filter_equipment: '장비', filter_soul: '영혼', filter_module: '🔩 모듈',
+      mat_empty: '재료가 없습니다. 낚시로 재료를 모은 뒤 새로고침 하세요.',
+      // 기초 재료
+      smelt_stock_title: '기초 재료', smelt_aria: '보관함 종류 필터', smelt_cat_aria: '기초 재료 분류',
+      cat_metal: '금속', cat_electronic: '전자', cat_chemical: '화학', cat_polymer: '폴리머', cat_gem: '보석', cat_bio: '생체', cat_etc: '기타',
+      // 오버레이
+      overlay_title: '대장간에서 제작 중…', overlay_timer: '예상 시간 약 {n}초',
+      // 결과
+      result_default: '장비', result_saved: '서버에 저장됨', goto_dungeon: '⚔️ 던전에서 사용하기',
+      // 재료 상세
+      material_hint: '끌어서 <strong>용광로</strong>에 녹이세요. 산출물이 되면 모루에서 장비를 만들 수 있어요.',
+      // 시그니처
+      sig_title: '멋진 이름 달성!', sig_sub: 'AI가 이 장비 이름을 특별히 멋지거나 예쁘다고 인정했어요. 축하합니다!',
+      // 장비 커스터마이즈
+      custom_title: '🔨 장비 이름 & 도안 설정',
+      custom_name_placeholder: '장비 이름 입력', custom_rand_title: '랜덤 이름',
+      custom_color: '색상', custom_eyedropper_title: '스포이드 — 캔버스에서 색상 추출',
+      custom_eraser: '지우개', custom_clear: '전체 지우기',
+      custom_random_pixel: '🎲 랜덤 도안', custom_done: '✅ 완성하기',
+      custom_loading_congrats: '✨ 축하합니다!<br>처음 만든 레시피입니다!',
+      custom_loading_timer: '예상 대기시간 {n}초',
+      custom_loading_coin_hint: '🪙 기다린 만큼 게임머니를 드려요!',
+      custom_loading_wait: '잠시만 기다려주세요…',
+      // 컬러 피커
+      color_picker_title: '색상 선택', color_picker_eyedropper: '스포이드',
+      // 개조
+      module_aria: '장비 개조', module_equip_section: '🛡️ 장비 선택', module_inv_title: '🔩 보유 모듈',
+      module_select_first: '장비를 선택하세요', module_craft_toggle: '⚒️ 모듈 제작',
+      module_craft_title: '⚒️ 모듈 제작', module_craft_slots_label: '재료 슬롯',
+      module_craft_slot_count: '{n}/{max}', module_craft_clear: '전체 비우기',
+      module_craft_stock: '보유 산출물', module_craft_btn: '✨ 제작',
+      // 강화
+      enhance_aria: '장비 강화', enhance_stones: '🗃️ 보유 강화 아이템', enhance_equip: '🛡️ 강화할 장비 선택',
+      enhance_hint: '강화 아이템과 장비를 선택하세요', enhance_btn: '✨ 강화하기',
+      // 모바일 탭
+      tab_materials: '재료', tab_furnace: '용광로', tab_forge: '제련', tab_stock: '기초재료',
+      tab_equipment: '장비', tab_repair: '수리', tab_enhance: '강화', tab_modules: '개조',
+      // 토스트
+      forge_done: '⚒️ 제련 완료!',
+      forge_failed: '제련 실패',
+      // 튜토리얼
+      t5_t1_title: '대장간에 오신 걸 환영해요!', t5_t1_body: '낚시 아이템을 녹여 재료를 모으고,<br>그 재료로 장비를 제작·강화하는 곳이에요.',
+      t5_t2_title: '용광로 — 아이템 녹이기', t5_t2_body: '<b>낚시에서 얻은 폐품</b>을 용광로에 넣으면<br>재료(철·구리·보석 등)가 나와요.<br>명사 등급이 높을수록 더 많이 나옵니다.',
+      t5_t3_title: '모루 — 장비 제작', t5_t3_body: '<b>산출 재료</b>를 모루에 올려놓고 제작하면<br>무기·방어구·악세서리가 만들어져요.<br>재료 조합에 따라 능력치가 결정돼요.',
+      t5_t4_title: '모듈로 강화', t5_t4_body: '<b>모듈</b>을 장비 슬롯에 끼우면 추가 능력치를 부여할 수 있어요.<br>모듈도 재료를 모아 제작 가능!',
+      t5_t5_title: '수리', t5_t5_body: '던전에서 닳은 장비는 <b>코인을 내고 수리</b>할 수 있어요.<br>내구도 0이 되기 전에 수리하세요!',
+      t5_t6_title: '던전 연동', t5_t6_body: '여기서 만든 장비는 <b>던전 탐험(Game7)</b>에서 장착해 사용해요.<br>좋은 장비 = 더 깊은 던전!',
+    },
+    en: {
+      cancel: 'Cancel', confirm: 'OK', close: 'Close', back_to_games: '← Games',
+      tutorial_help: 'Replay tutorial', t_prev: 'Back', t_next: 'Next', t_skip: 'Skip', t_start: 'Start!', t_dont_show: "Don't show again",
+      page_title: 'Kingdom Blacksmith',
+      furnace_title: 'Furnace', furnace_hint: '<strong>Drag</strong> materials here and smelt them into ingots, glass, and more.',
+      furnace_smelt: '🔥 Smelt', furnace_clear: 'Clear furnace',
+      furnace_equip_warn: '⚠️ Smelting equipment may lose some materials.',
+      anvil_aria: 'Anvil · Forge', forge_label: 'Click <strong>base material (output)</strong> → auto-fill empty slot · Drag → choose slot (preferred shown on drag)',
+      anvil_aria_only: 'Anvil', forge_btn: '⚒️ Forge', forge_clear: 'Clear selection',
+      status_msg_default: 'Drag base materials (output) onto the anvil. Smelt fish/gear in the furnace first.',
+      prof_label: 'Apprentice Smith', prof_count: '{n} times',
+      crafted_title: '🛡️ Crafted Gear',
+      repair_aria: 'Gear Repair', repair_drop_hint: '← Click or drag<br>gear from the right',
+      repair_dur_info: 'Durability --/--', repair_guide_tip: 'Tap when the press hits the glowing zone!',
+      repair_confirm: '✅ Save', repair_sidebar_title: '🛡️ Gear List',
+      material_aria: 'Material Stash', material_count_title: '📦 Materials',
+      filter_all: 'All', filter_material: 'Materials', filter_equipment: 'Gear', filter_soul: 'Souls', filter_module: '🔩 Modules',
+      mat_empty: 'No materials. Fish for materials then refresh.',
+      smelt_stock_title: 'Base Materials', smelt_aria: 'Stash filter', smelt_cat_aria: 'Base material category',
+      cat_metal: 'Metal', cat_electronic: 'Electronic', cat_chemical: 'Chemical', cat_polymer: 'Polymer', cat_gem: 'Gem', cat_bio: 'Bio', cat_etc: 'Other',
+      overlay_title: 'Forging at the Smithy…', overlay_timer: 'About {n}s',
+      result_default: 'Equipment', result_saved: 'Saved to server', goto_dungeon: '⚔️ Use in Dungeon',
+      material_hint: 'Drag to the <strong>Furnace</strong> to smelt. Once it\'s an output, craft gear at the anvil.',
+      sig_title: 'Great Name!', sig_sub: 'AI thinks this gear name is especially cool or pretty. Congrats!',
+      custom_title: '🔨 Gear Name & Sprite',
+      custom_name_placeholder: 'Enter gear name', custom_rand_title: 'Random name',
+      custom_color: 'Color', custom_eyedropper_title: 'Eyedropper — pick color from canvas',
+      custom_eraser: 'Eraser', custom_clear: 'Clear all',
+      custom_random_pixel: '🎲 Random sprite', custom_done: '✅ Finish',
+      custom_loading_congrats: '✨ Congrats!<br>It\'s your first time crafting this recipe!',
+      custom_loading_timer: 'About {n}s',
+      custom_loading_coin_hint: '🪙 You\'ll earn coins for waiting!',
+      custom_loading_wait: 'Please wait…',
+      color_picker_title: 'Pick Color', color_picker_eyedropper: 'Eyedropper',
+      module_aria: 'Gear Modification', module_equip_section: '🛡️ Pick Gear', module_inv_title: '🔩 Owned Modules',
+      module_select_first: 'Pick gear first', module_craft_toggle: '⚒️ Craft Module',
+      module_craft_title: '⚒️ Craft Module', module_craft_slots_label: 'Material slots',
+      module_craft_slot_count: '{n}/{max}', module_craft_clear: 'Clear all',
+      module_craft_stock: 'Owned outputs', module_craft_btn: '✨ Craft',
+      enhance_aria: 'Gear Enhancement', enhance_stones: '🗃️ Enhance Items', enhance_equip: '🛡️ Pick gear to enhance',
+      enhance_hint: 'Select enhance item and gear', enhance_btn: '✨ Enhance',
+      tab_materials: 'Materials', tab_furnace: 'Furnace', tab_forge: 'Forge', tab_stock: 'Base',
+      tab_equipment: 'Gear', tab_repair: 'Repair', tab_enhance: 'Enhance', tab_modules: 'Modify',
+      forge_done: '⚒️ Forging done!',
+      forge_failed: 'Forging failed',
+      t5_t1_title: 'Welcome to the Blacksmith!', t5_t1_body: 'Smelt fishing items into materials,<br>then craft and enhance gear with them.',
+      t5_t2_title: 'Furnace — Smelt Items', t5_t2_body: '<b>Scrap from fishing</b> goes in the furnace<br>and comes out as materials (iron/copper/gems).<br>Higher noun-tier = more output!',
+      t5_t3_title: 'Anvil — Craft Gear', t5_t3_body: 'Place <b>output materials</b> on the anvil and craft<br>weapons/armor/accessories.<br>Material combinations decide the stats.',
+      t5_t4_title: 'Enhance with Modules', t5_t4_body: 'Slot <b>modules</b> into gear to grant bonus stats.<br>Modules can also be crafted from materials!',
+      t5_t5_title: 'Repair', t5_t5_body: 'Worn-out gear from dungeons can be <b>repaired for coins</b>.<br>Repair before durability hits 0!',
+      t5_t6_title: 'Dungeon Sync', t5_t6_body: 'Gear made here is used in <b>Dungeon Exploration (Game7)</b>.<br>Better gear = deeper dungeons!',
+    },
+    ja: {
+      cancel: 'キャンセル', confirm: 'OK', close: '閉じる', back_to_games: '← ゲーム一覧',
+      tutorial_help: 'チュートリアルを再表示', t_prev: '戻る', t_next: '次へ', t_skip: 'スキップ', t_start: 'はじめる!', t_dont_show: '次回から表示しない',
+      page_title: '王国の鍛冶屋',
+      furnace_title: '炉', furnace_hint: '素材を<strong>ドラッグ</strong>してこの枠に置き溶かすと、インゴットやガラスなどが出ます。',
+      furnace_smelt: '🔥 溶かす', furnace_clear: '炉を空にする',
+      furnace_equip_warn: '⚠️ 装備を溶かすと素材の一部が失われることがあります。',
+      anvil_aria: '金床・精錬', forge_label: '<strong>基礎素材(産出物)</strong>クリック → 空きスロットへ自動配置 · ドラッグ → スロット選択(優先スロット表示)',
+      anvil_aria_only: '金床', forge_btn: '⚒️ 精錬する', forge_clear: '選択クリア',
+      status_msg_default: '基礎素材(産出物)を金床にドラッグして置きましょう。釣り素材・装備はまず炉で溶かしてください。',
+      prof_label: '見習い鍛冶屋', prof_count: '{n}回',
+      crafted_title: '🛡️ 製作した装備',
+      repair_aria: '装備修理', repair_drop_hint: '← 右の装備をクリックまたは<br>ドラッグして置いてください',
+      repair_dur_info: '耐久度 --/--', repair_guide_tip: 'プレスが光る区域に来た時タップ!',
+      repair_confirm: '✅ 保存', repair_sidebar_title: '🛡️ 装備一覧',
+      material_aria: '素材保管庫', material_count_title: '📦 素材',
+      filter_all: 'すべて', filter_material: '素材', filter_equipment: '装備', filter_soul: '魂', filter_module: '🔩 モジュール',
+      mat_empty: '素材がありません。釣りで素材を集めて再読み込みしてください。',
+      smelt_stock_title: '基礎素材', smelt_aria: '保管庫種別フィルター', smelt_cat_aria: '基礎素材分類',
+      cat_metal: '金属', cat_electronic: '電子', cat_chemical: '化学', cat_polymer: 'ポリマー', cat_gem: '宝石', cat_bio: '生体', cat_etc: 'その他',
+      overlay_title: '鍛冶屋で製作中…', overlay_timer: '予想時間 約{n}秒',
+      result_default: '装備', result_saved: 'サーバーに保存済み', goto_dungeon: '⚔️ ダンジョンで使う',
+      material_hint: '<strong>炉</strong>にドラッグして溶かしてください。産出物になれば金床で装備が作れます。',
+      sig_title: '素晴らしい名前達成!', sig_sub: 'AIがこの装備名を特に格好いい/可愛いと認めました。おめでとうございます!',
+      custom_title: '🔨 装備名 & 図案設定',
+      custom_name_placeholder: '装備名を入力', custom_rand_title: 'ランダム名',
+      custom_color: '色', custom_eyedropper_title: 'スポイト — キャンバスから色を抽出',
+      custom_eraser: '消しゴム', custom_clear: '全消去',
+      custom_random_pixel: '🎲 ランダム図案', custom_done: '✅ 完成',
+      custom_loading_congrats: '✨ おめでとうございます!<br>初めて作るレシピです!',
+      custom_loading_timer: '予想待機時間 {n}秒',
+      custom_loading_coin_hint: '🪙 待った分だけコインを差し上げます!',
+      custom_loading_wait: 'しばらくお待ちください…',
+      color_picker_title: '色選択', color_picker_eyedropper: 'スポイト',
+      module_aria: '装備改造', module_equip_section: '🛡️ 装備選択', module_inv_title: '🔩 所持モジュール',
+      module_select_first: '装備を選択してください', module_craft_toggle: '⚒️ モジュール製作',
+      module_craft_title: '⚒️ モジュール製作', module_craft_slots_label: '素材スロット',
+      module_craft_slot_count: '{n}/{max}', module_craft_clear: '全クリア',
+      module_craft_stock: '所持産出物', module_craft_btn: '✨ 製作',
+      enhance_aria: '装備強化', enhance_stones: '🗃️ 所持強化アイテム', enhance_equip: '🛡️ 強化する装備選択',
+      enhance_hint: '強化アイテムと装備を選択してください', enhance_btn: '✨ 強化する',
+      tab_materials: '素材', tab_furnace: '炉', tab_forge: '精錬', tab_stock: '基礎',
+      tab_equipment: '装備', tab_repair: '修理', tab_enhance: '強化', tab_modules: '改造',
+      forge_done: '⚒️ 精錬完了!',
+      forge_failed: '精錬失敗',
+      t5_t1_title: '鍛冶屋へようこそ!', t5_t1_body: '釣りで得たアイテムを溶かして素材を集め、<br>その素材で装備を製作・強化する場所です。',
+      t5_t2_title: '炉 — アイテムを溶かす', t5_t2_body: '<b>釣りで得た廃品</b>を炉に入れると<br>素材(鉄・銅・宝石など)が出ます。<br>名詞ランクが高いほどたくさん出ます。',
+      t5_t3_title: '金床 — 装備製作', t5_t3_body: '<b>産出素材</b>を金床に置いて製作すると<br>武器・防具・アクセサリができます。<br>素材の組み合わせで能力値が決まります。',
+      t5_t4_title: 'モジュールで強化', t5_t4_body: '<b>モジュール</b>を装備スロットに装着すると追加能力値を付与できます。<br>モジュールも素材を集めて製作可能!',
+      t5_t5_title: '修理', t5_t5_body: 'ダンジョンで消耗した装備は<b>コインで修理</b>できます。<br>耐久度0になる前に修理しましょう!',
+      t5_t6_title: 'ダンジョン連動', t5_t6_body: 'ここで作った装備は<b>ダンジョン探索 (Game7)</b>で装着して使います。<br>良い装備 = より深いダンジョン!',
+    },
+    zh: {
+      cancel: '取消', confirm: '确认', close: '关闭', back_to_games: '← 游戏列表',
+      tutorial_help: '重新查看教程', t_prev: '上一步', t_next: '下一步', t_skip: '跳过', t_start: '开始!', t_dont_show: '不再显示',
+      page_title: '王国铁匠铺',
+      furnace_title: '熔炉', furnace_hint: '将材料<strong>拖动</strong>到此处熔炼,可获得锭、玻璃等。',
+      furnace_smelt: '🔥 熔炼', furnace_clear: '清空熔炉',
+      furnace_equip_warn: '⚠️ 熔炼装备可能损失部分材料。',
+      anvil_aria: '铁砧·精炼', forge_label: '点击<strong>基础材料(产物)</strong> → 自动放入空槽 · 拖动 → 选择槽(拖动时显示首选槽)',
+      anvil_aria_only: '铁砧', forge_btn: '⚒️ 精炼', forge_clear: '清空选择',
+      status_msg_default: '将基础材料(产物)拖到铁砧上。钓鱼物品和装备请先在熔炉熔炼。',
+      prof_label: '学徒铁匠', prof_count: '{n}次',
+      crafted_title: '🛡️ 制作的装备',
+      repair_aria: '装备修理', repair_drop_hint: '← 点击或拖动<br>右侧的装备',
+      repair_dur_info: '耐久度 --/--', repair_guide_tip: '冲压到发光区域时点击!',
+      repair_confirm: '✅ 保存', repair_sidebar_title: '🛡️ 装备列表',
+      material_aria: '材料仓库', material_count_title: '📦 材料',
+      filter_all: '全部', filter_material: '材料', filter_equipment: '装备', filter_soul: '灵魂', filter_module: '🔩 模块',
+      mat_empty: '没有材料。请钓鱼收集材料后刷新。',
+      smelt_stock_title: '基础材料', smelt_aria: '仓库种类筛选', smelt_cat_aria: '基础材料分类',
+      cat_metal: '金属', cat_electronic: '电子', cat_chemical: '化学', cat_polymer: '聚合物', cat_gem: '宝石', cat_bio: '生物', cat_etc: '其他',
+      overlay_title: '正在铁匠铺制作…', overlay_timer: '约{n}秒',
+      result_default: '装备', result_saved: '已保存到服务器', goto_dungeon: '⚔️ 在地下城使用',
+      material_hint: '拖到<strong>熔炉</strong>熔炼。变成产物后可在铁砧制作装备。',
+      sig_title: '名字超棒!', sig_sub: 'AI认为这个装备名字特别帅或可爱。恭喜!',
+      custom_title: '🔨 装备名 & 图案设置',
+      custom_name_placeholder: '输入装备名', custom_rand_title: '随机名字',
+      custom_color: '颜色', custom_eyedropper_title: '吸管 — 从画布提取颜色',
+      custom_eraser: '橡皮擦', custom_clear: '全部清除',
+      custom_random_pixel: '🎲 随机图案', custom_done: '✅ 完成',
+      custom_loading_congrats: '✨ 恭喜!<br>这是您第一次制作的配方!',
+      custom_loading_timer: '预计等待{n}秒',
+      custom_loading_coin_hint: '🪙 等待越久得越多金币!',
+      custom_loading_wait: '请稍候…',
+      color_picker_title: '选择颜色', color_picker_eyedropper: '吸管',
+      module_aria: '装备改造', module_equip_section: '🛡️ 选择装备', module_inv_title: '🔩 持有模块',
+      module_select_first: '请先选择装备', module_craft_toggle: '⚒️ 制作模块',
+      module_craft_title: '⚒️ 制作模块', module_craft_slots_label: '材料槽',
+      module_craft_slot_count: '{n}/{max}', module_craft_clear: '全部清空',
+      module_craft_stock: '持有产物', module_craft_btn: '✨ 制作',
+      enhance_aria: '装备强化', enhance_stones: '🗃️ 持有强化道具', enhance_equip: '🛡️ 选择强化的装备',
+      enhance_hint: '请选择强化道具和装备', enhance_btn: '✨ 强化',
+      tab_materials: '材料', tab_furnace: '熔炉', tab_forge: '精炼', tab_stock: '基础',
+      tab_equipment: '装备', tab_repair: '修理', tab_enhance: '强化', tab_modules: '改造',
+      forge_done: '⚒️ 精炼完成!',
+      forge_failed: '精炼失败',
+      t5_t1_title: '欢迎来到铁匠铺!', t5_t1_body: '将钓鱼物品熔炼成材料,<br>然后用这些材料制作和强化装备。',
+      t5_t2_title: '熔炉 — 熔炼物品', t5_t2_body: '<b>钓鱼获得的废品</b>放入熔炉<br>会变成材料(铁/铜/宝石等)。<br>名词等级越高产出越多!',
+      t5_t3_title: '铁砧 — 制作装备', t5_t3_body: '将<b>产物材料</b>放到铁砧制作<br>武器/防具/饰品。<br>材料组合决定能力值。',
+      t5_t4_title: '用模块强化', t5_t4_body: '将<b>模块</b>插入装备槽可增加能力值。<br>模块也可用材料制作!',
+      t5_t5_title: '修理', t5_t5_body: '地下城中磨损的装备可<b>用金币修理</b>。<br>耐久归0前请修理!',
+      t5_t6_title: '地下城联动', t5_t6_body: '这里制作的装备可在<b>地下城探险 (Game7)</b>装备使用。<br>好装备 = 更深地下城!',
+    },
+  };
+  function tr(key, params) {
+    const dict = _I18N[_LANG] || _I18N.ko;
+    let s = dict[key] || _I18N.ko[key] || key;
+    if (params) for (const k in params) s = s.split('{' + k + '}').join(String(params[k]));
+    return s;
+  }
+  function applyHtmlI18n() {
+    try { document.documentElement.lang = _LANG; document.title = tr('page_title'); } catch {}
+    const setText = (sel, key) => { const el = document.querySelector(sel); if (el) el.textContent = tr(key); };
+    const setHtml = (sel, key) => { const el = document.querySelector(sel); if (el) el.innerHTML = tr(key); };
+    // 용광로
+    setText('.furnace-title', 'furnace_title');
+    setHtml('.furnace-hint', 'furnace_hint');
+    setText('#btnSmelt', 'furnace_smelt');
+    setText('#btnClearFurnace', 'furnace_clear');
+    setText('#furnaceEquipWarn', 'furnace_equip_warn');
+    // 모루
+    setHtml('.forge-slots-label', 'forge_label');
+    setText('#btnForge', 'forge_btn');
+    setText('#btnClear', 'forge_clear');
+    setText('#statusMsg', 'status_msg_default');
+    setText('#profLabel', 'prof_label');
+    const profCnt = document.getElementById('profCount'); if (profCnt) profCnt.textContent = tr('prof_count', { n: 0 });
+    // 제작 장비
+    setText('.forge-extra .log-title', 'crafted_title');
+    // 수리
+    setHtml('#repairDropHint', 'repair_drop_hint');
+    setText('#repairDurInfo', 'repair_dur_info');
+    setText('.repair-guide-tip', 'repair_guide_tip');
+    setText('#repairConfirmBtn', 'repair_confirm');
+    setText('.repair-sidebar-title', 'repair_sidebar_title');
+    // 재료
+    const mcb = document.getElementById('matCountBadge');
+    const mc = document.querySelector('#materialDock .log-title');
+    if (mc) mc.innerHTML = tr('material_count_title') + ' <span id="matCountBadge" class="mat-badge">' + (mcb ? mcb.textContent : '0') + '</span>';
+    document.querySelectorAll('#materialDockFilters .material-dock-filter').forEach(b => {
+      const f = b.dataset.filter;
+      const key = f === 'all' ? 'filter_all' : f === 'material' ? 'filter_material' :
+                  f === 'equipment' ? 'filter_equipment' : f === 'soul' ? 'filter_soul' :
+                  f === 'module' ? 'filter_module' : null;
+      if (key) b.textContent = tr(key);
+    });
+    setText('.log-empty', 'mat_empty');
+    // 기초 재료
+    setText('.smelt-stock-title', 'smelt_stock_title');
+    document.querySelectorAll('#smeltCategoryFilters .smelt-filter').forEach(b => {
+      const c = b.dataset.cat;
+      const key = c === 'all' ? 'filter_all' : c === 'metal' ? 'cat_metal' :
+                  c === 'electronic' ? 'cat_electronic' : c === 'chemical' ? 'cat_chemical' :
+                  c === 'polymer' ? 'cat_polymer' : c === 'gem' ? 'cat_gem' :
+                  c === 'bio' ? 'cat_bio' : c === 'etc' ? 'cat_etc' : null;
+      if (key) b.textContent = tr(key);
+    });
+    // 오버레이
+    setText('#forgeOverlayTitle', 'overlay_title');
+    setText('#forgeOverlayTimer', tr('overlay_timer', { n: 20 }));
+    // 결과
+    setText('#resultRarity', 'result_default');
+    setText('.result-added', 'result_saved');
+    setText('#btn-go-dungeon', 'goto_dungeon');
+    // 재료 상세
+    setHtml('.material-detail-hint', 'material_hint');
+    // 시그니처
+    setText('#signatureCelebrateTitle', 'sig_title');
+    setText('.signature-celebrate-sub', 'sig_sub');
+    setText('#signatureCelebrateOk', 'confirm');
+    // 커스터마이즈
+    setText('#equipCustomizeTitle', 'custom_title');
+    const ein = document.getElementById('equipNameInput'); if (ein) ein.placeholder = tr('custom_name_placeholder');
+    const erb = document.getElementById('equipRandomNameBtn'); if (erb) erb.title = tr('custom_rand_title');
+    setText('.equip-color-btn-text', 'custom_color');
+    const eed = document.getElementById('equipEyedropperBtn'); if (eed) eed.title = tr('custom_eyedropper_title');
+    setText('#equipEraserBtn', 'custom_eraser');
+    setText('#equipClearBtn', 'custom_clear');
+    setText('#equipRandomPixelBtn', 'custom_random_pixel');
+    setText('#equipCustomizeDoneBtn', 'custom_done');
+    setHtml('.ecl-congrats', 'custom_loading_congrats');
+    const eclTimer = document.getElementById('eclTimer'); if (eclTimer) eclTimer.textContent = tr('custom_loading_timer', { n: 20 });
+    setText('.ecl-coin-hint', 'custom_loading_coin_hint');
+    setText('.ecl-wait', 'custom_loading_wait');
+    // 색상 피커
+    setText('.cpk-title', 'color_picker_title');
+    const ce = document.getElementById('cpkEyedropper'); if (ce) ce.title = tr('color_picker_eyedropper');
+    // 개조
+    document.querySelectorAll('.module-section-title').forEach(el => {
+      if (el.textContent.indexOf('장비 선택') >= 0) el.textContent = tr('module_equip_section');
+      else if (el.textContent.indexOf('보유 모듈') >= 0) el.textContent = tr('module_inv_title');
+      else if (el.id === 'moduleSlotTitle') el.textContent = tr('module_select_first');
+      else if (el.textContent.indexOf('모듈 제작') >= 0) el.textContent = tr('module_craft_title');
+    });
+    setText('#moduleCraftToggleBtn', 'module_craft_toggle');
+    setText('#moduleCraftClearBtn', 'module_craft_clear');
+    setText('#moduleCraftBtn', 'module_craft_btn');
+    document.querySelectorAll('.module-craft-area-label').forEach(el => {
+      if (el.textContent.indexOf('재료 슬롯') >= 0) {
+        const cntEl = el.querySelector('#moduleCraftSlotCount');
+        el.innerHTML = tr('module_craft_slots_label') + ' <span class="module-craft-slot-count" id="moduleCraftSlotCount">' + (cntEl ? cntEl.textContent : '0/8') + '</span>';
+      } else if (el.textContent.indexOf('보유 산출물') >= 0) el.textContent = tr('module_craft_stock');
+    });
+    // 강화
+    document.querySelectorAll('.enhance-area-title').forEach(el => {
+      if (el.textContent.indexOf('강화 아이템') >= 0) el.textContent = tr('enhance_stones');
+      else if (el.textContent.indexOf('강화할 장비') >= 0) el.textContent = tr('enhance_equip');
+    });
+    setText('#enhanceHint', 'enhance_hint');
+    setText('#enhanceBtn', 'enhance_btn');
+    // 모바일 탭
+    document.querySelectorAll('.mobile-tab').forEach(b => {
+      const tab = b.dataset.tab;
+      const key = 'tab_' + tab;
+      const lblEl = b.querySelector('.mobile-tab-label');
+      if (lblEl) lblEl.textContent = tr(key);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyHtmlI18n);
+  else applyHtmlI18n();
 
   /* ── 캐릭터 위젯 — React 컴포넌트와 동일 기능 (드래그 바, 리사이즈 핸들, localStorage 저장) ── */
   function mountCharacterWidget(userId, { app = 'platform', bottomOffset = 0, storageKey = 'charwidget' } = {}) {
@@ -147,7 +495,7 @@
     const helpBtn = document.createElement('button');
     helpBtn.id = '_tutorial-help-btn';
     helpBtn.textContent = '?';
-    helpBtn.title = '튜토리얼 다시 보기';
+    helpBtn.title = tr('tutorial_help');
     helpBtn.style.cssText = `position:fixed;top:${helpButtonPos.top}px;left:${helpButtonPos.left}px;width:36px;height:36px;border-radius:50%;background:rgba(30,30,40,0.85);color:#fff;border:1.5px solid rgba(255,255,255,0.4);font-size:18px;font-weight:bold;cursor:pointer;z-index:9998;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:transform 0.15s;`;
     helpBtn.addEventListener('mouseenter', () => helpBtn.style.transform = 'scale(1.1)');
     helpBtn.addEventListener('mouseleave', () => helpBtn.style.transform = 'scale(1)');
