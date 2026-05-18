@@ -139,6 +139,109 @@
     });
   }
 
+  /* ── 튜토리얼 시스템 — 첫 방문 자동 오버레이 + ? 버튼으로 재시도 ── */
+  function mountTutorial({ storageKey, steps, helpButtonPos = { top: 12, left: 12 } }) {
+    if (document.getElementById('_tutorial-help-btn')) return;
+    const seenKey = storageKey + '_seen';
+
+    const helpBtn = document.createElement('button');
+    helpBtn.id = '_tutorial-help-btn';
+    helpBtn.textContent = '?';
+    helpBtn.title = '튜토리얼 다시 보기';
+    helpBtn.style.cssText = `position:fixed;top:${helpButtonPos.top}px;left:${helpButtonPos.left}px;width:36px;height:36px;border-radius:50%;background:rgba(30,30,40,0.85);color:#fff;border:1.5px solid rgba(255,255,255,0.4);font-size:18px;font-weight:bold;cursor:pointer;z-index:9998;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:transform 0.15s;`;
+    helpBtn.addEventListener('mouseenter', () => helpBtn.style.transform = 'scale(1.1)');
+    helpBtn.addEventListener('mouseleave', () => helpBtn.style.transform = 'scale(1)');
+    helpBtn.addEventListener('click', () => showTutorial());
+    document.body.appendChild(helpBtn);
+
+    function showTutorial() {
+      if (document.getElementById('_tutorial-modal')) return;
+      let idx = 0;
+
+      const backdrop = document.createElement('div');
+      backdrop.id = '_tutorial-modal';
+      backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+
+      const card = document.createElement('div');
+      card.style.cssText = 'max-width:420px;width:100%;background:#1e1e28;color:#fff;border-radius:16px;padding:24px;box-shadow:0 12px 48px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);';
+      backdrop.appendChild(card);
+
+      const emoji = document.createElement('div');
+      emoji.style.cssText = 'font-size:56px;text-align:center;margin-bottom:12px;';
+      card.appendChild(emoji);
+
+      const title = document.createElement('div');
+      title.style.cssText = 'font-size:20px;font-weight:bold;text-align:center;margin-bottom:8px;color:#fff;';
+      card.appendChild(title);
+
+      const body = document.createElement('div');
+      body.style.cssText = 'font-size:14px;line-height:1.6;text-align:center;color:rgba(255,255,255,0.85);margin-bottom:20px;min-height:60px;';
+      card.appendChild(body);
+
+      const dots = document.createElement('div');
+      dots.style.cssText = 'display:flex;justify-content:center;gap:6px;margin-bottom:16px;';
+      card.appendChild(dots);
+
+      const nav = document.createElement('div');
+      nav.style.cssText = 'display:flex;gap:8px;';
+      card.appendChild(nav);
+
+      const prevBtn = document.createElement('button');
+      prevBtn.textContent = '이전';
+      prevBtn.style.cssText = 'flex:1;padding:10px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;font-size:14px;';
+      nav.appendChild(prevBtn);
+
+      const skipBtn = document.createElement('button');
+      skipBtn.textContent = '건너뛰기';
+      skipBtn.style.cssText = 'flex:1;padding:10px;background:transparent;color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;font-size:14px;';
+      nav.appendChild(skipBtn);
+
+      const nextBtn = document.createElement('button');
+      nextBtn.style.cssText = 'flex:1;padding:10px;background:#3b82f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;';
+      nav.appendChild(nextBtn);
+
+      const dontShow = document.createElement('label');
+      dontShow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:12px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;justify-content:center;';
+      dontShow.innerHTML = '<input type="checkbox" id="_tutorial-dontshow" style="cursor:pointer;"> 다시 보지 않기';
+      card.appendChild(dontShow);
+
+      function render() {
+        const s = steps[idx];
+        emoji.textContent = s.emoji || '✨';
+        title.textContent = s.title || '';
+        body.innerHTML = s.body || '';
+        prevBtn.style.visibility = idx === 0 ? 'hidden' : 'visible';
+        nextBtn.textContent = idx === steps.length - 1 ? '시작!' : '다음';
+        dots.innerHTML = '';
+        steps.forEach((_, i) => {
+          const d = document.createElement('div');
+          d.style.cssText = `width:6px;height:6px;border-radius:50%;background:${i === idx ? '#3b82f6' : 'rgba(255,255,255,0.3)'};`;
+          dots.appendChild(d);
+        });
+      }
+      render();
+
+      function close() {
+        const cb = card.querySelector('#_tutorial-dontshow');
+        if (cb && cb.checked) localStorage.setItem(seenKey, '1');
+        backdrop.remove();
+      }
+      prevBtn.addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+      nextBtn.addEventListener('click', () => {
+        if (idx < steps.length - 1) { idx++; render(); }
+        else { localStorage.setItem(seenKey, '1'); backdrop.remove(); }
+      });
+      skipBtn.addEventListener('click', close);
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+
+      document.body.appendChild(backdrop);
+    }
+
+    if (!localStorage.getItem(seenKey)) {
+      setTimeout(showTutorial, 800);
+    }
+  }
+
   const FORGE_MATERIALS_KEY = 'WEB_ALP_SPACE_FISHING_FORGE_V1';
   const FORGE_SPENT_UIDS_KEY = 'WEB_ALP_FORGE_SPENT_UIDS_V1';
 
