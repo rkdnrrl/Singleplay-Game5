@@ -535,7 +535,7 @@
       card.appendChild(nav);
 
       const prevBtn = document.createElement('button');
-      prevBtn.textContent = '이전';
+      prevBtn.textContent = tr('t_prev');
       prevBtn.style.cssText = 'flex:1;padding:10px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;font-size:14px;';
       nav.appendChild(prevBtn);
 
