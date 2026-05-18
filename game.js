@@ -79,9 +79,8 @@
       function onMove(ev) {
         if (ev.cancelable) ev.preventDefault();
         const t = ev.touches ? ev.touches[0] : ev;
-        const wrapperH = state.size.h + TOOLBAR_H;
         const nx = Math.max(0, Math.min(window.innerWidth  - state.size.w, sX + t.clientX - sMx));
-        const ny = Math.max(0, Math.min(window.innerHeight - wrapperH,    sY + t.clientY - sMy));
+        const ny = Math.max(0, Math.min(window.innerHeight - state.size.h, sY + t.clientY - sMy));
         state.pos = { x: nx, y: ny };
         wrapper.style.left = nx + 'px'; wrapper.style.top = ny + 'px';
       }
