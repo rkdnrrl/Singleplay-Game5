@@ -128,6 +128,13 @@
       forge_failed_msg: '제련 실패! 재료 일부가 회수됐어요.',
       forge_basic_drag_hint: '기초 재료(산출물)를 모루에 끌어다 놓으세요.',
       result_desc_template: '성공률 {p}% · 강도 [{strength}]{gain}{syn}{ret}',
+      module_no_modules: '모듈 없음 — 아래에서 제작하세요',
+      module_no_outputs: '산출물 없음',
+      module_craft_busy: '제작 중…',
+      module_craft_fail: '제작 실패',
+      module_craft_success: '✅ {name} 제작 완료!',
+      module_craft_close: '✕ 닫기',
+      desc_stats_full: '{fit}{base}\n공격 +{atk} · 방어 +{def} · 스피드 +{spd}%{dur}',
       // 튜토리얼
       t5_t1_title: '대장간에 오신 걸 환영해요!', t5_t1_body: '낚시 아이템을 녹여 재료를 모으고,<br>그 재료로 장비를 제작·강화하는 곳이에요.',
       t5_t2_title: '용광로 — 아이템 녹이기', t5_t2_body: '<b>낚시에서 얻은 폐품</b>을 용광로에 넣으면<br>재료(철·구리·보석 등)가 나와요.<br>명사 등급이 높을수록 더 많이 나옵니다.',
@@ -242,6 +249,13 @@
       forge_failed_msg: 'Forge failed! Some materials recovered.',
       forge_basic_drag_hint: 'Drag base materials onto the anvil.',
       result_desc_template: 'Success {p}% · Strength [{strength}]{gain}{syn}{ret}',
+      module_no_modules: 'No modules — craft below',
+      module_no_outputs: 'No outputs',
+      module_craft_busy: 'Crafting…',
+      module_craft_fail: 'Craft failed',
+      module_craft_success: '✅ {name} crafted!',
+      module_craft_close: '✕ Close',
+      desc_stats_full: '{fit}{base}\nATK +{atk} · DEF +{def} · SPD +{spd}%{dur}',
       t5_t1_title: 'Welcome to the Blacksmith!', t5_t1_body: 'Smelt fishing items into materials,<br>then craft and enhance gear with them.',
       t5_t2_title: 'Furnace — Smelt Items', t5_t2_body: '<b>Scrap from fishing</b> goes in the furnace<br>and comes out as materials (iron/copper/gems).<br>Higher noun-tier = more output!',
       t5_t3_title: 'Anvil — Craft Gear', t5_t3_body: 'Place <b>output materials</b> on the anvil and craft<br>weapons/armor/accessories.<br>Material combinations decide the stats.',
@@ -355,6 +369,13 @@
       forge_failed_msg: '精錬失敗! 素材の一部が回収されました。',
       forge_basic_drag_hint: '基礎素材(産出物)を金床にドラッグしてください。',
       result_desc_template: '成功率 {p}% · 強度 [{strength}]{gain}{syn}{ret}',
+      module_no_modules: 'モジュールなし — 下で製作',
+      module_no_outputs: '産出物なし',
+      module_craft_busy: '製作中…',
+      module_craft_fail: '製作失敗',
+      module_craft_success: '✅ {name} 製作完了!',
+      module_craft_close: '✕ 閉じる',
+      desc_stats_full: '{fit}{base}\n攻撃 +{atk} · 防御 +{def} · スピード +{spd}%{dur}',
       t5_t1_title: '鍛冶屋へようこそ!', t5_t1_body: '釣りで得たアイテムを溶かして素材を集め、<br>その素材で装備を製作・強化する場所です。',
       t5_t2_title: '炉 — アイテムを溶かす', t5_t2_body: '<b>釣りで得た廃品</b>を炉に入れると<br>素材(鉄・銅・宝石など)が出ます。<br>名詞ランクが高いほどたくさん出ます。',
       t5_t3_title: '金床 — 装備製作', t5_t3_body: '<b>産出素材</b>を金床に置いて製作すると<br>武器・防具・アクセサリができます。<br>素材の組み合わせで能力値が決まります。',
@@ -468,6 +489,13 @@
       forge_failed_msg: '精炼失败! 部分材料已回收。',
       forge_basic_drag_hint: '将基础材料(产物)拖到铁砧。',
       result_desc_template: '成功率 {p}% · 强度 [{strength}]{gain}{syn}{ret}',
+      module_no_modules: '没有模块 — 请在下方制作',
+      module_no_outputs: '没有产物',
+      module_craft_busy: '制作中…',
+      module_craft_fail: '制作失败',
+      module_craft_success: '✅ {name} 制作完成!',
+      module_craft_close: '✕ 关闭',
+      desc_stats_full: '{fit}{base}\n攻击 +{atk} · 防御 +{def} · 速度 +{spd}%{dur}',
       t5_t1_title: '欢迎来到铁匠铺!', t5_t1_body: '将钓鱼物品熔炼成材料,<br>然后用这些材料制作和强化装备。',
       t5_t2_title: '熔炉 — 熔炼物品', t5_t2_body: '<b>钓鱼获得的废品</b>放入熔炉<br>会变成材料(铁/铜/宝石等)。<br>名词等级越高产出越多!',
       t5_t3_title: '铁砧 — 制作装备', t5_t3_body: '将<b>产物材料</b>放到铁砧制作<br>武器/防具/饰品。<br>材料组合决定能力值。',
@@ -3640,7 +3668,7 @@
         stats.durabilityMax != null && Number.isFinite(Number(stats.durabilityMax))
           ? ` · 내구 ${stats.durability != null ? stats.durability : stats.durabilityMax}/${stats.durabilityMax}`
           : '';
-      resultDesc.textContent = `${fitLine}${baseDesc}\n공격 +${stats.attackBonus} · 방어 +${stats.defenseBonus} · 스피드 +${spdPct}%${dur}`;
+      resultDesc.textContent = tr('desc_stats_full', { fit: fitLine, base: baseDesc, atk: stats.attackBonus, def: stats.defenseBonus, spd: spdPct, dur: dur });
     } else {
       resultDesc.textContent = `${fitLine}${baseDesc}`;
     }
@@ -6037,7 +6065,7 @@
 
   function renderModuleSlots(eq) {
     if (!$moduleSlotGrid || !eq) return;
-    $moduleSlotTitle.textContent = eq.name || '장비';
+    $moduleSlotTitle.textContent = eq.name || tr('result_default');
     $moduleSlotGrid.innerHTML = '';
     const equipSlot = eq.stats?.equipSlot || 'weapon';
     const slots = EQUIP_MODULE_SLOTS_CLIENT[equipSlot] || [];
@@ -6101,7 +6129,7 @@
     const equipped   = moduleAllList.filter(m => m.equippedTo);
     const allSorted  = [...unequipped, ...equipped];
     if (allSorted.length === 0) {
-      $moduleInvList.innerHTML = '<p style="color:rgba(200,180,240,0.35);font-size:0.75rem;padding:0.4rem">모듈 없음 — 아래에서 제작하세요</p>';
+      $moduleInvList.innerHTML = '<p style="color:rgba(200,180,240,0.35);font-size:0.75rem;padding:0.4rem">' + tr('module_no_modules') + '</p>';
       return;
     }
     allSorted.forEach(mod => {
@@ -6454,7 +6482,7 @@
     $list.innerHTML = '';
     const items = Object.values(moduleCraftStockCache).filter(s => (s.count || 0) > 0);
     if (items.length === 0) {
-      $list.innerHTML = '<span style="font-size:0.72rem;color:rgba(200,190,240,0.4)">산출물 없음</span>';
+      $list.innerHTML = '<span style="font-size:0.72rem;color:rgba(200,190,240,0.4)">' + tr('module_no_outputs') + '</span>';
       return;
     }
     const full = moduleCraftSlots.filter(Boolean).length >= MAX_CRAFT_SLOTS;
@@ -6539,7 +6567,7 @@
     $moduleCraftToggleBtn.addEventListener('click', () => {
       const shown = $moduleCraftPanel && $moduleCraftPanel.style.display !== 'none';
       if ($moduleCraftPanel) $moduleCraftPanel.style.display = shown ? 'none' : 'block';
-      $moduleCraftToggleBtn.textContent = shown ? '⚒️ 모듈 제작' : '✕ 닫기';
+      $moduleCraftToggleBtn.textContent = shown ? tr('module_craft_toggle') : tr('module_craft_close');
     });
   }
 
@@ -6547,7 +6575,7 @@
     $moduleCraftBtn.addEventListener('click', async () => {
       const filledSlots = moduleCraftSlots.filter(Boolean);
       if (!moduleCraftSelectedType || filledSlots.length === 0 || $moduleCraftBtn.disabled) return;
-      if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '제작 중…'; $moduleCraftMsg.style.color = 'rgba(200,190,240,0.6)'; }
+      if ($moduleCraftMsg) { $moduleCraftMsg.textContent = tr('module_craft_busy'); $moduleCraftMsg.style.color = 'rgba(200,190,240,0.6)'; }
       $moduleCraftBtn.disabled = true;
 
       // 슬롯 재료를 productId별로 집계
@@ -6567,20 +6595,20 @@
         const json = await resp.json();
         if (!resp.ok) {
           // 실패 시 재료 슬롯 복구
-          if ($moduleCraftMsg) { $moduleCraftMsg.textContent = json?.error?.message || '제작 실패'; $moduleCraftMsg.style.color = '#fca5a5'; }
+          if ($moduleCraftMsg) { $moduleCraftMsg.textContent = json?.error?.message || tr('module_craft_fail'); $moduleCraftMsg.style.color = '#fca5a5'; }
           $moduleCraftBtn.disabled = false;
           return;
         }
         // 성공: 슬롯 비우기 (서버에서 이미 소모됨)
         moduleCraftSlots = Array(MAX_CRAFT_SLOTS).fill(null);
         moduleAllList.push(json.module);
-        if ($moduleCraftMsg) { $moduleCraftMsg.textContent = `✅ ${json.module.name} 제작 완료!`; $moduleCraftMsg.style.color = '#6ee7b7'; }
+        if ($moduleCraftMsg) { $moduleCraftMsg.textContent = tr('module_craft_success', { name: json.module.name }); $moduleCraftMsg.style.color = '#6ee7b7'; }
         renderModuleInvList();
         renderModuleCraftSlots();
         renderModuleCraftStock();
         $moduleCraftBtn.disabled = false;
       } catch (e) {
-        if ($moduleCraftMsg) { $moduleCraftMsg.textContent = '오류가 발생했습니다.'; $moduleCraftMsg.style.color = '#fca5a5'; }
+        if ($moduleCraftMsg) { $moduleCraftMsg.textContent = tr('error_occurred'); $moduleCraftMsg.style.color = '#fca5a5'; }
         $moduleCraftBtn.disabled = false;
       }
     });
