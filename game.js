@@ -302,6 +302,32 @@
       tab_equipment: '装备', tab_repair: '修理', tab_enhance: '强化', tab_modules: '改造',
       forge_done: '⚒️ 精炼完成!',
       forge_failed: '精炼失败',
+      smelt_result_label: '熔炼结果',
+      smelt_loss_chip: '{emoji}{name} ×{n} 损失',
+      smelt_empty: '还没有', smelt_cat_empty: '没有{cat}基础材料',
+      module_empty: '没有模块。', module_equipped_tag: '{tier} · 已装备',
+      smelt_equip_warn: '⚠️ 熔炼{parts}可能损失部分材料 (回收率约70%)。',
+      smelt_preview_prefix: '预计: ',
+      smelt_preview_unknown: '🎲 不确定会出什么',
+      forge_overlay_bonus: '🪙 精炼奖励预计: +{n} 金币',
+      forge_overlay_timer: '约{n}秒',
+      forge_overlay_overdue: '超出预计{n}秒',
+      forge_overlay_busy: '正在铁匠铺制作…',
+      msg_qty_limit: '基础材料只能放入持有数量。',
+      msg_slot_full: '槽位已满。 (最多9格)',
+      msg_smelt_first: '钓鱼材料/装备必须先在熔炉熔炼。已为您移动到熔炉。',
+      msg_anvil_only_outputs: '基础材料只能拖到铁砧。',
+      smith_proficiency_label: '铁匠熟练度',
+      smith_proficiency_count: '{n}  (+{p}% 加成)',
+      msg_drag_to_anvil: '点击产物或拖到指定槽位。位置影响能力值。',
+      msg_open_from_game: '只有从游戏内打开此页面时才能在服务器精炼。',
+      msg_anvil_only_outputs2: '铁砧只能放基础材料(产物)。',
+      msg_forge_ready: '材料{n}个 · [{harm}] · 成功率约{p}%{syn}',
+      msg_forge_basic_ready: '基础材料(产物){n}个 — 按"⚒️ 精炼"制作装备。',
+      result_failed: '精炼失败', result_broken: '装备损坏了',
+      material_history_hint: '制作此装备使用的材料列表。',
+      nameless: '无名',
+      sound_label: '🔊',
       t5_t1_title: '欢迎来到铁匠铺!', t5_t1_body: '将钓鱼物品熔炼成材料,<br>然后用这些材料制作和强化装备。',
       t5_t2_title: '熔炉 — 熔炼物品', t5_t2_body: '<b>钓鱼获得的废品</b>放入熔炉<br>会变成材料(铁/铜/宝石等)。<br>名词等级越高产出越多!',
       t5_t3_title: '铁砧 — 制作装备', t5_t3_body: '将<b>产物材料</b>放到铁砧制作<br>武器/防具/饰品。<br>材料组合决定能力值。',
@@ -1690,7 +1716,7 @@
     }
     const label = document.createElement('span');
     label.className = 'furnace-result-label';
-    label.textContent = '녹인 결과';
+    label.textContent = tr('smelt_result_label');
     furnaceResultEl.appendChild(label);
     for (const g of gains) {
       const chip = document.createElement('span');
@@ -1701,7 +1727,7 @@
     for (const l of lost) {
       const chip = document.createElement('span');
       chip.className = 'furnace-result-chip furnace-result-chip--lost';
-      chip.textContent = `${l.emoji || ''}${l.name} ×${l.count} 소실`;
+      chip.textContent = tr('smelt_loss_chip', { emoji: l.emoji || '', name: l.name, n: l.count });
       furnaceResultEl.appendChild(chip);
     }
     furnaceResultEl.classList.remove('hidden');
@@ -1779,13 +1805,13 @@
       .filter((x) => x && x.count > 0);
     renderSmeltCategoryFilterUi();
     if (entries.length === 0) {
-      smeltStockListEl.innerHTML = '<span class="smelt-pill smelt-pill--empty">아직 없음</span>';
+      smeltStockListEl.innerHTML = '<span class="smelt-pill smelt-pill--empty">' + tr('smelt_empty') + '</span>';
       return;
     }
     const filtered = entries.filter((e) => matchSmeltCategory(e, smeltCategory));
     if (filtered.length === 0) {
       const catLabel = SMELT_CATEGORY_NAMES[smeltCategory] || '선택한 카테고리';
-      smeltStockListEl.innerHTML = `<span class="smelt-pill smelt-pill--empty">${escapeHtml(catLabel)} 기초 재료 없음</span>`;
+      smeltStockListEl.innerHTML = '<span class="smelt-pill smelt-pill--empty">' + escapeHtml(tr('smelt_cat_empty', { cat: catLabel })) + '</span>';
       return;
     }
     smeltStockListEl.innerHTML = '';
@@ -1868,7 +1894,7 @@
     if (matCountBadge) matCountBadge.textContent = String(dockModulePool.length);
     materialListEl.innerHTML = '';
     if (dockModulePool.length === 0) {
-      materialListEl.innerHTML = '<p class="log-empty">모듈이 없습니다.</p>';
+      materialListEl.innerHTML = '<p class="log-empty">' + tr('module_empty') + '</p>';
       renderMaterialDockFilterUi();
       syncScrollOverflow();
       return;
@@ -1894,7 +1920,7 @@
       row.appendChild(nameEl);
       const tagEl = document.createElement('span');
       tagEl.className = 'inv-tag';
-      tagEl.textContent = mod.equippedTo ? `${tierLabel} · 장착중` : tierLabel;
+      tagEl.textContent = mod.equippedTo ? tr('module_equipped_tag', { tier: tierLabel }) : tierLabel;
       row.appendChild(tagEl);
 
       if (mod.equippedTo) {
@@ -1985,7 +2011,7 @@
         const parts = [];
         if (equipItems.length > 0) parts.push('장비');
         if (furnaceModulesPending.length > 0) parts.push('모듈');
-        furnaceEquipWarnEl.textContent = `⚠️ ${parts.join('·')}을 녹이면 재료 일부가 소실될 수 있습니다 (회수율 약 70%).`;
+        furnaceEquipWarnEl.textContent = tr('smelt_equip_warn', { parts: parts.join('·') });
       }
     }
     if (furnacePreviewEl) {
@@ -2011,7 +2037,7 @@
           const expected = Math.round(y * 0.7); // 70% 회수율 적용
           parts.push(`🔩 ${mod.name} (~${expected}개)`);
         }
-        furnacePreviewEl.textContent = parts.length > 0 ? `예상: ${parts.join(', ')}` : '🎲 무엇이 나올지 알 수 없어요';
+        furnacePreviewEl.textContent = parts.length > 0 ? tr('smelt_preview_prefix') + parts.join(', ') : tr('smelt_preview_unknown');
       }
     }
     renderSmeltStock();
@@ -2165,7 +2191,7 @@
   function updateForgeOverlayBonusEstimate(elapsedSec) {
     if (!forgeOverlayBonusEl) return;
     const coins = calcForgeExpectedCoins(elapsedSec);
-    forgeOverlayBonusEl.textContent = `🪙 제련 보상 예상: +${coins} 코인`;
+    forgeOverlayBonusEl.textContent = tr('forge_overlay_bonus', { n: coins });
     forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
   }
 
@@ -2176,16 +2202,16 @@
     if (!forgeOverlayTimerEl) return;
     let countdown = 20;
     let totalElapsed = 0;
-    forgeOverlayTimerEl.textContent = `예상 시간 약 ${countdown}초`;
+    forgeOverlayTimerEl.textContent = tr('forge_overlay_timer', { n: countdown });
     updateForgeOverlayBonusEstimate(totalElapsed);
     forgeOverlayCountdownId = window.setInterval(() => {
       totalElapsed += 1;
       countdown -= 1;
       if (countdown >= 0) {
-        forgeOverlayTimerEl.textContent = `예상 시간 약 ${countdown}초`;
+        forgeOverlayTimerEl.textContent = tr('forge_overlay_timer', { n: countdown });
       } else {
         const exceed = -countdown;
-        forgeOverlayTimerEl.textContent = `예상시간 ${exceed}초 초과`;
+        forgeOverlayTimerEl.textContent = tr('forge_overlay_overdue', { n: exceed });
       }
       updateForgeOverlayBonusEstimate(totalElapsed);
     }, 1000);
@@ -2220,7 +2246,7 @@
     if (!forgeOverlayEl) return;
     if (visible) {
       hideSignatureCelebrate();
-      if (forgeOverlayTitleEl) forgeOverlayTitleEl.textContent = '대장간에서 제작 중…';
+      if (forgeOverlayTitleEl) forgeOverlayTitleEl.textContent = tr('forge_overlay_busy');
       if (forgeDiscoveryBannerEl) {
         forgeDiscoveryBannerEl.textContent = '';
         forgeDiscoveryBannerEl.classList.add('forge-discovery-banner--hidden');
@@ -2334,13 +2360,13 @@
     const maxCount = latest && typeof latest.count === 'number' ? latest.count : 0;
     const inSelected = countSelectedSmeltById(sid);
     if (inSelected >= maxCount) {
-      if (statusMsgEl) statusMsgEl.textContent = '해당 기초 재료는 보유 수량만큼만 모루에 올릴 수 있어요.';
+      if (statusMsgEl) statusMsgEl.textContent = tr('msg_qty_limit');
       syncForgeUi();
       return true;
     }
     const emptyIdx = selected.indexOf(null);
     if (emptyIdx < 0) {
-      if (statusMsgEl) statusMsgEl.textContent = '슬롯이 꽉 찼어요. (최대 9칸)';
+      if (statusMsgEl) statusMsgEl.textContent = tr('msg_slot_full');
       return true;
     }
     selected[emptyIdx] = makeSmeltSelectionMaterial(latest || { id: sid, name: sid, emoji: '◆' });
@@ -2714,7 +2740,7 @@
     const desc = (item.description != null && String(item.description).trim()) || (item.desc != null && String(item.desc).trim()) || '';
     if (desc) appendMaterialDetailRow(materialDetailDlEl, '설명', desc);
 
-    if (materialDetailHintEl) materialDetailHintEl.textContent = '이 장비를 만들 때 사용된 재료 목록입니다.';
+    if (materialDetailHintEl) materialDetailHintEl.textContent = tr('material_history_hint');
     materialDetailModalEl.classList.remove('material-detail-modal--hidden');
     materialDetailModalEl.setAttribute('aria-hidden', 'false');
     document.documentElement.classList.add('material-detail-open');
@@ -2724,7 +2750,7 @@
 
   function openMaterialDetailModal(m) {
     if (!m || !materialDetailModalEl || !materialDetailThumbEl || !materialDetailTitleEl || !materialDetailRarityEl || !materialDetailDlEl) return;
-    materialDetailTitleEl.textContent = m.name != null ? String(m.name) : '이름 없음';
+    materialDetailTitleEl.textContent = m.name != null ? String(m.name) : tr('nameless');
     const tier = rarityClass(m.rarity);
     materialDetailRarityEl.textContent = tierLabel(tier);
     materialDetailRarityEl.className = `material-detail-rarity rarity-${tier}`;
@@ -2759,7 +2785,7 @@
       (m.desc != null && String(m.desc).trim()) ||
       '';
     if (desc) appendMaterialDetailRow(materialDetailDlEl, '설명', desc);
-    if (materialDetailHintEl) materialDetailHintEl.innerHTML = '끌어서 <strong>용광로</strong>에 녹이세요. 산출물이 되면 모루에서 장비를 만들 수 있어요.';
+    if (materialDetailHintEl) materialDetailHintEl.innerHTML = tr('material_hint');
     materialDetailModalEl.classList.remove('material-detail-modal--hidden');
     materialDetailModalEl.setAttribute('aria-hidden', 'false');
     document.documentElement.classList.add('material-detail-open');
@@ -2786,7 +2812,7 @@
     if (!m) return;
     if (!isSmeltMaterial(m)) {
       if (statusMsgEl) {
-        statusMsgEl.textContent = '낚시 재료·장비는 먼저 용광로에서 녹여야 해요. 재료를 용광로로 이동시켜 드릴게요.';
+        statusMsgEl.textContent = tr('msg_smelt_first');
       }
       applyMaterialToFurnaceByUid(uid);
       return;
@@ -2799,7 +2825,7 @@
     } else {
       const emptyIdx = selected.indexOf(null);
       if (emptyIdx >= 0) selected[emptyIdx] = m;
-      else if (statusMsgEl) statusMsgEl.textContent = '슬롯이 꽉 찼어요. (최대 9칸)';
+      else if (statusMsgEl) statusMsgEl.textContent = tr('msg_slot_full');
     }
     syncForgeUi();
     syncFurnaceUi();
@@ -2974,7 +3000,7 @@
             tryAddSmeltToAnvilBySid(s.smeltSid);
           }
         } else if (panel === 'furnace' && statusMsgEl) {
-          statusMsgEl.textContent = '기초 재료는 모루로만 끌어다 놓을 수 있어요.';
+          statusMsgEl.textContent = tr('msg_anvil_only_outputs');
         }
       } else if (s.kind === 'material' && s.uid) {
         if (panel === 'furnace') applyMaterialToFurnaceByUid(s.uid);
@@ -3089,7 +3115,7 @@
         clearForgeDnDHover();
         if (kind === 'furnace') {
           if (readSmeltDragSid(e.dataTransfer)) {
-            if (statusMsgEl) statusMsgEl.textContent = '기초 재료는 모루로만 끌어다 놓을 수 있어요.';
+            if (statusMsgEl) statusMsgEl.textContent = tr('msg_anvil_only_outputs');
             return;
           }
           // 모듈 드롭 처리
@@ -3242,11 +3268,11 @@
     const labelEl = document.getElementById('profLabel');
     const countEl = document.getElementById('profCount');
     if (!barEl || !labelEl || !countEl) return;
-    labelEl.textContent = '대장장이 능력치';
+    labelEl.textContent = tr('smith_proficiency_label');
     const profVal = Number(smithingProficiency) || 0;
     const mul = clientProfMul(profVal);
     const bonusPct = ((mul - 1.0) * 100).toFixed(1);
-    countEl.textContent = `${profVal.toFixed(3)}  (+${bonusPct}% 보너스)`;
+    countEl.textContent = tr('smith_proficiency_count', { n: profVal.toFixed(3), p: bonusPct });
     if (gained) {
       barEl.classList.add('prof-level-up');
       window.setTimeout(() => barEl.classList.remove('prof-level-up'), 1200);
@@ -3288,7 +3314,7 @@
     const maxCount = latest && typeof latest.count === 'number' ? latest.count : 0;
     const inSelected = countSelectedSmeltById(sid);
     if (inSelected >= maxCount) {
-      if (statusMsgEl) statusMsgEl.textContent = '해당 기초 재료는 보유 수량만큼만 모루에 올릴 수 있어요.';
+      if (statusMsgEl) statusMsgEl.textContent = tr('msg_qty_limit');
       return;
     }
     selected[slotIndex] = makeSmeltSelectionMaterial(latest || { id: sid, name: sid, emoji: '◆' });
@@ -3355,16 +3381,16 @@
     statusMsgEl.className = 'status-msg';
     const items = selected.filter(Boolean);
     if (items.length === 0) {
-      statusMsgEl.textContent = '산출물을 클릭하거나 원하는 슬롯으로 드래그하세요. 위치에 따라 능력치가 오르내려요.';
+      statusMsgEl.textContent = tr('msg_drag_to_anvil');
       return;
     }
     if (!alpToken || !platformApi) {
-      statusMsgEl.textContent = '게임에서 이 화면을 연 경우에만 서버에 제련할 수 있어요.';
+      statusMsgEl.textContent = tr('msg_open_from_game');
       return;
     }
     const nonSmelt = items.filter((m) => !isSmeltMaterial(m));
     if (nonSmelt.length > 0) {
-      statusMsgEl.textContent = `모루에는 기초 재료(산출물)만 올릴 수 있어요.`;
+      statusMsgEl.textContent = tr('msg_anvil_only_outputs2');
       return;
     }
     if (items.every((m) => isSmeltMaterial(m))) {
@@ -3381,12 +3407,12 @@
       const synLine = activeSyn.length > 0
         ? `  ⚡ ${activeSyn.map((s) => s.name).join(' · ')}`
         : '';
-      statusMsgEl.textContent = `재료 ${items.length}개 · [${harmLabel}] · 성공률 약 ${successPct}%${synLine}`;
+      statusMsgEl.textContent = tr('msg_forge_ready', { n: items.length, harm: harmLabel, p: successPct, syn: synLine });
       statusMsgEl.className = `status-msg ${harmCls}`;
       return;
     }
     statusMsgEl.className = 'status-msg';
-    statusMsgEl.textContent = `기초 재료(산출물) ${items.length}개 — 「⚒️ 제련하기」를 눌러 장비를 만드세요.`;
+    statusMsgEl.textContent = tr('msg_forge_basic_ready', { n: items.length });
   }
 
   function hideResultCard() {
@@ -3421,8 +3447,8 @@
 
     resultCard.className = 'result-card result-card--failed';
     resultRarity.className = 'result-rarity result-rarity--failed';
-    resultRarity.textContent = '제련 실패';
-    resultName.textContent = '장비가 부서졌습니다';
+    resultRarity.textContent = tr('result_failed');
+    resultName.textContent = tr('result_broken');
 
     // 반환 재료 목록
     const returned = Array.isArray(data.returnedMaterials) ? data.returnedMaterials : [];
