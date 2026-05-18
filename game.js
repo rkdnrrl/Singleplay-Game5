@@ -559,7 +559,7 @@
         title.textContent = s.title || '';
         body.innerHTML = s.body || '';
         prevBtn.style.visibility = idx === 0 ? 'hidden' : 'visible';
-        nextBtn.textContent = idx === steps.length - 1 ? '시작!' : '다음';
+        nextBtn.textContent = idx === steps.length - 1 ? tr('t_start') : tr('t_next');
         dots.innerHTML = '';
         steps.forEach((_, i) => {
           const d = document.createElement('div');
