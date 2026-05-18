@@ -123,10 +123,8 @@
 
     document.addEventListener('mousemove', (e) => {
       const p = state.pos, s = state.size;
-      const wrapperLeft = p.x >= 0 ? p.x : window.innerWidth  - s.w;
-      const wrapperTop  = p.y >= 0 ? p.y : window.innerHeight - (s.h + TOOLBAR_H) - bottomOffset;
-      const elX = wrapperLeft;
-      const elY = wrapperTop + TOOLBAR_H;
+      const elX = p.x >= 0 ? p.x : window.innerWidth  - s.w;
+      const elY = p.y >= 0 ? p.y : window.innerHeight - s.h - bottomOffset;
       const scale = s.w / NATURAL_W;
       iframe.contentWindow && iframe.contentWindow.postMessage({
         type: 'assistant:mousemove',
