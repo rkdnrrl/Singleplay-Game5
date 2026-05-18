@@ -550,7 +550,7 @@
 
       const dontShow = document.createElement('label');
       dontShow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:12px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;justify-content:center;';
-      dontShow.innerHTML = '<input type="checkbox" id="_tutorial-dontshow" style="cursor:pointer;"> 다시 보지 않기';
+      dontShow.innerHTML = '<input type="checkbox" id="_tutorial-dontshow" style="cursor:pointer;"> ' + tr('t_dont_show');
       card.appendChild(dontShow);
 
       function render() {
