@@ -602,7 +602,7 @@
   if (platformWeb) {
     const btn = document.createElement('a');
     btn.href = platformWeb + '/games';
-    btn.textContent = '← 게임 목록';
+    btn.textContent = tr('back_to_games');
     btn.style.cssText = [
       'position:fixed;top:12px;left:12px;z-index:9999',
       'background:rgba(0,0,0,0.35);color:#ccc',
