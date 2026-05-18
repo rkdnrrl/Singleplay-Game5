@@ -540,7 +540,7 @@
       nav.appendChild(prevBtn);
 
       const skipBtn = document.createElement('button');
-      skipBtn.textContent = '건너뛰기';
+      skipBtn.textContent = tr('t_skip');
       skipBtn.style.cssText = 'flex:1;padding:10px;background:transparent;color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;font-size:14px;';
       nav.appendChild(skipBtn);
 
