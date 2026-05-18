@@ -1062,58 +1062,15 @@
       }
     } catch { /* 비치명 */ }
     // 캐릭터 iframe 삽입 (1회)
-    if (!document.getElementById('assistant-iframe')) {
+    if (!document.getElementById('assistant-widget')) {
       try {
         const meRes = await apiFetch(`${platformApi}/api/auth/me`, {
           headers: { Authorization: `Bearer ${alpToken}` },
         });
         if (meRes.ok) {
           const me = await meRes.json();
-          // commonUserId 우선 — CommonDB 기준 ID
           const cuid = me?.user?.commonUserId || me?.user?.id;
-          if (cuid) {
-            const iframe = document.createElement('iframe');
-            iframe.id = 'assistant-iframe';
-            iframe.src = `https://assistant-chi-two.vercel.app?userId=${cuid}&app=platform`;
-            const _mob = window.innerWidth < 480;
-            let iframeW = _mob ? 120 : 220, iframeH = _mob ? 213 : 390;
-            let iframeX = -1, iframeY = -1;
-            iframe.style.cssText = `position:fixed;right:0;bottom:0;width:${iframeW}px;height:${iframeH}px;border:none;background:transparent;z-index:9999;`;
-            document.body.appendChild(iframe);
-            function switchToLeftTop() {
-              if (iframeX >= 0) return;
-              const rect = iframe.getBoundingClientRect();
-              iframeX = rect.left; iframeY = rect.top;
-              iframe.style.right = ''; iframe.style.bottom = '';
-              iframe.style.left = iframeX + 'px'; iframe.style.top = iframeY + 'px';
-            }
-            document.addEventListener('mousemove', (e) => {
-              iframe.contentWindow?.postMessage({ type: 'assistant:mousemove', x: e.clientX - iframeX, y: e.clientY - iframeY }, '*');
-            });
-            let pendingDx = 0, pendingDy = 0, rafPending = false;
-            function flushDrag() {
-              rafPending = false;
-              if (pendingDx === 0 && pendingDy === 0) return;
-              iframeX = Math.max(0, Math.min(window.innerWidth  - iframeW, iframeX + pendingDx));
-              iframeY = Math.max(0, Math.min(window.innerHeight - iframeH, iframeY + pendingDy));
-              iframe.style.left = iframeX + 'px'; iframe.style.top = iframeY + 'px';
-              pendingDx = 0; pendingDy = 0;
-            }
-            window.addEventListener('message', (e) => {
-              if (e.data?.type === 'assistant:navigate') { window.open(e.data.url, '_blank'); }
-              if (e.data?.type === 'assistant:drag') {
-                switchToLeftTop();
-                pendingDx += e.data.dx ?? 0; pendingDy += e.data.dy ?? 0;
-                if (!rafPending) { rafPending = true; requestAnimationFrame(flushDrag); }
-              }
-              if (e.data?.type === 'assistant:resize') {
-                iframeW = e.data.width;
-                iframeH = e.data.height;
-                iframe.style.width  = iframeW + 'px';
-                iframe.style.height = iframeH + 'px';
-              }
-            });
-          }
+          if (cuid) mountCharacterWidget(cuid, { app: 'platform', storageKey: 'alp_charwidget' });
         }
       } catch { /* 비치명 */ }
     }
