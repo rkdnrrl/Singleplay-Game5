@@ -93,6 +93,41 @@
       material_history_hint: '이 장비를 만들 때 사용된 재료 목록입니다.',
       nameless: '이름 없음',
       sound_label: '🔊',
+      forge_combo_prefix: '조합',
+      desc_stats: '공격 +{atk} · 방어 +{def} · 스피드 +{spd}%{dur}',
+      timing_title: '⚒️ 타이밍을 맞춰 제련하세요!',
+      timing_sub: '클릭 또는 스페이스바로 멈추세요',
+      no_token: '게임 연결(토큰)이 없어 제련할 수 없어요.',
+      btn_forging: '제련 중…',
+      server_resp_err: '서버 응답 형식 오류 — 다시 시도하세요.',
+      network_err: '네트워크 오류로 서버에 저장하지 못했어요.',
+      list_loading: '불러오는 중…',
+      list_load_fail: '목록을 불러오지 못했어요.',
+      list_no_crafted: '아직 제작한 장비가 없습니다.',
+      list_network_err: '네트워크 오류로 목록을 불러오지 못했어요.',
+      ecl_timer_remaining: '예상 대기시간 {n}초',
+      ecl_timer_overdue: '예상 대기시간 초과 +{n}초',
+      forge_specific: '⚒️ {label} 제련',
+      repair_dur_info_full: '내구도: {cur} / {max}',
+      repair_coin_info: '🪙 {n}  (-{spent})',
+      btn_processing: '처리 중…',
+      btn_repair_done: '✅ 수리 완료',
+      empty_dash: '—',
+      modules_label: '🔩 모듈',
+      no_crafted: '제작된 장비가 없습니다',
+      enhance_with_item: '{emoji} {sname}로 [{ename}] 강화',
+      enhance_pick_item: '강화 아이템을 선택하세요',
+      enhance_pick_equip: '강화할 장비를 선택하세요',
+      enhance_busy: '강화 중…',
+      enhance_fail_default: '강화 실패',
+      enhance_success: '✅ 강화 성공!',
+      enhance_fail_msg: '💔 강화 실패… 아이템만 소모됐습니다.',
+      error_occurred: '오류가 발생했습니다.',
+      list_load_fail_short: '불러오기 실패',
+      no_gear: '장비가 없습니다',
+      forge_failed_msg: '제련 실패! 재료 일부가 회수됐어요.',
+      forge_basic_drag_hint: '기초 재료(산출물)를 모루에 끌어다 놓으세요.',
+      result_desc_template: '성공률 {p}% · 강도 [{strength}]{gain}{syn}{ret}',
       // 튜토리얼
       t5_t1_title: '대장간에 오신 걸 환영해요!', t5_t1_body: '낚시 아이템을 녹여 재료를 모으고,<br>그 재료로 장비를 제작·강화하는 곳이에요.',
       t5_t2_title: '용광로 — 아이템 녹이기', t5_t2_body: '<b>낚시에서 얻은 폐품</b>을 용광로에 넣으면<br>재료(철·구리·보석 등)가 나와요.<br>명사 등급이 높을수록 더 많이 나옵니다.',
@@ -172,6 +207,41 @@
       material_history_hint: 'Materials used to craft this gear.',
       nameless: 'Unnamed',
       sound_label: '🔊',
+      forge_combo_prefix: 'combo',
+      desc_stats: 'ATK +{atk} · DEF +{def} · SPD +{spd}%{dur}',
+      timing_title: '⚒️ Time your forge!',
+      timing_sub: 'Click or press Space to stop',
+      no_token: 'No game connection — cannot forge.',
+      btn_forging: 'Forging…',
+      server_resp_err: 'Server response error — try again.',
+      network_err: 'Network error — could not save.',
+      list_loading: 'Loading…',
+      list_load_fail: 'Failed to load list.',
+      list_no_crafted: 'No crafted gear yet.',
+      list_network_err: 'Network error — could not load list.',
+      ecl_timer_remaining: 'About {n}s',
+      ecl_timer_overdue: '+{n}s over estimate',
+      forge_specific: '⚒️ Forge {label}',
+      repair_dur_info_full: 'Durability: {cur} / {max}',
+      repair_coin_info: '🪙 {n}  (-{spent})',
+      btn_processing: 'Processing…',
+      btn_repair_done: '✅ Repaired',
+      empty_dash: '—',
+      modules_label: '🔩 Modules',
+      no_crafted: 'No crafted gear',
+      enhance_with_item: '{emoji} {sname} on [{ename}]',
+      enhance_pick_item: 'Select an enhance item',
+      enhance_pick_equip: 'Select gear to enhance',
+      enhance_busy: 'Enhancing…',
+      enhance_fail_default: 'Enhance failed',
+      enhance_success: '✅ Enhance success!',
+      enhance_fail_msg: '💔 Enhance failed… item consumed.',
+      error_occurred: 'An error occurred.',
+      list_load_fail_short: 'Load failed',
+      no_gear: 'No gear',
+      forge_failed_msg: 'Forge failed! Some materials recovered.',
+      forge_basic_drag_hint: 'Drag base materials onto the anvil.',
+      result_desc_template: 'Success {p}% · Strength [{strength}]{gain}{syn}{ret}',
       t5_t1_title: 'Welcome to the Blacksmith!', t5_t1_body: 'Smelt fishing items into materials,<br>then craft and enhance gear with them.',
       t5_t2_title: 'Furnace — Smelt Items', t5_t2_body: '<b>Scrap from fishing</b> goes in the furnace<br>and comes out as materials (iron/copper/gems).<br>Higher noun-tier = more output!',
       t5_t3_title: 'Anvil — Craft Gear', t5_t3_body: 'Place <b>output materials</b> on the anvil and craft<br>weapons/armor/accessories.<br>Material combinations decide the stats.',
@@ -250,6 +320,41 @@
       material_history_hint: 'この装備を作るのに使われた素材リストです。',
       nameless: '名前なし',
       sound_label: '🔊',
+      forge_combo_prefix: '組合',
+      desc_stats: '攻撃 +{atk} · 防御 +{def} · スピード +{spd}%{dur}',
+      timing_title: '⚒️ タイミングを合わせて精錬しよう!',
+      timing_sub: 'クリックまたはスペースで停止',
+      no_token: 'ゲーム接続(トークン)がないので精錬できません。',
+      btn_forging: '精錬中…',
+      server_resp_err: 'サーバー応答エラー — 再試行してください。',
+      network_err: 'ネットワークエラーで保存できませんでした。',
+      list_loading: '読み込み中…',
+      list_load_fail: 'リスト読み込みに失敗。',
+      list_no_crafted: 'まだ製作した装備がありません。',
+      list_network_err: 'ネットワークエラーでリストを読み込めません。',
+      ecl_timer_remaining: '予想待機 {n}秒',
+      ecl_timer_overdue: '予想超過 +{n}秒',
+      forge_specific: '⚒️ {label}を精錬',
+      repair_dur_info_full: '耐久度: {cur} / {max}',
+      repair_coin_info: '🪙 {n}  (-{spent})',
+      btn_processing: '処理中…',
+      btn_repair_done: '✅ 修理完了',
+      empty_dash: '—',
+      modules_label: '🔩 モジュール',
+      no_crafted: '製作した装備なし',
+      enhance_with_item: '{emoji} {sname}で[{ename}]強化',
+      enhance_pick_item: '強化アイテムを選択',
+      enhance_pick_equip: '強化する装備を選択',
+      enhance_busy: '強化中…',
+      enhance_fail_default: '強化失敗',
+      enhance_success: '✅ 強化成功!',
+      enhance_fail_msg: '💔 強化失敗… アイテムだけ消費されました。',
+      error_occurred: 'エラーが発生しました。',
+      list_load_fail_short: '読み込み失敗',
+      no_gear: '装備なし',
+      forge_failed_msg: '精錬失敗! 素材の一部が回収されました。',
+      forge_basic_drag_hint: '基礎素材(産出物)を金床にドラッグしてください。',
+      result_desc_template: '成功率 {p}% · 強度 [{strength}]{gain}{syn}{ret}',
       t5_t1_title: '鍛冶屋へようこそ!', t5_t1_body: '釣りで得たアイテムを溶かして素材を集め、<br>その素材で装備を製作・強化する場所です。',
       t5_t2_title: '炉 — アイテムを溶かす', t5_t2_body: '<b>釣りで得た廃品</b>を炉に入れると<br>素材(鉄・銅・宝石など)が出ます。<br>名詞ランクが高いほどたくさん出ます。',
       t5_t3_title: '金床 — 装備製作', t5_t3_body: '<b>産出素材</b>を金床に置いて製作すると<br>武器・防具・アクセサリができます。<br>素材の組み合わせで能力値が決まります。',
@@ -328,6 +433,41 @@
       material_history_hint: '制作此装备使用的材料列表。',
       nameless: '无名',
       sound_label: '🔊',
+      forge_combo_prefix: '组合',
+      desc_stats: '攻击 +{atk} · 防御 +{def} · 速度 +{spd}%{dur}',
+      timing_title: '⚒️ 把握时机精炼!',
+      timing_sub: '点击或按空格停止',
+      no_token: '没有游戏连接(令牌),无法精炼。',
+      btn_forging: '精炼中…',
+      server_resp_err: '服务器响应错误 — 请重试。',
+      network_err: '网络错误,无法保存到服务器。',
+      list_loading: '加载中…',
+      list_load_fail: '加载列表失败。',
+      list_no_crafted: '还没有制作的装备。',
+      list_network_err: '网络错误,无法加载列表。',
+      ecl_timer_remaining: '预计等待 {n}秒',
+      ecl_timer_overdue: '超出预计 +{n}秒',
+      forge_specific: '⚒️ 精炼{label}',
+      repair_dur_info_full: '耐久度: {cur} / {max}',
+      repair_coin_info: '🪙 {n}  (-{spent})',
+      btn_processing: '处理中…',
+      btn_repair_done: '✅ 修理完成',
+      empty_dash: '—',
+      modules_label: '🔩 模块',
+      no_crafted: '没有制作的装备',
+      enhance_with_item: '{emoji} {sname}强化[{ename}]',
+      enhance_pick_item: '请选择强化道具',
+      enhance_pick_equip: '请选择强化的装备',
+      enhance_busy: '强化中…',
+      enhance_fail_default: '强化失败',
+      enhance_success: '✅ 强化成功!',
+      enhance_fail_msg: '💔 强化失败… 仅消耗道具。',
+      error_occurred: '发生错误。',
+      list_load_fail_short: '加载失败',
+      no_gear: '没有装备',
+      forge_failed_msg: '精炼失败! 部分材料已回收。',
+      forge_basic_drag_hint: '将基础材料(产物)拖到铁砧。',
+      result_desc_template: '成功率 {p}% · 强度 [{strength}]{gain}{syn}{ret}',
       t5_t1_title: '欢迎来到铁匠铺!', t5_t1_body: '将钓鱼物品熔炼成材料,<br>然后用这些材料制作和强化装备。',
       t5_t2_title: '熔炉 — 熔炼物品', t5_t2_body: '<b>钓鱼获得的废品</b>放入熔炉<br>会变成材料(铁/铜/宝石等)。<br>名词等级越高产出越多!',
       t5_t3_title: '铁砧 — 制作装备', t5_t3_body: '将<b>产物材料</b>放到铁砧制作<br>武器/防具/饰品。<br>材料组合决定能力值。',
@@ -2179,7 +2319,7 @@
     // 첫 조합 축하 메시지 아래에 코인 정보를 추가
     const prev = forgeOverlayBonusEl.textContent || '';
     const coinLine = `🪙 +${bonusCoins.toLocaleString()} 코인 적립!`;
-    forgeOverlayBonusEl.textContent = prev.includes('조합') ? `${prev}  ${coinLine}` : coinLine;
+    forgeOverlayBonusEl.textContent = prev.includes(tr('forge_combo_prefix')) ? `${prev}  ${coinLine}` : coinLine;
     forgeOverlayBonusEl.classList.remove('forge-overlay-bonus--hidden');
   }
 
@@ -3465,21 +3605,21 @@
       : '';
     const synArr = Array.isArray(data.activeSynergies) ? data.activeSynergies : [];
     const synFailLine = synArr.length > 0 ? `\n시너지: ⚡ ${synArr.map((s) => s.name).join(' · ')}` : '';
-    resultDesc.textContent = `성공률 ${data.successRatePct ?? '?'}% · 강도 [${data.materialStrengthLabel || '?'}]${gainStr}${synFailLine}${returnLine}`;
+    resultDesc.textContent = tr('result_desc_template', { p: data.successRatePct ?? '?', strength: data.materialStrengthLabel || '?', gain: gainStr, syn: synFailLine, ret: returnLine });
 
     // 깨진 이모지
     resultSpriteHost.innerHTML = '<span style="font-size:2.5rem;line-height:1">💥</span>';
 
     resultCard.classList.remove('hidden');
     if (statusMsgEl) {
-      statusMsgEl.textContent = `제련 실패! 재료 일부가 회수됐어요.`;
+      statusMsgEl.textContent = tr('forge_failed_msg');
       statusMsgEl.className = 'status-msg strength--weak';
     }
     resultHideTimer = window.setTimeout(() => {
       hideResultCard();
       if (statusMsgEl) {
         statusMsgEl.className = 'status-msg';
-        statusMsgEl.textContent = '기초 재료(산출물)를 모루에 끌어다 놓으세요.';
+        statusMsgEl.textContent = tr('forge_basic_drag_hint');
       }
     }, 5000);
   }
@@ -3491,7 +3631,7 @@
     resultCard.className = `result-card rarity-${rarityClass(tier)}`;
     resultRarity.className = `result-rarity rarity-${rarityClass(tier)}`;
     resultRarity.textContent = tierLabel(tier);
-    resultName.textContent = eq.name || eq.displayName || '장비';
+    resultName.textContent = eq.name || eq.displayName || tr('result_default');
     const baseDesc = eq.description || eq.desc || '';
     const fitLine = '';
     if (stats && typeof stats.attackBonus === 'number') {
@@ -3533,11 +3673,11 @@
 
     const title = document.createElement('div');
     title.style.cssText = 'color:#fff;font-size:1.1rem;font-weight:700;text-align:center';
-    title.textContent = '⚒️ 타이밍을 맞춰 제련하세요!';
+    title.textContent = tr('timing_title');
 
     const sub = document.createElement('div');
     sub.style.cssText = 'color:#aaa;font-size:.85rem;text-align:center';
-    sub.textContent = '클릭 또는 스페이스바로 멈추세요';
+    sub.textContent = tr('timing_sub');
 
     // 게이지 바
     const track = document.createElement('div');
@@ -3638,14 +3778,14 @@
     const usedSlots = selected.map((m, i) => m ? { m, i } : null).filter(Boolean);
     if (usedSlots.length < MIN_SMELT_MATERIALS_FOR_FORGE) return;
     if (!alpToken || !platformApi) {
-      if (statusMsgEl) statusMsgEl.textContent = '게임 연결(토큰)이 없어 제련할 수 없어요.';
+      if (statusMsgEl) statusMsgEl.textContent = tr('no_token');
       return;
     }
 
     const used = usedSlots.map(({ m }) => m);
     if (used.some((m) => !isSmeltMaterial(m))) {
       if (statusMsgEl) {
-        statusMsgEl.textContent = '모루에는 기초 재료(산출물)만 올릴 수 있어요.';
+        statusMsgEl.textContent = tr('msg_anvil_only_outputs2');
       }
       return;
     }
@@ -3661,7 +3801,7 @@
     pendingSignatureCelebrateName = null;
     if (btnForge) {
       btnForge.disabled = true;
-      btnForge.textContent = '제련 중…';
+      btnForge.textContent = tr('btn_forging');
     }
 
     try {
@@ -3725,7 +3865,7 @@
 
       // ── 성공 처리 ────────────────────────────────────────────
       if (!data.equipment) {
-        if (statusMsgEl) statusMsgEl.textContent = '서버 응답 형식 오류 — 다시 시도하세요.';
+        if (statusMsgEl) statusMsgEl.textContent = tr('server_resp_err');
         return;
       }
       const serverEquipment = data.equipment;
@@ -3764,11 +3904,11 @@
       }
     } catch {
       pendingSignatureCelebrateName = null;
-      if (statusMsgEl) statusMsgEl.textContent = '네트워크 오류로 서버에 저장하지 못했어요.';
+      if (statusMsgEl) statusMsgEl.textContent = tr('network_err');
     } finally {
       setForgeOverlay(false);
       forgeInFlight = false;
-      if (btnForge) btnForge.textContent = '⚒️ 제련하기';
+      if (btnForge) btnForge.textContent = tr('forge_btn');
       syncForgeUi();
       const sigName = pendingSignatureCelebrateName;
       pendingSignatureCelebrateName = null;
@@ -3809,7 +3949,7 @@
       syncForgeUi();
       return;
     }
-    craftedListEl.innerHTML = '<p class="log-empty">불러오는 중…</p>';
+    craftedListEl.innerHTML = '<p class="log-empty">' + tr('list_loading') + '</p>';
     try {
       const res = await apiFetch(`${platformApi}/api/craft/equipment`, {
         headers: { Authorization: `Bearer ${alpToken}` },
@@ -3824,7 +3964,7 @@
         return;
       }
       if (!res.ok) {
-        craftedListEl.innerHTML = '<p class="log-empty">목록을 불러오지 못했어요.</p>';
+        craftedListEl.innerHTML = '<p class="log-empty">' + tr('list_load_fail') + '</p>';
         serverEquipmentForgePool = [];
         refreshMaterials();
         renderMaterials();
@@ -3846,7 +3986,7 @@
       else if (data && Array.isArray(data.list)) list = data.list;
 
       if (list.length === 0) {
-        craftedListEl.innerHTML = '<p class="log-empty">아직 제작한 장비가 없습니다.</p>';
+        craftedListEl.innerHTML = '<p class="log-empty">' + tr('list_no_crafted') + '</p>';
         serverEquipmentForgePool = [];
         refreshMaterials();
         renderMaterials();
@@ -3931,7 +4071,7 @@
         craftedListEl.appendChild(row);
       });
     } catch {
-      craftedListEl.innerHTML = '<p class="log-empty">네트워크 오류로 목록을 불러오지 못했어요.</p>';
+      craftedListEl.innerHTML = '<p class="log-empty">' + tr('list_network_err') + '</p>';
       serverEquipmentForgePool = [];
       refreshMaterials();
       renderMaterials();
@@ -3981,7 +4121,7 @@
         materialDockFilter = next;
         if (next === 'module') {
           renderMaterialDockFilterUi();
-          materialListEl.innerHTML = '<p class="log-empty">불러오는 중…</p>';
+          materialListEl.innerHTML = '<p class="log-empty">' + tr('list_loading') + '</p>';
           await fetchDockModules();
         }
         renderMaterials();
@@ -4085,16 +4225,16 @@
     const timerEl = document.getElementById('eclTimer');
     if (!timerEl) return;
     timerEl.className = 'ecl-timer';
-    timerEl.textContent = `예상 대기시간 ${ECL_EXPECTED}초`;
+    timerEl.textContent = tr('custom_loading_timer', { n: ECL_EXPECTED });
     const startMs = Date.now();
     _eclTimerRef = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startMs) / 1000);
       const remaining = ECL_EXPECTED - elapsed;
       if (remaining > 0) {
-        timerEl.textContent = `예상 대기시간 ${remaining}초`;
+        timerEl.textContent = tr('ecl_timer_remaining', { n: remaining });
         timerEl.className = 'ecl-timer';
       } else {
-        timerEl.textContent = `예상 대기시간 초과 +${Math.abs(remaining)}초`;
+        timerEl.textContent = tr('ecl_timer_overdue', { n: Math.abs(remaining) });
         timerEl.className = 'ecl-timer ecl-timer--over';
       }
     }, 1000);
@@ -4783,7 +4923,7 @@
         forgeSlot = def.id;
         Object.values(slotBtns).forEach(b => b.classList.remove('forge-slot-active'));
         btn.classList.add('forge-slot-active');
-        if (btnForge) btnForge.textContent = `⚒️ ${def.label} 제련`;
+        if (btnForge) btnForge.textContent = tr('forge_specific', { label: def.label });
       });
       slotBtns[def.id] = btn;
       forgeSlotToggleEl.appendChild(btn);
@@ -5365,11 +5505,11 @@
 
   function updateRepairHud() {
     if ($repairDurInfo) {
-      $repairDurInfo.textContent = `내구도: ${repairDur} / ${repairMaxDur}`;
+      $repairDurInfo.textContent = tr('repair_dur_info_full', { cur: repairDur, max: repairMaxDur });
       $repairDurInfo.style.color = repairDur < repairMaxDur ? '#f87171' : '#4ade80';
     }
     if ($repairCoinInfo) {
-      $repairCoinInfo.textContent = `🪙 ${Math.max(0, totalCoins - repairSpent).toLocaleString()}  (-${repairSpent})`;
+      $repairCoinInfo.textContent = tr('repair_coin_info', { n: Math.max(0, totalCoins - repairSpent).toLocaleString(), spent: repairSpent });
     }
   }
 
@@ -5380,7 +5520,7 @@
     if (!alpToken || !platformApi) { repairMsg('로그인이 필요합니다.'); return; }
     repairConfirmInFlight = true;
     const btn = document.getElementById('repairConfirmBtn');
-    if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
+    if (btn) { btn.disabled = true; btn.textContent = tr('btn_processing'); }
     try {
       const url = repairItemIsModule
         ? `${platformApi}/api/modules/${encodeURIComponent(repairItem._eqId)}/repair`
@@ -5410,7 +5550,7 @@
     } catch { repairMsg('수리 중 오류가 발생했습니다.'); }
     finally {
       repairConfirmInFlight = false;
-      if (btn) { btn.disabled = false; btn.textContent = '✅ 수리 완료'; }
+      if (btn) { btn.disabled = false; btn.textContent = tr('btn_repair_done'); }
     }
   }
 
@@ -5442,12 +5582,12 @@
       const info = document.createElement('div');
       info.className = 'repair-equip-info';
       const name = document.createElement('div');
-      name.className = 'repair-equip-name'; name.textContent = item.name || '장비';
+      name.className = 'repair-equip-name'; name.textContent = item.name || tr('result_default');
       const dur = document.createElement('div');
       dur.className = 'repair-equip-dur';
       if (maxDur > 0) {
         dur.innerHTML = `<span style="color:${damaged ? '#f87171' : '#4ade80'}">${curDur}/${maxDur}</span>`;
-      } else { dur.textContent = '—'; }
+      } else { dur.textContent = tr('empty_dash'); }
       info.appendChild(name); info.appendChild(dur);
       el.appendChild(thumb); el.appendChild(info);
 
@@ -5472,7 +5612,7 @@
 
       const sep = document.createElement('p');
       sep.className = 'repair-module-section-title';
-      sep.textContent = '🔩 모듈';
+      sep.textContent = tr('modules_label');
       $repairEquipList.appendChild(sep);
 
       const TIER_COLOR = { common: '#9ca3af', rare: '#60a5fa', epic: '#c084fc', legendary: '#fbbf24' };
@@ -5628,7 +5768,7 @@
     $enhanceEquipList.innerHTML = '';
     const pool = (typeof serverEquipmentForgePool !== 'undefined' ? serverEquipmentForgePool : []);
     if (pool.length === 0) {
-      $enhanceEquipList.innerHTML = '<p style="color:rgba(200,190,240,0.4);font-size:0.8rem;padding:0.5rem">제작된 장비가 없습니다</p>';
+      $enhanceEquipList.innerHTML = '<p style="color:rgba(200,190,240,0.4);font-size:0.8rem;padding:0.5rem">' + tr('no_crafted') + '</p>';
       return;
     }
     pool.forEach((eq) => {
@@ -5672,13 +5812,13 @@
     if ($enhanceHint) {
       if (ready) {
         const smeta = ENHANCE_STONE_META[enhanceSelectedStone];
-        $enhanceHint.textContent = `${smeta.emoji} ${smeta.name}로 [${enhanceSelectedEquip.name}] 강화`;
+        $enhanceHint.textContent = tr('enhance_with_item', { emoji: smeta.emoji, sname: smeta.name, ename: enhanceSelectedEquip.name });
       } else if (!enhanceSelectedStone && !enhanceSelectedEquip) {
-        $enhanceHint.textContent = '강화 아이템과 장비를 선택하세요';
+        $enhanceHint.textContent = tr('enhance_hint');
       } else if (!enhanceSelectedStone) {
-        $enhanceHint.textContent = '강화 아이템을 선택하세요';
+        $enhanceHint.textContent = tr('enhance_pick_item');
       } else {
-        $enhanceHint.textContent = '강화할 장비를 선택하세요';
+        $enhanceHint.textContent = tr('enhance_pick_equip');
       }
     }
   }
@@ -5704,7 +5844,7 @@
       if (!enhanceSelectedStone || !enhanceSelectedEquip || $enhanceBtn.disabled) return;
       const equipId = enhanceSelectedEquip.equipmentId || enhanceSelectedEquip.id;
       $enhanceBtn.disabled = true;
-      if ($enhanceResult) { $enhanceResult.textContent = '강화 중…'; $enhanceResult.className = 'enhance-result'; }
+      if ($enhanceResult) { $enhanceResult.textContent = tr('enhance_busy'); $enhanceResult.className = 'enhance-result'; }
       try {
         const resp = await apiFetch(`${platformApi}/api/craft/equipment/${equipId}/enhance`, {
           method: 'POST',
@@ -5713,7 +5853,7 @@
         });
         const json = await resp.json();
         if (!resp.ok) {
-          if ($enhanceResult) { $enhanceResult.textContent = json?.error?.message || '강화 실패'; $enhanceResult.className = 'enhance-result enhance-result--fail'; }
+          if ($enhanceResult) { $enhanceResult.textContent = json?.error?.message || tr('enhance_fail_default'); $enhanceResult.className = 'enhance-result enhance-result--fail'; }
           $enhanceBtn.disabled = false;
           return;
         }
@@ -5725,15 +5865,15 @@
           const pool = (typeof serverEquipmentForgePool !== 'undefined' ? serverEquipmentForgePool : []);
           const poolItem = pool.find(e => (e.equipmentId || e.id) === equipId);
           if (poolItem && json.stats) { poolItem.stats = json.stats; enhanceSelectedEquip = poolItem; }
-          if ($enhanceResult) { $enhanceResult.textContent = '✅ 강화 성공!'; $enhanceResult.className = 'enhance-result enhance-result--success'; }
+          if ($enhanceResult) { $enhanceResult.textContent = tr('enhance_success'); $enhanceResult.className = 'enhance-result enhance-result--success'; }
         } else {
-          if ($enhanceResult) { $enhanceResult.textContent = '💔 강화 실패… 아이템만 소모됐습니다.'; $enhanceResult.className = 'enhance-result enhance-result--fail'; }
+          if ($enhanceResult) { $enhanceResult.textContent = tr('enhance_fail_msg'); $enhanceResult.className = 'enhance-result enhance-result--fail'; }
         }
         renderEnhanceStones();
         renderEnhanceEquipList();
         updateEnhanceBtn();
       } catch (e) {
-        if ($enhanceResult) { $enhanceResult.textContent = '오류가 발생했습니다.'; $enhanceResult.className = 'enhance-result enhance-result--fail'; }
+        if ($enhanceResult) { $enhanceResult.textContent = tr('error_occurred'); $enhanceResult.className = 'enhance-result enhance-result--fail'; }
         $enhanceBtn.disabled = false;
       }
     });
@@ -5854,7 +5994,7 @@
       renderModuleCraftSlots();
       renderModuleCraftStock();
     } catch (e) {
-      if ($moduleEquipList) $moduleEquipList.innerHTML = '<p style="color:rgba(200,180,240,0.4);font-size:0.78rem;padding:0.5rem">불러오기 실패</p>';
+      if ($moduleEquipList) $moduleEquipList.innerHTML = '<p style="color:rgba(200,180,240,0.4);font-size:0.78rem;padding:0.5rem">' + tr('list_load_fail_short') + '</p>';
     }
   }
 
@@ -5862,7 +6002,7 @@
     if (!$moduleEquipList) return;
     $moduleEquipList.innerHTML = '';
     if (!pool || pool.length === 0) {
-      $moduleEquipList.innerHTML = '<p style="color:rgba(200,180,240,0.4);font-size:0.78rem;padding:0.5rem">장비가 없습니다</p>';
+      $moduleEquipList.innerHTML = '<p style="color:rgba(200,180,240,0.4);font-size:0.78rem;padding:0.5rem">' + tr('no_gear') + '</p>';
       return;
     }
     pool.forEach(eq => {
