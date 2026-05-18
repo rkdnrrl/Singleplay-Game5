@@ -105,7 +105,7 @@
         const nw = Math.max(MIN_W, Math.min(MAX_W, sW + delta));
         state.size = { w: Math.round(nw), h: Math.round(nw * ASPECT) };
         wrapper.style.width = state.size.w + 'px';
-        wrapper.style.height = (state.size.h + TOOLBAR_H) + 'px';
+        wrapper.style.height = state.size.h + 'px';
         applyIframeStyle();
       }
       function onUp() {
