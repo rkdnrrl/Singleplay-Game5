@@ -621,6 +621,79 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyHtmlI18n);
   else applyHtmlI18n();
 
+  /* ── 보상형 광고 헬퍼 (placeholder). 구독자는 광고 스킵 + 즉시 보상 ── */
+  let alpIsSubscribed = false;
+  function showRewardedAd({ durationSec = 5, rewardLabel = '' } = {}) {
+    return new Promise((resolve) => {
+      if (alpIsSubscribed) { resolve(true); return; }
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:#fff;border-radius:8px;padding:20px;max-width:420px;width:100%;text-align:center;font-family:sans-serif;color:#111;';
+      box.innerHTML = `
+        <h3 style="margin:0 0 8px;font-size:18px;font-weight:600;">광고 시청 후 보상</h3>
+        ${rewardLabel ? `<p style="margin:0 0 12px;color:#059669;font-size:13px;">보상: ${rewardLabel}</p>` : ''}
+        <div style="aspect-ratio:16/9;border:1px dashed #d4d4d8;background:#f4f4f5;color:#a1a1aa;display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:13px;margin-bottom:12px;">보상형 광고 (placeholder)</div>
+        <p data-timer style="font-size:13px;color:#52525b;margin:0 0 12px;"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button data-cancel style="padding:8px 16px;border:1px solid #d4d4d8;background:#fff;border-radius:4px;font-size:13px;cursor:pointer;">취소</button>
+          <button data-claim disabled style="padding:8px 16px;border:0;background:#059669;color:#fff;border-radius:4px;font-size:13px;cursor:not-allowed;opacity:0.5;">보상 받기</button>
+        </div>`;
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      const timerEl = box.querySelector('[data-timer]');
+      const cancelBtn = box.querySelector('[data-cancel]');
+      const claimBtn = box.querySelector('[data-claim]');
+      let remaining = durationSec;
+      timerEl.textContent = `${remaining}초 후 보상을 받을 수 있어요`;
+      const id = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(id);
+          timerEl.textContent = '광고 시청 완료! 보상을 받으세요.';
+          claimBtn.disabled = false;
+          claimBtn.style.cursor = 'pointer';
+          claimBtn.style.opacity = '1';
+        } else {
+          timerEl.textContent = `${remaining}초 후 보상을 받을 수 있어요`;
+        }
+      }, 1000);
+      const close = (granted) => { clearInterval(id); overlay.remove(); resolve(granted); };
+      cancelBtn.onclick = () => close(false);
+      claimBtn.onclick = () => close(true);
+    });
+  }
+  window.alpShowRewardedAd = showRewardedAd;
+
+  /** 제련 후 광고 시청 → 보너스 코인 +8 */
+  async function offerSmeltAdBonus() {
+    if (!alpToken || !platformApi) return;
+    if (!confirm('제련 완료! 광고를 보고 보너스 코인 +8을 받으시겠습니까?')) return;
+    const watched = await window.alpShowRewardedAd({ rewardLabel: '코인 +8' });
+    if (!watched) return;
+    try {
+      const res = await apiFetch(`${platformApi}/api/ads/reward`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alpToken}` },
+        body: JSON.stringify({ rewardType: 'smelt_free' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setFurnaceMsg(err?.error?.message || '광고 보상을 받을 수 없습니다.');
+        window.setTimeout(() => setFurnaceMsg(''), 3000);
+        return;
+      }
+      const { coinsGranted } = await res.json();
+      totalCoins += coinsGranted;
+      updateCoinDisplay();
+      setFurnaceMsg(`🪙 광고 보상 +${coinsGranted} 코인 지급!`);
+      window.setTimeout(() => setFurnaceMsg(''), 3000);
+    } catch {
+      setFurnaceMsg('네트워크 오류로 보상을 받을 수 없습니다.');
+      window.setTimeout(() => setFurnaceMsg(''), 3000);
+    }
+  }
+
   /* ── 캐릭터 위젯 — React 컴포넌트와 동일 기능 (드래그 바, 리사이즈 핸들, localStorage 저장) ── */
   function mountCharacterWidget(userId, { app = 'platform' } = {}) {
     if (document.getElementById('assistant-iframe')) return;
@@ -1902,6 +1975,7 @@
         });
         if (meRes.ok) {
           const me = await meRes.json();
+          alpIsSubscribed = !!me?.user?.isSubscribed;
           const cuid = me?.user?.commonUserId || me?.user?.id;
           if (cuid) mountCharacterWidget(cuid, { app: 'platform', storageKey: 'alp_charwidget' });
         }
@@ -2289,6 +2363,8 @@
       renderSmeltStock();
       void refreshCraftedList();
       window.setTimeout(() => setFurnaceMsg(''), 3000);
+      // 제련 성공 후: 광고 보고 보너스 코인 제안 (비동기, 결과 처리와 무관)
+      void offerSmeltAdBonus();
     } catch {
       setFurnaceMsg('네트워크 오류로 녹이기에 실패했어요.');
       window.setTimeout(() => setFurnaceMsg(''), 4200);
