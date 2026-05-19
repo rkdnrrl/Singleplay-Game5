@@ -1164,6 +1164,7 @@
   const FORGE_DRAG_MATERIAL_UID = 'application/x-forge-material-uid';
   const FORGE_DRAG_SMELT_UID = 'application/x-forge-smelt-id';
   const FORGE_DRAG_MODULE_ID = 'application/x-forge-module-id';
+  const FORGE_DRAG_ANVIL_FROM = 'application/x-forge-anvil-from'; // 모루 슬롯 → 슬롯 이동
   const SMELT_CATEGORY_NAMES = {
     all: '전체',
     metal: '금속',
@@ -3545,40 +3546,83 @@
         const cell = document.createElement('div');
         cell.setAttribute('data-slot', String(i));
 
+        const slotIdx = i;
         if (m) {
           cell.className = 'forge-grid-cell forge-grid-cell--filled';
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'fgc-remove-btn';
           const label = m.name.length > 5 ? m.name.slice(0, 4) + '…' : m.name;
-          btn.title = `${m.name}  클릭하여 빼기`;
+          btn.title = `${m.name}  클릭하여 빼기 · 드래그하여 슬롯 이동`;
           btn.innerHTML = `<span class="fgc-emoji">${escapeHtml(m.emoji || '◆')}</span>`
             + `<span class="fgc-name">${escapeHtml(label)}</span>`;
           btn.addEventListener('click', () => removeSelectedUid(m.uid));
+          // 드래그 시작: 같은 모루 안에서 슬롯간 이동
+          btn.setAttribute('draggable', 'true');
+          btn.addEventListener('dragstart', (e) => {
+            try {
+              e.dataTransfer.setData(FORGE_DRAG_ANVIL_FROM, String(slotIdx));
+              e.dataTransfer.setData('text/plain', `anvil-from:${slotIdx}`);
+              e.dataTransfer.effectAllowed = 'move';
+            } catch { /* ignore */ }
+            cell.classList.add('forge-grid-cell--dragging');
+          });
+          btn.addEventListener('dragend', () => {
+            cell.classList.remove('forge-grid-cell--dragging');
+          });
           cell.appendChild(btn);
         } else {
           cell.className = 'forge-grid-cell forge-grid-cell--empty';
           const _slotNouns = SLOT_ITEM_NOUNS[forgeSlot] || SLOT_ITEM_NOUNS.weapon;
           cell.innerHTML = `<span class="fgc-slot-noun">${_slotNouns[i] || (i + 1)}</span>`;
-          const slotIdx = i;
-          cell.addEventListener('dragover', (e) => {
-            if (!readSmeltDragSid(e.dataTransfer) && !e.dataTransfer.types.includes('text/plain')) return;
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'copy';
-            cell.classList.add('forge-grid-cell--drag-over');
-          });
-          cell.addEventListener('dragleave', (e) => {
-            if (!cell.contains(e.relatedTarget)) cell.classList.remove('forge-grid-cell--drag-over');
-          });
-          cell.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            cell.classList.remove('forge-grid-cell--drag-over');
+        }
+        // 빈 슬롯 + 채워진 슬롯 모두 드롭 수락 (모루↔모루 이동 / 새 산출물 추가 / 채워진 슬롯엔 교환)
+        cell.addEventListener('dragover', (e) => {
+          const types = e.dataTransfer.types;
+          const isAnvilMove = types.includes(FORGE_DRAG_ANVIL_FROM);
+          const isNewSmelt = readSmeltDragSid(e.dataTransfer) || types.includes('text/plain');
+          if (!isAnvilMove && !isNewSmelt) return;
+          // 빈 슬롯: 모두 허용 / 채워진 슬롯: 모루 이동(교환)만 허용
+          if (m && !isAnvilMove) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = isAnvilMove ? 'move' : 'copy';
+          cell.classList.add('forge-grid-cell--drag-over');
+        });
+        cell.addEventListener('dragleave', (e) => {
+          if (!cell.contains(e.relatedTarget)) cell.classList.remove('forge-grid-cell--drag-over');
+        });
+        cell.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cell.classList.remove('forge-grid-cell--drag-over');
+          // 1) 모루 슬롯 내부 이동 (또는 교환)
+          let fromRaw = '';
+          try { fromRaw = e.dataTransfer.getData(FORGE_DRAG_ANVIL_FROM); } catch {}
+          if (!fromRaw) {
+            try {
+              const tp = e.dataTransfer.getData('text/plain');
+              if (tp && tp.startsWith('anvil-from:')) fromRaw = tp.slice('anvil-from:'.length);
+            } catch {}
+          }
+          if (fromRaw) {
+            const fromIdx = parseInt(fromRaw, 10);
+            if (!Number.isNaN(fromIdx) && fromIdx !== slotIdx
+                && fromIdx >= 0 && fromIdx < selected.length
+                && selected[fromIdx]) {
+              const tmp = selected[slotIdx];
+              selected[slotIdx] = selected[fromIdx];
+              selected[fromIdx] = tmp; // 비어있으면 null이 들어가 자동 이동, 차있으면 교환
+              syncForgeUi();
+            }
+            return;
+          }
+          // 2) 외부 산출물 추가 (빈 슬롯만)
+          if (!m) {
             const sid = readSmeltDragSid(e.dataTransfer);
             if (sid) tryAddSmeltToAnvilAtSlot(sid, slotIdx);
-          });
-        }
+          }
+        });
         selectedSlotsEl.appendChild(cell);
       }
     }
