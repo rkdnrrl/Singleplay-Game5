@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   'use strict';
 
   /* ── i18n ── */
@@ -622,142 +622,108 @@
   else applyHtmlI18n();
 
   /* ── 캐릭터 위젯 — React 컴포넌트와 동일 기능 (드래그 바, 리사이즈 핸들, localStorage 저장) ── */
-  function mountCharacterWidget(userId, { app = 'platform', bottomOffset = 0, storageKey = 'charwidget' } = {}) {
-    if (document.getElementById('assistant-widget')) return;
+  function mountCharacterWidget(userId, { app = 'platform' } = {}) {
+    if (document.getElementById('assistant-iframe')) return;
     const IFRAME_SRC = 'https://assistant-chi-two.vercel.app';
-    const NATURAL_W = 220, NATURAL_H = 390, ASPECT = NATURAL_H / NATURAL_W;
-    const DESKTOP_W = 220, MOBILE_W = 140, MIN_W = 80, MAX_W = 360;
-    const isMobile = () => window.innerWidth < 640;
-    const load = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); if (v != null) return v; } catch (e) {} return f; };
-    const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-    const defaultSize = { w: isMobile() ? MOBILE_W : DESKTOP_W, h: Math.round((isMobile() ? MOBILE_W : DESKTOP_W) * ASPECT) };
-    const state = {
-      pos:  load(storageKey + '_pos',  { x: -1, y: -1 }),
-      size: load(storageKey + '_size', defaultSize),
-      blocked: false,
-    };
 
-    const TOOLBAR_H = 32;
+    const loader = document.createElement('div');
+    loader.id = 'assistant-loader';
+    loader.style.cssText = 'position:fixed;inset:0;z-index:10000;background:#0f0920;display:flex;align-items:center;justify-content:center;';
+    const spin = document.createElement('div');
+    spin.style.cssText = 'width:40px;height:40px;border:4px solid #58CC02;border-top-color:transparent;border-radius:50%;animation:assistant-spin 1s linear infinite;';
+    loader.appendChild(spin);
+    if (!document.getElementById('assistant-spin-style')) {
+      const st = document.createElement('style');
+      st.id = 'assistant-spin-style';
+      st.textContent = '@keyframes assistant-spin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(st);
+    }
+    document.body.appendChild(loader);
 
-    const wrapper = document.createElement('div');
-    wrapper.id = 'assistant-widget';
-    const pos0 = state.pos.x >= 0 ? `left:${state.pos.x}px;top:${state.pos.y}px;` : `right:0;bottom:${bottomOffset}px;`;
-    wrapper.style.cssText = `position:fixed;${pos0}width:${state.size.w}px;height:${state.size.h}px;z-index:9999;background:transparent;`;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+    svg.style.cssText = 'position:absolute;';
+    const defs = document.createElementNS(svgNS, 'defs');
+    const clip = document.createElementNS(svgNS, 'clipPath');
+    clip.setAttribute('id', 'assistantClip');
+    clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+    document.body.appendChild(svg);
 
     const iframe = document.createElement('iframe');
-    iframe.src = `${IFRAME_SRC}?userId=${encodeURIComponent(userId)}&app=${encodeURIComponent(app)}`;
+    iframe.id = 'assistant-iframe';
+    iframe.src = IFRAME_SRC + '?userId=' + encodeURIComponent(userId)
+      + '&app=' + encodeURIComponent(app)
+      + '&size=large&externalBubbles=1';
     iframe.setAttribute('allow', 'autoplay');
-    function applyIframeStyle() {
-      const scale = state.size.w / NATURAL_W;
-      iframe.style.cssText = `width:${NATURAL_W}px;height:${NATURAL_H}px;border:none;background:transparent;pointer-events:${state.blocked ? 'none' : 'auto'};transform:scale(${scale});transform-origin:bottom right;position:absolute;bottom:0;right:0;will-change:transform;`;
+    iframe.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;background:transparent;clip-path:inset(100%);z-index:9999;';
+    document.body.appendChild(iframe);
+
+    const bubbleHost = document.createElement('div');
+    bubbleHost.id = 'assistant-bubble-host';
+    bubbleHost.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:10000;';
+    document.body.appendChild(bubbleHost);
+    const bubbles = {};
+
+    function updateClip(bounds) {
+      while (clip.firstChild) clip.removeChild(clip.firstChild);
+      bounds.forEach(b => {
+        const r = document.createElementNS(svgNS, 'rect');
+        r.setAttribute('x', b.x); r.setAttribute('y', b.y);
+        r.setAttribute('width', b.w); r.setAttribute('height', b.h);
+        clip.appendChild(r);
+      });
+      iframe.style.clipPath = bounds.length > 0 ? 'url(#assistantClip)' : 'inset(100%)';
     }
-    applyIframeStyle();
-    wrapper.appendChild(iframe);
 
-    const blocker = document.createElement('div');
-    blocker.style.cssText = 'position:absolute;inset:0;z-index:2;display:none;';
-    wrapper.appendChild(blocker);
-
-    // 툴바 — 캐릭터 위에 오버레이
-    const toolbar = document.createElement('div');
-    toolbar.style.cssText = `position:absolute;top:0;left:0;right:0;height:${TOOLBAR_H}px;display:flex;align-items:center;background:rgba(30,30,40,0.85);border-radius:8px 8px 0 0;box-shadow:0 -1px 0 rgba(255,255,255,0.15) inset;z-index:3;`;
-
-    const resizeHandle = document.createElement('div');
-    resizeHandle.style.cssText = `width:32px;height:${TOOLBAR_H}px;cursor:nwse-resize;display:flex;align-items:center;justify-content:center;`;
-    const resizeInner = document.createElement('div');
-    resizeInner.style.cssText = 'width:12px;height:12px;border-top:2.5px solid #fff;border-left:2.5px solid #fff;border-radius:2px 0 0 0;';
-    resizeHandle.appendChild(resizeInner);
-    toolbar.appendChild(resizeHandle);
-
-    const dragBar = document.createElement('div');
-    dragBar.style.cssText = `flex:1;height:${TOOLBAR_H}px;cursor:grab;display:flex;align-items:center;justify-content:center;`;
-    const dragInner1 = document.createElement('div');
-    dragInner1.style.cssText = 'width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.6);';
-    const dragInner2 = document.createElement('div');
-    dragInner2.style.cssText = 'width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.6);margin-left:4px;';
-    dragBar.appendChild(dragInner1); dragBar.appendChild(dragInner2);
-    toolbar.appendChild(dragBar);
-
-    wrapper.appendChild(toolbar);
-    document.body.appendChild(wrapper);
-
-    function setBlocked(b) { state.blocked = b; blocker.style.display = b ? 'block' : 'none'; applyIframeStyle(); }
-    function switchToLeftTop() {
-      if (state.pos.x >= 0) return;
-      const r = wrapper.getBoundingClientRect();
-      state.pos = { x: r.left, y: r.top };
-      wrapper.style.right = ''; wrapper.style.bottom = '';
-      wrapper.style.left = r.left + 'px'; wrapper.style.top = r.top + 'px';
+    function showBubble(d) {
+      let el = bubbles[d.id];
+      if (!el) {
+        el = document.createElement('div');
+        el.style.cssText = 'position:fixed;pointer-events:none;background:rgba(20,15,40,0.95);color:#fff;padding:8px 14px;border-radius:16px;border:1.5px solid rgba(168,85,247,0.4);box-shadow:0 4px 16px rgba(0,0,0,.5);font-size:12px;font-weight:600;max-width:220px;text-align:center;line-height:1.4;z-index:10000;';
+        bubbleHost.appendChild(el);
+        bubbles[d.id] = el;
+      }
+      el.textContent = d.text;
+      el.style.left = d.x + 'px';
+      el.style.top  = d.y + 'px';
+      el.style.transform = 'translateX(-50%)' + ((d.anchor === 'above' || !d.anchor) ? ' translateY(-100%)' : '');
     }
-    function startDrag(e) {
-      e.preventDefault(); e.stopPropagation();
-      switchToLeftTop();
-      const sMx = e.touches ? e.touches[0].clientX : e.clientX;
-      const sMy = e.touches ? e.touches[0].clientY : e.clientY;
-      const sX = state.pos.x, sY = state.pos.y;
-      setBlocked(true);
-      function onMove(ev) {
-        if (ev.cancelable) ev.preventDefault();
-        const t = ev.touches ? ev.touches[0] : ev;
-        const nx = Math.max(0, Math.min(window.innerWidth  - state.size.w, sX + t.clientX - sMx));
-        const ny = Math.max(0, Math.min(window.innerHeight - state.size.h, sY + t.clientY - sMy));
-        state.pos = { x: nx, y: ny };
-        wrapper.style.left = nx + 'px'; wrapper.style.top = ny + 'px';
-      }
-      function onUp() {
-        setBlocked(false); save(storageKey + '_pos', state.pos);
-        document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
-        document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp);
-      }
-      document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
-      document.addEventListener('touchmove', onMove, { passive: false }); document.addEventListener('touchend', onUp);
+    function hideBubble(id) {
+      const el = bubbles[id];
+      if (el) { el.remove(); delete bubbles[id]; }
     }
-    function startResize(e) {
-      e.preventDefault(); e.stopPropagation();
-      const sMx = e.touches ? e.touches[0].clientX : e.clientX;
-      const sMy = e.touches ? e.touches[0].clientY : e.clientY;
-      const sW = state.size.w;
-      setBlocked(true);
-      function onMove(ev) {
-        if (ev.cancelable) ev.preventDefault();
-        const t = ev.touches ? ev.touches[0] : ev;
-        const delta = ((sMx - t.clientX) + (sMy - t.clientY)) / 2;
-        const nw = Math.max(MIN_W, Math.min(MAX_W, sW + delta));
-        state.size = { w: Math.round(nw), h: Math.round(nw * ASPECT) };
-        wrapper.style.width = state.size.w + 'px';
-        wrapper.style.height = state.size.h + 'px';
-        applyIframeStyle();
-      }
-      function onUp() {
-        setBlocked(false); save(storageKey + '_size', state.size);
-        document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
-        document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp);
-      }
-      document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
-      document.addEventListener('touchmove', onMove, { passive: false }); document.addEventListener('touchend', onUp);
-    }
-    dragBar.addEventListener('mousedown', startDrag);
-    dragBar.addEventListener('touchstart', startDrag, { passive: false });
-    resizeHandle.addEventListener('mousedown', startResize);
-    resizeHandle.addEventListener('touchstart', startResize, { passive: false });
 
-    document.addEventListener('mousemove', (e) => {
-      const p = state.pos, s = state.size;
-      const elX = p.x >= 0 ? p.x : window.innerWidth  - s.w;
-      const elY = p.y >= 0 ? p.y : window.innerHeight - s.h - bottomOffset;
-      const scale = s.w / NATURAL_W;
-      iframe.contentWindow && iframe.contentWindow.postMessage({
-        type: 'assistant:mousemove',
-        x: (e.clientX - elX) / scale,
-        y: (e.clientY - elY) / scale,
-      }, '*');
-    });
-    window.addEventListener('message', (e) => {
-      if (e.data && e.data.type === 'assistant:navigate' && typeof e.data.url === 'string') {
-        window.open(e.data.url, '_blank');
+    let firstBoundsTime = 0;
+    let readyTimer = null;
+    let removed = false;
+    function setReady() { if (removed) return; removed = true; loader.remove(); }
+
+    function onMsg(e) {
+      const d = e.data;
+      if (!d || !d.type) return;
+      if (d.type === 'assistant:bounds') {
+        const arr = Array.isArray(d.bounds) ? d.bounds : [d.bounds];
+        updateClip(arr);
+        if (firstBoundsTime === 0) { firstBoundsTime = Date.now(); readyTimer = setTimeout(setReady, 3000); }
       }
-    });
+      if (d.type === 'assistant:navigate' && typeof d.url === 'string') window.open(d.url, '_blank');
+      if (d.type === 'assistant:bubble:show') showBubble(d);
+      if (d.type === 'assistant:bubble:hide') hideBubble(d.id);
+    }
+    window.addEventListener('message', onMsg);
+    const fallback = setTimeout(setReady, 15000);
+
+    function onMove(e) {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'assistant:mousemove', x: e.clientX, y: e.clientY }, '*');
+      }
+    }
+    document.addEventListener('mousemove', onMove);
   }
+
 
   /* ── 튜토리얼 시스템 — 첫 방문 자동 오버레이 + ? 버튼으로 재시도 ── */
   function mountTutorial({ storageKey, steps, helpButtonPos = { top: 12, left: 12 } }) {
