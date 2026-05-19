@@ -667,6 +667,31 @@
     document.body.appendChild(bubbleHost);
     const bubbles = {};
 
+    let currentCharBound = null;
+    const BASE_CHAR_WIDTH = 200;
+
+    function applyBubbleStyle(el, scale) {
+      el.style.padding = (8 * scale) + 'px ' + (14 * scale) + 'px';
+      el.style.borderRadius = (16 * scale) + 'px';
+      el.style.border = (1.5 * scale) + 'px solid rgba(168,85,247,0.4)';
+      el.style.boxShadow = '0 ' + (4 * scale) + 'px ' + (16 * scale) + 'px rgba(0,0,0,.5)';
+      el.style.fontSize = (12 * scale) + 'px';
+      el.style.maxWidth = (220 * scale) + 'px';
+    }
+    function positionBubble(el, scale) {
+      if (!currentCharBound) return;
+      const cx = currentCharBound.x + currentCharBound.w / 2;
+      const topY = currentCharBound.y - 8 * scale;
+      el.style.left = cx + 'px';
+      el.style.top  = topY + 'px';
+      el.style.transform = 'translateX(-50%) translateY(-100%)';
+    }
+    function repositionAllBubbles() {
+      if (!currentCharBound) return;
+      const scale = Math.max(0.5, Math.min(2.5, currentCharBound.w / BASE_CHAR_WIDTH));
+      Object.values(bubbles).forEach(el => { applyBubbleStyle(el, scale); positionBubble(el, scale); });
+    }
+
     function updateClip(bounds) {
       while (clip.firstChild) clip.removeChild(clip.firstChild);
       bounds.forEach(b => {
@@ -676,20 +701,22 @@
         clip.appendChild(r);
       });
       iframe.style.clipPath = bounds.length > 0 ? 'url(#assistantClip)' : 'inset(100%)';
+      currentCharBound = bounds.find(b => b.kind === 'character') || bounds[0] || null;
+      repositionAllBubbles();
     }
 
     function showBubble(d) {
+      const scale = currentCharBound ? Math.max(0.5, Math.min(2.5, currentCharBound.w / BASE_CHAR_WIDTH)) : 1;
       let el = bubbles[d.id];
       if (!el) {
         el = document.createElement('div');
-        el.style.cssText = 'position:fixed;pointer-events:none;background:rgba(20,15,40,0.95);color:#fff;padding:8px 14px;border-radius:16px;border:1.5px solid rgba(168,85,247,0.4);box-shadow:0 4px 16px rgba(0,0,0,.5);font-size:12px;font-weight:600;max-width:220px;text-align:center;line-height:1.4;z-index:10000;';
+        el.style.cssText = 'position:fixed;pointer-events:none;background:rgba(20,15,40,0.95);color:#fff;font-weight:600;text-align:center;line-height:1.4;white-space:pre-wrap;z-index:10000;';
         bubbleHost.appendChild(el);
         bubbles[d.id] = el;
       }
       el.textContent = d.text;
-      el.style.left = d.x + 'px';
-      el.style.top  = d.y + 'px';
-      el.style.transform = 'translateX(-50%)' + ((d.anchor === 'above' || !d.anchor) ? ' translateY(-100%)' : '');
+      applyBubbleStyle(el, scale);
+      positionBubble(el, scale);
     }
     function hideBubble(id) {
       const el = bubbles[id];
