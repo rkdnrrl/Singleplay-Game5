@@ -626,20 +626,6 @@
     if (document.getElementById('assistant-iframe')) return;
     const IFRAME_SRC = 'https://assistant-chi-two.vercel.app';
 
-    const loader = document.createElement('div');
-    loader.id = 'assistant-loader';
-    loader.style.cssText = 'position:fixed;inset:0;z-index:10000;background:#0f0920;display:flex;align-items:center;justify-content:center;';
-    const spin = document.createElement('div');
-    spin.style.cssText = 'width:40px;height:40px;border:4px solid #58CC02;border-top-color:transparent;border-radius:50%;animation:assistant-spin 1s linear infinite;';
-    loader.appendChild(spin);
-    if (!document.getElementById('assistant-spin-style')) {
-      const st = document.createElement('style');
-      st.id = 'assistant-spin-style';
-      st.textContent = '@keyframes assistant-spin{to{transform:rotate(360deg)}}';
-      document.head.appendChild(st);
-    }
-    document.body.appendChild(loader);
-
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
@@ -723,25 +709,18 @@
       if (el) { el.remove(); delete bubbles[id]; }
     }
 
-    let firstBoundsTime = 0;
-    let readyTimer = null;
-    let removed = false;
-    function setReady() { if (removed) return; removed = true; loader.remove(); }
-
     function onMsg(e) {
       const d = e.data;
       if (!d || !d.type) return;
       if (d.type === 'assistant:bounds') {
         const arr = Array.isArray(d.bounds) ? d.bounds : [d.bounds];
         updateClip(arr);
-        if (firstBoundsTime === 0) { firstBoundsTime = Date.now(); readyTimer = setTimeout(setReady, 3000); }
       }
       if (d.type === 'assistant:navigate' && typeof d.url === 'string') window.open(d.url, '_blank');
       if (d.type === 'assistant:bubble:show') showBubble(d);
       if (d.type === 'assistant:bubble:hide') hideBubble(d.id);
     }
     window.addEventListener('message', onMsg);
-    const fallback = setTimeout(setReady, 15000);
 
     function onMove(e) {
       if (iframe.contentWindow) {
